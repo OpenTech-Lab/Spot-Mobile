@@ -81,6 +81,23 @@ class _FeedScreenState extends State<FeedScreen> {
     await _initFeed();
   }
 
+  Future<void> _reportPost(MediaPost post) async {
+    try {
+      await widget.nostrService.reportContent(
+        eventId: post.nostrEventId,
+        contentHash: post.contentHash,
+        reason: 'harmful',
+        wallet: widget.wallet,
+      );
+      setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Reported. Content hidden.')),
+        );
+      }
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: SpotColors.bg,
@@ -108,6 +125,7 @@ class _FeedScreenState extends State<FeedScreen> {
           return PostThreadRow(
             post: post,
             isLast: i == _posts.length - 1,
+            onReport: () => _reportPost(post),
             onReply: () => Navigator.of(ctx).push(
               MaterialPageRoute(
                 builder: (_) => CameraScreen(

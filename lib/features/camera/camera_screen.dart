@@ -11,6 +11,7 @@ import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/camera_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
@@ -167,6 +168,8 @@ class _CameraScreenState extends State<CameraScreen>
 
     try {
       await widget.nostrService.publishMediaPost(post, widget.wallet);
+      // Register in local cache (enforces 5 GB cap) then seed to swarm
+      await CacheManager.instance.addToCache(contentHash, mediaFile.path);
       await P2PService.instance.seedMedia(mediaFile.path, contentHash);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

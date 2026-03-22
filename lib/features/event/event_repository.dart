@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:mobile/features/nostr/nostr_models.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
+import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
+import 'package:mobile/services/cache_manager.dart';
 
 /// Aggregates raw [NostrEvent]s from relays into [CivicEvent] domain objects.
 ///
@@ -33,6 +35,7 @@ class EventRepository {
   Stream<CivicEvent> subscribeToEvents() {
     _globalSubId ??= _nostr.subscribe(
       [
+        // kind-1: media posts (app-filtered)
         NostrFilter(
           kinds: [1],
           limit: 50,
@@ -41,6 +44,9 @@ class EventRepository {
           // others send more, and the client-side check below discards them.
           tags: {'app': ['spot']},
         ),
+        // kind-5: revocation events (spec v1.4 §12 "Deletion Flow")
+        // kind-1984: community reports (spec v1.4 §12.B)
+        NostrFilter(kinds: [5, 1984], limit: 100, tags: {'app': ['spot']}),
       ],
       _handleNostrEvent,
     );
@@ -116,11 +122,57 @@ class EventRepository {
 
   void _handleNostrEvent(NostrEvent event) {
     // Client-side guard: discard events not tagged as Spot-originated.
-    // This handles relays that ignored the #app filter in the subscription.
     if (event.getTagValue('app') != 'spot') return;
 
+    switch (event.kind) {
+      case 5:
+        _handleRevocation(event);
+      case 1984:
+        _handleReport(event);
+      default:
+        _handleMediaPost(event);
+    }
+  }
+
+  /// Spec v1.4 §12 "Deletion Flow" step 2: hide revoked content immediately.
+  void _handleRevocation(NostrEvent event) {
+    final contentHash = event.getTagValue('media_hash');
+    if (contentHash != null) {
+      CacheManager.instance.block(contentHash); // local block
+      P2PService.instance.dropFromCache(contentHash); // drop swarm cache
+      // Remove any in-memory posts matching this content hash
+      for (final key in _cache.keys.toList()) {
+        final civic = _cache[key]!;
+        final updated =
+            civic.posts.where((p) => p.contentHash != contentHash).toList();
+        if (updated.length != civic.posts.length) {
+          _cache[key] = civic.copyWith(
+            posts: updated,
+            participantCount:
+                updated.map((p) => p.pubkey).toSet().length,
+          );
+          if (!_controller.isClosed) _controller.add(_cache[key]!);
+        }
+      }
+    }
+  }
+
+  /// Spec v1.4 §12.B: propagate community reports to local blocklist.
+  void _handleReport(NostrEvent event) {
+    final contentHash = event.getTagValue('media_hash');
+    if (contentHash != null) {
+      CacheManager.instance.block(contentHash);
+      P2PService.instance.dropFromCache(contentHash);
+    }
+  }
+
+  void _handleMediaPost(NostrEvent event) {
     final hashtag = event.getTagValue('t');
     if (hashtag == null) return;
+
+    final contentHash = event.getTagValue('media_hash') ?? event.id;
+    // Client-side blocklist filter (spec v1.4 §12.B)
+    if (CacheManager.instance.isBlocked(contentHash)) return;
 
     final post = _nostrEventToMediaPost(event, hashtag);
     _mergePost(hashtag, post);

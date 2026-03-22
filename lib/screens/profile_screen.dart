@@ -87,17 +87,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _deletePost(MediaPost post) async {
-    // Optimistic removal
+    // Optimistic removal from UI
     setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
     try {
-      await widget.nostrService.deletePost(post.nostrEventId, widget.wallet);
+      // Publish revocation event (kind-5) with content hash (spec v1.4 §12)
+      await widget.nostrService.deletePost(
+        post.nostrEventId,
+        post.contentHash,
+        widget.wallet,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Post deleted')),
+          const SnackBar(
+            content: Text(
+              'Post deleted. Swarm participants will be notified to remove local copies.',
+            ),
+          ),
         );
       }
     } catch (e) {
-      // Restore post if delete failed
+      // Restore post on failure
       if (mounted) {
         setState(() {
           final restored = [..._posts, post]
@@ -109,6 +118,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
     }
+  }
+
+  Future<void> _reportPost(MediaPost post) async {
+    try {
+      await widget.nostrService.reportContent(
+        eventId: post.nostrEventId,
+        contentHash: post.contentHash,
+        reason: 'harmful',
+        wallet: widget.wallet,
+      );
+      // Also block locally so it disappears from this user's feed
+      setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Reported. Content hidden.')),
+        );
+      }
+    } catch (_) {}
   }
 
   void _openSettings() {
@@ -222,6 +249,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       onDelete: () => _deletePost(post),
+                      onReport: () => _reportPost(post),
                     );
                   },
                   childCount: _posts.length,

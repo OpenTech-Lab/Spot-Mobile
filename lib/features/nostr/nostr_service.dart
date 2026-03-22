@@ -161,12 +161,17 @@ class NostrService {
     return signed;
   }
 
-  /// Publishes a NIP-09 kind-5 deletion event for [eventId].
-  Future<void> deletePost(String eventId, WalletModel wallet) async {
+  /// Publishes a NIP-09 kind-5 revocation event for [eventId].
+  ///
+  /// Spec v1.4 §12 "Deletion Flow" step 1: include the content hash so that
+  /// compliant clients can block by hash in addition to event ID.
+  Future<void> deletePost(
+      String eventId, String contentHash, WalletModel wallet) async {
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
     final tags = <List<String>>[
       ['e', eventId],
+      ['media_hash', contentHash], // hash-based revocation (spec v1.4 §12)
       ['app', 'spot'],
     ];
 
@@ -177,6 +182,59 @@ class NostrService {
       kind: 5, // NIP-09 deletion
       tags: tags,
       content: '',
+      sig: '',
+    );
+
+    final id = WalletService.computeEventId(placeholder);
+    final withId = NostrEvent(
+      id: id,
+      pubkey: placeholder.pubkey,
+      createdAt: placeholder.createdAt,
+      kind: placeholder.kind,
+      tags: placeholder.tags,
+      content: placeholder.content,
+      sig: '',
+    );
+
+    final sig = WalletService.signNostrEvent(withId, wallet.privateKeyHex);
+    final signed = NostrEvent(
+      id: withId.id,
+      pubkey: withId.pubkey,
+      createdAt: withId.createdAt,
+      kind: withId.kind,
+      tags: withId.tags,
+      content: withId.content,
+      sig: sig,
+    );
+
+    publishEvent(signed);
+  }
+
+  /// Publishes a NIP-56 kind-1984 report event.
+  ///
+  /// Spec v1.4 §12.B: users can report content → blocklist propagates across
+  /// the network. All compliant clients suppress reported content from feeds.
+  Future<void> reportContent({
+    required String eventId,
+    required String contentHash,
+    required String reason,
+    required WalletModel wallet,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+    final tags = <List<String>>[
+      ['e', eventId, reason],
+      ['media_hash', contentHash],
+      ['app', 'spot'],
+    ];
+
+    final placeholder = NostrEvent(
+      id: '',
+      pubkey: wallet.publicKeyHex,
+      createdAt: now,
+      kind: 1984, // NIP-56 reporting
+      tags: tags,
+      content: reason,
       sig: '',
     );
 

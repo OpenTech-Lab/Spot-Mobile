@@ -15,12 +15,14 @@ class PostThreadRow extends StatelessWidget {
     required this.isLast,
     this.onReply,
     this.onDelete,
+    this.onReport,
   });
 
   final MediaPost post;
   final bool isLast;
   final VoidCallback? onReply;
   final VoidCallback? onDelete;
+  final VoidCallback? onReport;
 
   void _showPostMenu(BuildContext context) {
     showModalBottomSheet<void>(
@@ -48,23 +50,42 @@ class PostThreadRow extends StatelessWidget {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              // Delete option
-              ListTile(
-                leading: const Icon(
-                  CupertinoIcons.delete,
-                  color: SpotColors.danger,
-                  size: 20,
+              // Delete option (own posts only)
+              if (onDelete != null)
+                ListTile(
+                  leading: const Icon(
+                    CupertinoIcons.delete,
+                    color: SpotColors.danger,
+                    size: 20,
+                  ),
+                  title: const Text(
+                    'Delete post',
+                    style: TextStyle(color: SpotColors.danger),
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    onDelete?.call();
+                  },
                 ),
-                title: const Text(
-                  'Delete post',
-                  style: TextStyle(color: SpotColors.danger),
+              // Report option (all posts)
+              if (onReport != null)
+                ListTile(
+                  leading: const Icon(
+                    CupertinoIcons.flag,
+                    color: SpotColors.warning,
+                    size: 20,
+                  ),
+                  title: const Text(
+                    'Report content',
+                    style: TextStyle(color: SpotColors.warning),
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    onReport?.call();
+                  },
                 ),
-                contentPadding: EdgeInsets.zero,
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  onDelete?.call();
-                },
-              ),
               // Cancel option
               ListTile(
                 leading: const Icon(
@@ -72,7 +93,8 @@ class PostThreadRow extends StatelessWidget {
                   color: SpotColors.textSecondary,
                   size: 20,
                 ),
-                title: const Text('Cancel', style: TextStyle(color: SpotColors.textSecondary)),
+                title: const Text('Cancel',
+                    style: TextStyle(color: SpotColors.textSecondary)),
                 contentPadding: EdgeInsets.zero,
                 onTap: () => Navigator.of(ctx).pop(),
               ),
@@ -156,7 +178,7 @@ class PostThreadRow extends StatelessWidget {
                             ),
                           ),
                         ],
-                        if (onDelete != null) ...[
+                        if (onDelete != null || onReport != null) ...[
                           const Spacer(),
                           GestureDetector(
                             onTap: () => _showPostMenu(context),
