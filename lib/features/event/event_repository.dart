@@ -191,6 +191,26 @@ class EventRepository {
     final contentHash =
         event.getTagValue('media_hash') ?? event.id;
 
+    // Parse replyToId from ["e", ...] NIP-10 tag
+    String? replyToId;
+    for (final tag in event.tags) {
+      if (tag.isNotEmpty && tag[0] == 'e' && tag.length >= 2) {
+        replyToId = tag[1];
+        break;
+      }
+    }
+
+    // Parse caption: content minus the trailing #tag line
+    String? caption;
+    final rawContent = event.content.trim();
+    if (rawContent.isNotEmpty) {
+      final lines = rawContent.split('\n');
+      final captionLines =
+          lines.where((l) => !l.trim().startsWith('#')).toList();
+      final joined = captionLines.join('\n').trim();
+      if (joined.isNotEmpty) caption = joined;
+    }
+
     return MediaPost(
       id: event.id,
       pubkey: event.pubkey,
@@ -201,6 +221,8 @@ class EventRepository {
           DateTime.fromMillisecondsSinceEpoch(event.createdAt * 1000),
       eventTag: hashtag,
       isDangerMode: event.getTagValue('danger') == '1',
+      caption: caption,
+      replyToId: replyToId,
       tags: event.tags
           .where((t) => t.isNotEmpty)
           .map((t) => t.join(':'))

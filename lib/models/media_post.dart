@@ -31,6 +31,12 @@ class MediaPost {
   /// Whether this was recorded in Danger Mode (face blur + GPS stripped)
   final bool isDangerMode;
 
+  /// Optional text caption added by the author at publish time.
+  final String? caption;
+
+  /// Nostr event ID this post is replying to (null if not a reply).
+  final String? replyToId;
+
   /// Arbitrary Nostr tags attached to this post
   final List<String> tags;
 
@@ -48,6 +54,8 @@ class MediaPost {
     required this.capturedAt,
     this.eventTag,
     this.isDangerMode = false,
+    this.caption,
+    this.replyToId,
     this.tags = const [],
     required this.nostrEventId,
   });
@@ -63,6 +71,8 @@ class MediaPost {
         'capturedAt': capturedAt.toIso8601String(),
         'eventTag': eventTag,
         'isDangerMode': isDangerMode,
+        'caption': caption,
+        'replyToId': replyToId,
         'tags': tags,
         'nostrEventId': nostrEventId,
       };
@@ -78,6 +88,8 @@ class MediaPost {
         capturedAt: DateTime.parse(json['capturedAt'] as String),
         eventTag: json['eventTag'] as String?,
         isDangerMode: json['isDangerMode'] as bool? ?? false,
+        caption: json['caption'] as String?,
+        replyToId: json['replyToId'] as String?,
         tags: List<String>.from(json['tags'] as List? ?? []),
         nostrEventId: json['nostrEventId'] as String,
       );
@@ -93,6 +105,8 @@ class MediaPost {
     DateTime? capturedAt,
     String? eventTag,
     bool? isDangerMode,
+    String? caption,
+    String? replyToId,
     List<String>? tags,
     String? nostrEventId,
   }) =>
@@ -107,6 +121,8 @@ class MediaPost {
         capturedAt: capturedAt ?? this.capturedAt,
         eventTag: eventTag ?? this.eventTag,
         isDangerMode: isDangerMode ?? this.isDangerMode,
+        caption: caption ?? this.caption,
+        replyToId: replyToId ?? this.replyToId,
         tags: tags ?? this.tags,
         nostrEventId: nostrEventId ?? this.nostrEventId,
       );

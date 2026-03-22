@@ -21,10 +21,14 @@ class CameraScreen extends StatefulWidget {
     super.key,
     required this.wallet,
     required this.nostrService,
+    this.replyToPost,
   });
 
   final WalletModel wallet;
   final NostrService nostrService;
+
+  /// When set, this post is being composed as a reply to [replyToPost].
+  final MediaPost? replyToPost;
 
   @override
   State<CameraScreen> createState() => _CameraScreenState();
@@ -132,7 +136,7 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
-  Future<void> _publishPost() async {
+  Future<void> _publishPost(String caption) async {
     if (_capturedFile == null) return;
     File mediaFile = File(_capturedFile!.path);
     if (_isDangerMode) {
@@ -140,6 +144,11 @@ class _CameraScreenState extends State<CameraScreen>
     }
     final bytes = await mediaFile.readAsBytes();
     final contentHash = EncryptionUtils.sha256BytesHex(bytes);
+
+    // Inherit event tag from parent post when replying
+    final effectiveTag = _eventTag.isNotEmpty
+        ? _eventTag
+        : widget.replyToPost?.eventTag;
 
     final post = MediaPost(
       id:           contentHash,
@@ -149,8 +158,10 @@ class _CameraScreenState extends State<CameraScreen>
       latitude:     _isDangerMode ? null : _gpsLock?.latitude,
       longitude:    _isDangerMode ? null : _gpsLock?.longitude,
       capturedAt:   _gpsLock?.timestamp ?? DateTime.now().toUtc(),
-      eventTag:     _eventTag.isEmpty ? null : _eventTag,
+      eventTag:     effectiveTag,
       isDangerMode: _isDangerMode,
+      caption:      caption.isEmpty ? null : caption,
+      replyToId:    widget.replyToPost?.nostrEventId,
       nostrEventId: contentHash,
     );
 
@@ -211,7 +222,8 @@ class _CameraScreenState extends State<CameraScreen>
         isVideo:      _capturedIsVideo,
         isDangerMode: _isDangerMode,
         gpsLock:      _gpsLock,
-        eventTag:     _eventTag,
+        eventTag:     _eventTag.isNotEmpty ? _eventTag : widget.replyToPost?.eventTag,
+        replyToPost:  widget.replyToPost,
         onConfirm:    _publishPost,
         onDiscard:    _discardCapture,
       );
@@ -493,13 +505,14 @@ class _ControlsPanel extends StatelessWidget {
 
 // ── Preview / publish screen ───────────────────────────────────────────────────
 
-class _PreviewScreen extends StatelessWidget {
+class _PreviewScreen extends StatefulWidget {
   const _PreviewScreen({
     required this.filePath,
     required this.isVideo,
     required this.isDangerMode,
     this.gpsLock,
-    required this.eventTag,
+    this.eventTag,
+    this.replyToPost,
     required this.onConfirm,
     required this.onDiscard,
   });
@@ -508,30 +521,45 @@ class _PreviewScreen extends StatelessWidget {
   final bool isVideo;
   final bool isDangerMode;
   final GpsLock? gpsLock;
-  final String eventTag;
-  final VoidCallback onConfirm;
+  final String? eventTag;
+  final MediaPost? replyToPost;
+  final void Function(String caption) onConfirm;
   final VoidCallback onDiscard;
+
+  @override
+  State<_PreviewScreen> createState() => _PreviewScreenState();
+}
+
+class _PreviewScreenState extends State<_PreviewScreen> {
+  final _captionController = TextEditingController();
+
+  @override
+  void dispose() {
+    _captionController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         title: Text(
-          'Review',
+          widget.replyToPost != null ? 'Reply' : 'Review',
           style: SpotType.subheading.copyWith(color: Colors.white),
         ),
         leading: IconButton(
           icon: const Icon(CupertinoIcons.xmark, size: 20),
-          onPressed: onDiscard,
+          onPressed: widget.onDiscard,
         ),
       ),
       body: Column(
         children: [
           Expanded(
-            child: isVideo
+            child: widget.isVideo
                 ? Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -545,10 +573,10 @@ class _PreviewScreen extends StatelessWidget {
                       ],
                     ),
                   )
-                : Image.file(File(filePath), fit: BoxFit.contain),
+                : Image.file(File(widget.filePath), fit: BoxFit.contain),
           ),
 
-          // Metadata + action bar
+          // Metadata + caption + action bar
           Container(
             padding: EdgeInsets.fromLTRB(
               SpotSpacing.lg,
@@ -558,24 +586,77 @@ class _PreviewScreen extends StatelessWidget {
             ),
             color: SpotColors.surface,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Reply-to indicator
+                if (widget.replyToPost != null) ...[
+                  Row(
+                    children: [
+                      const Icon(
+                        CupertinoIcons.arrow_turn_up_left,
+                        size: 12,
+                        color: SpotColors.textTertiary,
+                      ),
+                      const SizedBox(width: SpotSpacing.xs),
+                      Text(
+                        'Replying to ${_shortPubkey(widget.replyToPost!.pubkey)}',
+                        style: SpotType.caption,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: SpotSpacing.sm),
+                ],
+
                 // GPS / protection info
                 _PreviewMetaRow(
-                  icon: isDangerMode ? CupertinoIcons.shield : CupertinoIcons.location_fill,
-                  label: isDangerMode
+                  icon: widget.isDangerMode
+                      ? CupertinoIcons.shield
+                      : CupertinoIcons.location_fill,
+                  label: widget.isDangerMode
                       ? 'Protected — location and faces hidden'
-                      : gpsLock != null
-                          ? '${gpsLock!.latitude.toStringAsFixed(4)}, '
-                            '${gpsLock!.longitude.toStringAsFixed(4)}'
+                      : widget.gpsLock != null
+                          ? '${widget.gpsLock!.latitude.toStringAsFixed(4)}, '
+                            '${widget.gpsLock!.longitude.toStringAsFixed(4)}'
                           : 'No location',
-                  color: isDangerMode ? SpotColors.danger : SpotColors.success,
+                  color: widget.isDangerMode ? SpotColors.danger : SpotColors.success,
                 ),
-                if (eventTag.isNotEmpty)
+                if (widget.eventTag?.isNotEmpty == true)
                   _PreviewMetaRow(
                     icon: CupertinoIcons.tag,
-                    label: '#$eventTag',
+                    label: '#${widget.eventTag}',
                     color: SpotColors.textSecondary,
                   ),
+                const SizedBox(height: SpotSpacing.md),
+
+                // Caption input
+                TextField(
+                  controller: _captionController,
+                  maxLines: 3,
+                  minLines: 1,
+                  style: SpotType.body,
+                  decoration: InputDecoration(
+                    hintText: 'Add a caption… (optional)',
+                    hintStyle: SpotType.body.copyWith(color: SpotColors.textTertiary),
+                    filled: true,
+                    fillColor: SpotColors.bg,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(SpotRadius.sm),
+                      borderSide: const BorderSide(color: SpotColors.border, width: 0.5),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(SpotRadius.sm),
+                      borderSide: const BorderSide(color: SpotColors.border, width: 0.5),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(SpotRadius.sm),
+                      borderSide: const BorderSide(color: SpotColors.accent, width: 0.5),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: SpotSpacing.md,
+                      vertical: SpotSpacing.sm,
+                    ),
+                  ),
+                ),
                 const SizedBox(height: SpotSpacing.lg),
 
                 // Action buttons
@@ -583,7 +664,7 @@ class _PreviewScreen extends StatelessWidget {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: onDiscard,
+                        onPressed: widget.onDiscard,
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: SpotSpacing.md),
                         ),
@@ -594,7 +675,8 @@ class _PreviewScreen extends StatelessWidget {
                     Expanded(
                       flex: 2,
                       child: FilledButton(
-                        onPressed: onConfirm,
+                        onPressed: () =>
+                            widget.onConfirm(_captionController.text.trim()),
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: SpotSpacing.md),
                         ),
@@ -610,6 +692,11 @@ class _PreviewScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+String _shortPubkey(String pubkey) {
+  if (pubkey.length <= 12) return pubkey;
+  return '${pubkey.substring(0, 6)}…${pubkey.substring(pubkey.length - 4)}';
 }
 
 class _PreviewMetaRow extends StatelessWidget {

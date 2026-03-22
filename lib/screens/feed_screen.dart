@@ -3,18 +3,25 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import 'package:mobile/features/camera/camera_screen.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
+import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
 /// Main content feed — chronological thread of [MediaPost]s from Nostr relays.
 class FeedScreen extends StatefulWidget {
-  const FeedScreen({super.key, required this.nostrService});
+  const FeedScreen({
+    super.key,
+    required this.nostrService,
+    required this.wallet,
+  });
 
   final NostrService nostrService;
+  final WalletModel wallet;
 
   @override
   State<FeedScreen> createState() => _FeedScreenState();
@@ -96,10 +103,22 @@ class _FeedScreenState extends State<FeedScreen> {
           bottom: SpotSpacing.xl,
         ),
         itemCount: _posts.length,
-        itemBuilder: (ctx, i) => PostThreadRow(
-          post: _posts[i],
-          isLast: i == _posts.length - 1,
-        ),
+        itemBuilder: (ctx, i) {
+          final post = _posts[i];
+          return PostThreadRow(
+            post: post,
+            isLast: i == _posts.length - 1,
+            onReply: () => Navigator.of(ctx).push(
+              MaterialPageRoute(
+                builder: (_) => CameraScreen(
+                  wallet: widget.wallet,
+                  nostrService: widget.nostrService,
+                  replyToPost: post,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

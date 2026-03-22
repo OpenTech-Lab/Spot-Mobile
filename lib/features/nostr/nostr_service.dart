@@ -105,8 +105,15 @@ class NostrService {
       MediaPost post, WalletModel wallet) async {
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
+    // Build content: optional caption + optional #tag
+    final contentParts = <String>[];
+    if (post.caption?.isNotEmpty == true) contentParts.add(post.caption!);
+    if (post.eventTag != null) contentParts.add('#${post.eventTag}');
+    final content = contentParts.join('\n');
+
     final tags = <List<String>>[
       ['app', 'spot'], // identifies events originating from the Spot app
+      if (post.replyToId != null) ['e', post.replyToId!, '', 'reply'],
       if (post.eventTag != null) ['t', post.eventTag!],
       if (post.latitude != null && post.longitude != null)
         ['geo', post.latitude.toString(), post.longitude.toString()],
@@ -122,7 +129,7 @@ class NostrService {
       createdAt: now,
       kind: _kindTextNote,
       tags: tags,
-      content: post.eventTag != null ? '#${post.eventTag}' : '',
+      content: content,
       sig: '',
     );
 

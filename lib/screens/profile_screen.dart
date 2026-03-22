@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:mobile/features/camera/camera_screen.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/event_model.dart';
@@ -181,10 +182,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
             else
               SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (ctx, i) => PostThreadRow(
-                    post: _posts[i],
-                    isLast: i == _posts.length - 1,
-                  ),
+                  (ctx, i) {
+                    final post = _posts[i];
+                    return PostThreadRow(
+                      post: post,
+                      isLast: i == _posts.length - 1,
+                      onReply: () => Navigator.of(ctx).push(
+                        MaterialPageRoute(
+                          builder: (_) => CameraScreen(
+                            wallet: widget.wallet,
+                            nostrService: widget.nostrService,
+                            replyToPost: post,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                   childCount: _posts.length,
                 ),
               ),

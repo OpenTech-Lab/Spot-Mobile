@@ -43,13 +43,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCurrentTab() {
     switch (_selectedTab) {
       case 0:
-        return FeedScreen(nostrService: _nostrService);
+        return FeedScreen(nostrService: _nostrService, wallet: widget.wallet);
       case 1:
         return _EventsListTab(eventRepo: _eventRepo);
       case 2:
         return ProfileScreen(wallet: widget.wallet, nostrService: _nostrService);
       default:
-        return FeedScreen(nostrService: _nostrService);
+        return FeedScreen(nostrService: _nostrService, wallet: widget.wallet);
     }
   }
 

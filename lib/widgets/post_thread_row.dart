@@ -12,10 +12,12 @@ class PostThreadRow extends StatelessWidget {
     super.key,
     required this.post,
     required this.isLast,
+    this.onReply,
   });
 
   final MediaPost post;
   final bool isLast;
+  final VoidCallback? onReply;
 
   @override
   Widget build(BuildContext context) {
@@ -92,6 +94,25 @@ class PostThreadRow extends StatelessWidget {
                         ],
                       ],
                     ),
+                    // Reply-to indicator
+                    if (post.replyToId != null) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          const Icon(
+                            CupertinoIcons.arrow_turn_up_left,
+                            size: 11,
+                            color: SpotColors.textTertiary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _shortKey(post.replyToId!),
+                            style: SpotType.caption
+                                .copyWith(color: SpotColors.textTertiary),
+                          ),
+                        ],
+                      ),
+                    ],
                     // Event hashtag
                     if (post.eventTag != null) ...[
                       const SizedBox(height: 3),
@@ -99,6 +120,11 @@ class PostThreadRow extends StatelessWidget {
                         '#${post.eventTag}',
                         style: SpotType.body.copyWith(color: SpotColors.accent),
                       ),
+                    ],
+                    // Caption
+                    if (post.caption?.isNotEmpty == true) ...[
+                      const SizedBox(height: SpotSpacing.sm),
+                      Text(post.caption!, style: SpotType.body),
                     ],
                     const SizedBox(height: SpotSpacing.sm),
                     // Media placeholder
@@ -159,6 +185,33 @@ class PostThreadRow extends StatelessWidget {
                         ),
                       ],
                     ),
+                    // Reply button
+                    if (onReply != null) ...[
+                      const SizedBox(height: SpotSpacing.xs),
+                      GestureDetector(
+                        onTap: onReply,
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                CupertinoIcons.arrow_turn_up_left,
+                                size: 13,
+                                color: SpotColors.textTertiary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Reply',
+                                style: SpotType.caption
+                                    .copyWith(color: SpotColors.textTertiary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
