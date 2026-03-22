@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:mobile/features/ebes/trust_service.dart';
 import 'package:mobile/features/nostr/nostr_models.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
+import 'package:mobile/models/witness_model.dart';
 import 'package:mobile/services/cache_manager.dart';
 
 /// Aggregates raw [NostrEvent]s from relays into [CivicEvent] domain objects.
@@ -16,6 +18,7 @@ class EventRepository {
       : _nostr = nostrService;
 
   final NostrService _nostr;
+  final _trust = const TrustService();
 
   /// In-memory cache: hashtag → CivicEvent
   final Map<String, CivicEvent> _cache = {};
@@ -25,6 +28,9 @@ class EventRepository {
 
   String? _globalSubId;
   final List<String> _authorSubIds = [];
+
+  /// Tracks post counts per pubkey for SourceScore computation.
+  final Map<String, int> _postCountByPubkey = {};
 
   // ── Subscription ──────────────────────────────────────────────────────────
 
@@ -170,8 +176,47 @@ class EventRepository {
       case 1984:
         _handleReport(event);
       default:
-        _handleMediaPost(event);
+        // Check for witness signal before treating as a media post
+        if (event.getTagValue('witness') != null) {
+          _handleWitness(event);
+        } else {
+          _handleMediaPost(event);
+        }
     }
+  }
+
+  /// Processes a witness signal event and updates the relevant [CivicEvent].
+  void _handleWitness(NostrEvent event) {
+    final hashtag = event.getTagValue('t');
+    if (hashtag == null || !_cache.containsKey(hashtag)) return;
+
+    final weight = _trust.witnessWeight(
+      Witness.fromNostrEvent(event, weight: 0.5) ??
+          Witness(
+            id: event.id,
+            eventId: hashtag,
+            userId: event.pubkey,
+            type: WitnessType.seen,
+            timestamp: DateTime.fromMillisecondsSinceEpoch(
+                event.createdAt * 1000),
+            weight: 0.5,
+          ),
+      _cache[hashtag]!,
+      postCountByPubkey: _postCountByPubkey,
+    );
+
+    final witness = Witness.fromNostrEvent(event, weight: weight);
+    if (witness == null) return;
+
+    final existing = _cache[hashtag]!;
+    final alreadyPresent = existing.witnesses.any((w) => w.id == witness.id);
+    if (alreadyPresent) return;
+
+    final updatedWitnesses = [...existing.witnesses, witness];
+    final updatedEvent =
+        _applyTrust(existing.copyWith(witnesses: updatedWitnesses));
+    _cache[hashtag] = updatedEvent;
+    if (!_controller.isClosed) _controller.add(updatedEvent);
   }
 
   /// Spec v1.4 §12 "Deletion Flow" step 2: hide revoked content immediately.
@@ -221,10 +266,14 @@ class EventRepository {
   }
 
   void _mergePost(String hashtag, MediaPost post) {
+    // Track post count per pubkey for reputation scoring
+    _postCountByPubkey[post.pubkey] =
+        (_postCountByPubkey[post.pubkey] ?? 0) + 1;
+
     final existing = _cache[hashtag];
 
     if (existing == null) {
-      _cache[hashtag] = CivicEvent(
+      final civic = CivicEvent(
         hashtag: hashtag,
         title: '#$hashtag',
         posts: [post],
@@ -233,6 +282,7 @@ class EventRepository {
         firstSeen: post.capturedAt,
         participantCount: 1,
       );
+      _cache[hashtag] = _applyTrust(civic);
     } else {
       // Deduplicate by post ID
       final alreadyPresent =
@@ -256,19 +306,36 @@ class EventRepository {
             geoTagged.length;
       }
 
-      _cache[hashtag] = existing.copyWith(
+      final updated = existing.copyWith(
         posts: updatedPosts,
         centerLat: lat ?? existing.centerLat,
         centerLon: lon ?? existing.centerLon,
         participantCount: uniquePubkeys.length,
         firstSeen: updatedPosts.first.capturedAt,
       );
+      _cache[hashtag] = _applyTrust(updated);
     }
 
     if (!_controller.isClosed) {
       _controller.add(_cache[hashtag]!);
     }
   }
+
+  /// Recomputes [trustScore] and [status] on [event] using [TrustService].
+  CivicEvent _applyTrust(CivicEvent event) {
+    final score = _trust.computeEventTrust(
+      event,
+      event.witnesses,
+      postCountByPubkey: _postCountByPubkey,
+    );
+    final status = _trust.statusFromScore(score, event.witnesses);
+    return event.copyWith(trustScore: score, status: status);
+  }
+
+  /// Public static helper used by [FeedScreen] to convert raw Nostr events
+  /// received via ad-hoc subscriptions into [MediaPost] objects.
+  static MediaPost nostrEventToPost(NostrEvent event, String? hashtag) =>
+      _nostrEventToMediaPost(event, hashtag);
 
   static MediaPost _nostrEventToMediaPost(
       NostrEvent event, String? hashtag) {

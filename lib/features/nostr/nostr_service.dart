@@ -168,6 +168,68 @@ class NostrService {
     return signed;
   }
 
+  /// Publishes a witness signal (seen / confirm / deny) for an event hashtag.
+  ///
+  /// Witness events are kind-1 events with a `witness` tag carrying the
+  /// signal type. They are Spot-tagged and optionally carry a GPS location.
+  Future<NostrEvent> publishWitness({
+    required String hashtag,
+    required String witnessType, // 'seen' | 'confirm' | 'deny'
+    required WalletModel wallet,
+    double? lat,
+    double? lon,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+    final tags = <List<String>>[
+      ['app', 'spot'],
+      ['t', hashtag],
+      ['witness', witnessType],
+      if (lat != null && lon != null) ['geo', lat.toString(), lon.toString()],
+    ];
+
+    final placeholder = NostrEvent(
+      id: '',
+      pubkey: wallet.publicKeyHex,
+      createdAt: now,
+      kind: _kindTextNote,
+      tags: tags,
+      content: witnessType,
+      sig: '',
+    );
+
+    final id = WalletService.computeEventId(placeholder);
+    final withId = NostrEvent(
+      id: id,
+      pubkey: placeholder.pubkey,
+      createdAt: placeholder.createdAt,
+      kind: placeholder.kind,
+      tags: placeholder.tags,
+      content: placeholder.content,
+      sig: '',
+    );
+
+    final sig = WalletService.signNostrEvent(withId, wallet.privateKeyHex);
+    final signed = NostrEvent(
+      id: withId.id,
+      pubkey: withId.pubkey,
+      createdAt: withId.createdAt,
+      kind: withId.kind,
+      tags: withId.tags,
+      content: withId.content,
+      sig: sig,
+    );
+
+    publishEvent(signed);
+
+    // Self-deliver
+    for (final sub in _subscriptions.values) {
+      sub.onEvent(signed);
+    }
+
+    return signed;
+  }
+
   /// Publishes a NIP-09 kind-5 revocation event for [eventId].
   ///
   /// Spec v1.4 §12 "Deletion Flow" step 1: include the content hash so that

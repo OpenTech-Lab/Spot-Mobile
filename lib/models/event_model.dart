@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:mobile/models/media_post.dart';
+import 'package:mobile/models/witness_model.dart';
 
 /// NIP-01 Nostr event.
 /// The event ID is the SHA-256 of the canonical serialisation defined by Nostr.
@@ -88,6 +89,18 @@ class NostrEvent {
       'NostrEvent(id: ${id.substring(0, 8)}..., kind: $kind, pubkey: ${pubkey.substring(0, 8)}...)';
 }
 
+/// EBES confidence status for a [CivicEvent].
+enum EventStatus {
+  /// Not enough evidence to draw a conclusion.
+  unverified,
+
+  /// Multiple independent sources confirm the event; trust score ≥ 0.65.
+  highConfidence,
+
+  /// Significant deny-witness signals detected; likely disputed or fake.
+  conflicted,
+}
+
 /// App-level grouping of [MediaPost]s under a shared event hashtag.
 /// Conceptually similar to a live Wikipedia page with timeline and map.
 class CivicEvent {
@@ -110,6 +123,17 @@ class CivicEvent {
   /// Number of unique pubkeys that have contributed posts.
   final int participantCount;
 
+  // ── EBES fields ────────────────────────────────────────────────────────────
+
+  /// Aggregate EBES trust score 0.0–1.0 computed by [TrustService].
+  final double trustScore;
+
+  /// Human-readable confidence level derived from [trustScore] + [witnesses].
+  final EventStatus status;
+
+  /// Witness signals (seen / confirm / deny) received for this event.
+  final List<Witness> witnesses;
+
   const CivicEvent({
     required this.hashtag,
     required this.title,
@@ -118,6 +142,9 @@ class CivicEvent {
     this.centerLon,
     required this.firstSeen,
     required this.participantCount,
+    this.trustScore = 0.0,
+    this.status = EventStatus.unverified,
+    this.witnesses = const [],
   });
 
   /// Returns the most recent post, or null if there are no posts.
@@ -127,6 +154,19 @@ class CivicEvent {
   List<MediaPost> get postsByNewest =>
       List<MediaPost>.from(posts)..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
 
+  // ── EBES convenience getters ───────────────────────────────────────────────
+
+  /// Percentage representation of [trustScore] (0–100).
+  int get trustPercent => (trustScore * 100).round();
+
+  /// Counts of each witness type.
+  int get seenCount =>
+      witnesses.where((w) => w.type == WitnessType.seen).length;
+  int get confirmCount =>
+      witnesses.where((w) => w.type == WitnessType.confirm).length;
+  int get denyCount =>
+      witnesses.where((w) => w.type == WitnessType.deny).length;
+
   CivicEvent copyWith({
     String? hashtag,
     String? title,
@@ -135,6 +175,9 @@ class CivicEvent {
     double? centerLon,
     DateTime? firstSeen,
     int? participantCount,
+    double? trustScore,
+    EventStatus? status,
+    List<Witness>? witnesses,
   }) =>
       CivicEvent(
         hashtag: hashtag ?? this.hashtag,
@@ -144,6 +187,9 @@ class CivicEvent {
         centerLon: centerLon ?? this.centerLon,
         firstSeen: firstSeen ?? this.firstSeen,
         participantCount: participantCount ?? this.participantCount,
+        trustScore: trustScore ?? this.trustScore,
+        status: status ?? this.status,
+        witnesses: witnesses ?? this.witnesses,
       );
 
   @override

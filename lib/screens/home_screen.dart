@@ -43,7 +43,11 @@ class _HomeScreenState extends State<HomeScreen> {
   // Tabs built once and preserved via IndexedStack
   late final List<Widget> _tabs = [
     FeedScreen(nostrService: _nostrService, wallet: widget.wallet),
-    _EventsListTab(eventRepo: _eventRepo),
+    _EventsListTab(
+      eventRepo: _eventRepo,
+      nostrService: _nostrService,
+      wallet: widget.wallet,
+    ),
     ProfileScreen(wallet: widget.wallet, nostrService: _nostrService),
   ];
 
@@ -178,9 +182,15 @@ class _NavItem extends StatelessWidget {
 // ── Events list tab ────────────────────────────────────────────────────────────
 
 class _EventsListTab extends StatelessWidget {
-  const _EventsListTab({required this.eventRepo});
+  const _EventsListTab({
+    required this.eventRepo,
+    required this.nostrService,
+    required this.wallet,
+  });
 
   final EventRepository eventRepo;
+  final NostrService nostrService;
+  final WalletModel wallet;
 
   @override
   Widget build(BuildContext context) {
@@ -213,7 +223,13 @@ class _EventsListTab extends StatelessWidget {
         final event = events[i];
         return InkWell(
           onTap: () => Navigator.of(ctx).push(
-            MaterialPageRoute(builder: (_) => EventScreen(event: event)),
+            MaterialPageRoute(
+              builder: (_) => EventScreen(
+                event: event,
+                nostrService: nostrService,
+                wallet: wallet,
+              ),
+            ),
           ),
           borderRadius: BorderRadius.circular(SpotRadius.sm),
           child: Container(

@@ -8,6 +8,7 @@ import 'package:mobile/screens/splash_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/services/storage_service.dart';
+import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
 Future<void> main() async {
@@ -17,6 +18,7 @@ Future<void> main() async {
   // any media or feed content loads (spec v1.4 §6 & §12.B).
   await CacheManager.instance.init();
   await GeoLookup.instance.init(); // loads Natural Earth cities into memory
+  await UserPrefsService.instance.init(); // load user interests & view history
 
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
