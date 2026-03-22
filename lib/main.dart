@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:mobile/models/wallet_model.dart';
-import 'package:mobile/screens/home_screen.dart';
+import 'package:mobile/screens/altcha_gate_screen.dart';
 import 'package:mobile/screens/onboarding_screen.dart';
+import 'package:mobile/screens/splash_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/storage_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
@@ -44,9 +45,11 @@ class SpotApp extends StatelessWidget {
       title: 'Spot',
       debugShowCheckedModeBanner: false,
       theme: SpotTheme.build(),
+      // Returning users: silent splash + ALTCHA, then HomeScreen.
+      // New users: explicit ALTCHA gate, then OnboardingScreen.
       home: initialWallet != null
-          ? HomeScreen(wallet: initialWallet!)
-          : const OnboardingScreen(),
+          ? SplashScreen(wallet: initialWallet!)
+          : AltchaGateScreen(next: const OnboardingScreen()),
     );
   }
 }
