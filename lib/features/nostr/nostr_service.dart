@@ -106,6 +106,7 @@ class NostrService {
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
     final tags = <List<String>>[
+      ['app', 'spot'], // identifies events originating from the Spot app
       if (post.eventTag != null) ['t', post.eventTag!],
       if (post.latitude != null && post.longitude != null)
         ['geo', post.latitude.toString(), post.longitude.toString()],

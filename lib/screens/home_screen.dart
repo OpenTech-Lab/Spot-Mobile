@@ -45,45 +45,70 @@ class _HomeScreenState extends State<HomeScreen> {
       case 0:
         return FeedScreen(nostrService: _nostrService);
       case 1:
-        return CameraScreen(wallet: widget.wallet, nostrService: _nostrService);
-      case 2:
         return _EventsListTab(eventRepo: _eventRepo);
-      case 3:
+      case 2:
         return WalletScreen(wallet: widget.wallet);
       default:
         return FeedScreen(nostrService: _nostrService);
     }
   }
 
+  void _openCamera() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CameraScreen(
+          wallet: widget.wallet,
+          nostrService: _nostrService,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SpotColors.bg,
-      appBar: _selectedTab == 1
-          ? null
-          : AppBar(
-              backgroundColor: SpotColors.bg,
-              title: const Text('Spot', style: SpotType.wordmark),
-              actions: _selectedTab == 3
-                  ? [
-                      IconButton(
-                        icon: const Icon(Icons.grid_on_outlined, size: 18),
-                        color: SpotColors.textSecondary,
-                        tooltip: 'My Posts',
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => MyPostsScreen(
-                              wallet: widget.wallet,
-                              nostrService: _nostrService,
-                            ),
-                          ),
-                        ),
+      appBar: AppBar(
+        backgroundColor: SpotColors.bg,
+        title: const Text('Spot', style: SpotType.wordmark),
+        actions: _selectedTab == 2
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.grid_on_outlined, size: 18),
+                  color: SpotColors.textSecondary,
+                  tooltip: 'My Posts',
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => MyPostsScreen(
+                        wallet: widget.wallet,
+                        nostrService: _nostrService,
                       ),
-                    ]
-                  : const [],
-            ),
+                    ),
+                  ),
+                ),
+              ]
+            : const [],
+      ),
       body: _buildCurrentTab(),
       bottomNavigationBar: _buildBottomNav(),
+      floatingActionButton: GestureDetector(
+        onTap: _openCamera,
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: SpotColors.bg,
+            border: Border.all(color: SpotColors.border, width: 0.5),
+          ),
+          child: const Icon(
+            Icons.add,
+            color: SpotColors.textSecondary,
+            size: 22,
+          ),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -105,42 +130,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 selected: _selectedTab == 0,
                 onTap: () => setState(() => _selectedTab = 0),
               ),
-              // Capture button — center focal point
-              GestureDetector(
-                onTap: () => setState(() => _selectedTab = 1),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _selectedTab == 1 ? SpotColors.accent : Colors.transparent,
-                    border: Border.all(
-                      color: _selectedTab == 1
-                          ? SpotColors.accent
-                          : SpotColors.border,
-                      width: 0.5,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.radio_button_unchecked,
-                    color: _selectedTab == 1
-                        ? SpotColors.onAccent
-                        : SpotColors.textSecondary,
-                    size: 22,
-                  ),
-                ),
-              ),
               _NavItem(
                 icon: Icons.folder_open_outlined,
                 label: 'Events',
-                selected: _selectedTab == 2,
-                onTap: () => setState(() => _selectedTab = 2),
+                selected: _selectedTab == 1,
+                onTap: () => setState(() => _selectedTab = 1),
               ),
               _NavItem(
                 icon: Icons.person_outline,
                 label: 'Identity',
-                selected: _selectedTab == 3,
-                onTap: () => setState(() => _selectedTab = 3),
+                selected: _selectedTab == 2,
+                onTap: () => setState(() => _selectedTab = 2),
               ),
             ],
           ),

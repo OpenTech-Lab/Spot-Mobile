@@ -33,7 +33,14 @@ class EventRepository {
   Stream<CivicEvent> subscribeToEvents() {
     _globalSubId ??= _nostr.subscribe(
       [
-        NostrFilter(kinds: [1], limit: 50),
+        NostrFilter(
+          kinds: [1],
+          limit: 50,
+          // #app filter tells the relay to send only Spot-originated events.
+          // Relays that support multi-letter tag queries filter server-side;
+          // others send more, and the client-side check below discards them.
+          tags: {'app': ['spot']},
+        ),
       ],
       _handleNostrEvent,
     );
@@ -108,6 +115,10 @@ class EventRepository {
   // ── Internal ──────────────────────────────────────────────────────────────
 
   void _handleNostrEvent(NostrEvent event) {
+    // Client-side guard: discard events not tagged as Spot-originated.
+    // This handles relays that ignored the #app filter in the subscription.
+    if (event.getTagValue('app') != 'spot') return;
+
     final hashtag = event.getTagValue('t');
     if (hashtag == null) return;
 
