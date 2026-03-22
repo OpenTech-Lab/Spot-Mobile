@@ -6,6 +6,7 @@ import 'package:mobile/features/event/event_screen.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/feed_screen.dart';
+import 'package:mobile/screens/my_posts_screen.dart';
 import 'package:mobile/screens/wallet_screen.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
@@ -63,7 +64,23 @@ class _HomeScreenState extends State<HomeScreen> {
           : AppBar(
               backgroundColor: SpotColors.bg,
               title: const Text('Spot', style: SpotType.wordmark),
-              actions: const [],
+              actions: _selectedTab == 3
+                  ? [
+                      IconButton(
+                        icon: const Icon(Icons.grid_on_outlined, size: 18),
+                        color: SpotColors.textSecondary,
+                        tooltip: 'My Posts',
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => MyPostsScreen(
+                              wallet: widget.wallet,
+                              nostrService: _nostrService,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ]
+                  : const [],
             ),
       body: _buildCurrentTab(),
       bottomNavigationBar: _buildBottomNav(),

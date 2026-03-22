@@ -6,20 +6,26 @@ import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
+import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
-/// Main content feed — chronological thread of [MediaPost]s from Nostr relays.
-class FeedScreen extends StatefulWidget {
-  const FeedScreen({super.key, required this.nostrService});
+/// Shows only the posts authored by the current wallet owner.
+class MyPostsScreen extends StatefulWidget {
+  const MyPostsScreen({
+    super.key,
+    required this.wallet,
+    required this.nostrService,
+  });
 
+  final WalletModel wallet;
   final NostrService nostrService;
 
   @override
-  State<FeedScreen> createState() => _FeedScreenState();
+  State<MyPostsScreen> createState() => _MyPostsScreenState();
 }
 
-class _FeedScreenState extends State<FeedScreen> {
+class _MyPostsScreenState extends State<MyPostsScreen> {
   late final EventRepository _repo;
   StreamSubscription<CivicEvent>? _sub;
 
@@ -58,9 +64,12 @@ class _FeedScreenState extends State<FeedScreen> {
 
   void _onEvent(CivicEvent event) {
     if (!mounted) return;
+    final mine = event.posts
+        .where((p) => p.pubkey == widget.wallet.publicKeyHex)
+        .toList();
+    if (mine.isEmpty) return;
     final existingIds = {for (final p in _posts) p.id};
-    final incoming =
-        event.posts.where((p) => !existingIds.contains(p.id)).toList();
+    final incoming = mine.where((p) => !existingIds.contains(p.id)).toList();
     if (incoming.isEmpty) return;
     final merged = [..._posts, ...incoming]
       ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
@@ -74,36 +83,25 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: SpotColors.bg,
+      appBar: AppBar(
         backgroundColor: SpotColors.bg,
-        body: _buildBody(),
-      );
-
-  Widget _buildBody() {
-    if (_isLoading && _posts.isEmpty) return _buildLoading();
-    if (_error != null && _posts.isEmpty) return _buildError();
-    if (_posts.isEmpty) return _buildEmpty();
-
-    return RefreshIndicator(
-      color: SpotColors.accent,
-      backgroundColor: SpotColors.surface,
-      displacement: 28,
-      onRefresh: _refresh,
-      child: ListView.builder(
-        padding: const EdgeInsets.only(
-          top: SpotSpacing.sm,
-          bottom: SpotSpacing.xl,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 16),
+          color: SpotColors.textSecondary,
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        itemCount: _posts.length,
-        itemBuilder: (ctx, i) => PostThreadRow(
-          post: _posts[i],
-          isLast: i == _posts.length - 1,
-        ),
+        title: const Text('My Posts', style: SpotType.subheading),
       ),
+      body: _buildBody(),
     );
   }
 
-  Widget _buildLoading() => const Center(
+  Widget _buildBody() {
+    if (_isLoading && _posts.isEmpty) {
+      return const Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -116,12 +114,14 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
             ),
             SizedBox(height: SpotSpacing.xl),
-            Text('Connecting', style: SpotType.label),
+            Text('Loading', style: SpotType.label),
           ],
         ),
       );
+    }
 
-  Widget _buildError() => Center(
+    if (_error != null && _posts.isEmpty) {
+      return Center(
         child: Padding(
           padding: const EdgeInsets.all(SpotSpacing.xxxl),
           child: Column(
@@ -134,7 +134,7 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
               const SizedBox(height: SpotSpacing.xl),
               const Text(
-                'Could not connect to relays',
+                'Could not load posts',
                 style: SpotType.bodySecondary,
               ),
               const SizedBox(height: SpotSpacing.xl),
@@ -156,13 +156,15 @@ class _FeedScreenState extends State<FeedScreen> {
           ),
         ),
       );
+    }
 
-  Widget _buildEmpty() => Center(
+    if (_posts.isEmpty) {
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(
-              Icons.inbox_outlined,
+              Icons.camera_outlined,
               color: SpotColors.overlay,
               size: 36,
             ),
@@ -173,8 +175,31 @@ class _FeedScreenState extends State<FeedScreen> {
                   .copyWith(fontWeight: FontWeight.w300),
             ),
             const SizedBox(height: SpotSpacing.xs),
-            const Text('Be the first to record', style: SpotType.caption),
+            const Text(
+              'Capture a moment to see it here',
+              style: SpotType.caption,
+            ),
           ],
         ),
       );
+    }
+
+    return RefreshIndicator(
+      color: SpotColors.accent,
+      backgroundColor: SpotColors.surface,
+      displacement: 28,
+      onRefresh: _refresh,
+      child: ListView.builder(
+        padding: const EdgeInsets.only(
+          top: SpotSpacing.sm,
+          bottom: SpotSpacing.xl,
+        ),
+        itemCount: _posts.length,
+        itemBuilder: (ctx, i) => PostThreadRow(
+          post: _posts[i],
+          isLast: i == _posts.length - 1,
+        ),
+      ),
+    );
+  }
 }
