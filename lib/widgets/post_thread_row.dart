@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:mobile/models/media_post.dart';
@@ -13,11 +14,74 @@ class PostThreadRow extends StatelessWidget {
     required this.post,
     required this.isLast,
     this.onReply,
+    this.onDelete,
   });
 
   final MediaPost post;
   final bool isLast;
   final VoidCallback? onReply;
+  final VoidCallback? onDelete;
+
+  void _showPostMenu(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: SpotColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(SpotRadius.lg)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: SpotSpacing.lg,
+            vertical: SpotSpacing.md,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: SpotSpacing.lg),
+                decoration: BoxDecoration(
+                  color: SpotColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Delete option
+              ListTile(
+                leading: const Icon(
+                  CupertinoIcons.delete,
+                  color: SpotColors.danger,
+                  size: 20,
+                ),
+                title: const Text(
+                  'Delete post',
+                  style: TextStyle(color: SpotColors.danger),
+                ),
+                contentPadding: EdgeInsets.zero,
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  onDelete?.call();
+                },
+              ),
+              // Cancel option
+              ListTile(
+                leading: const Icon(
+                  CupertinoIcons.xmark,
+                  color: SpotColors.textSecondary,
+                  size: 20,
+                ),
+                title: const Text('Cancel', style: TextStyle(color: SpotColors.textSecondary)),
+                contentPadding: EdgeInsets.zero,
+                onTap: () => Navigator.of(ctx).pop(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +123,7 @@ class PostThreadRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Author + timestamp
+                    // Author + timestamp + menu
                     Row(
                       children: [
                         Text(
@@ -89,6 +153,21 @@ class PostThreadRow extends StatelessWidget {
                               'Protected',
                               style: SpotType.label
                                   .copyWith(color: SpotColors.danger),
+                            ),
+                          ),
+                        ],
+                        if (onDelete != null) ...[
+                          const Spacer(),
+                          GestureDetector(
+                            onTap: () => _showPostMenu(context),
+                            behavior: HitTestBehavior.opaque,
+                            child: const Padding(
+                              padding: EdgeInsets.only(left: SpotSpacing.sm),
+                              child: Icon(
+                                CupertinoIcons.ellipsis,
+                                size: 16,
+                                color: SpotColors.textTertiary,
+                              ),
                             ),
                           ),
                         ],

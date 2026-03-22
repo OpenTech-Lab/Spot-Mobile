@@ -86,6 +86,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _initFeed();
   }
 
+  Future<void> _deletePost(MediaPost post) async {
+    // Optimistic removal
+    setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
+    try {
+      await widget.nostrService.deletePost(post.nostrEventId, widget.wallet);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Post deleted')),
+        );
+      }
+    } catch (e) {
+      // Restore post if delete failed
+      if (mounted) {
+        setState(() {
+          final restored = [..._posts, post]
+            ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+          _posts = restored;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete post')),
+        );
+      }
+    }
+  }
+
   void _openSettings() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -196,6 +221,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                       ),
+                      onDelete: () => _deletePost(post),
                     );
                   },
                   childCount: _posts.length,
