@@ -164,21 +164,26 @@ class PostThreadRow extends StatelessWidget {
                         ),
                         if (post.isDangerMode) ...[
                           const SizedBox(width: SpotSpacing.sm),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: SpotColors.dangerSubtle,
-                              borderRadius:
-                                  BorderRadius.circular(SpotRadius.xs),
-                            ),
-                            child: Text(
-                              'Protected',
-                              style: SpotType.label
-                                  .copyWith(color: SpotColors.danger),
-                            ),
+                          _PostBadge(
+                            label: 'Protected',
+                            color: SpotColors.danger,
+                            bg: SpotColors.dangerSubtle,
+                          ),
+                        ],
+                        if (post.isAiGenerated) ...[
+                          const SizedBox(width: SpotSpacing.sm),
+                          _PostBadge(
+                            label: 'AI',
+                            color: SpotColors.warning,
+                            bg: SpotColors.warningSubtle,
+                          ),
+                        ],
+                        if (post.sourceType == PostSourceType.secondhand) ...[
+                          const SizedBox(width: SpotSpacing.sm),
+                          _PostBadge(
+                            label: '2nd hand',
+                            color: SpotColors.textSecondary,
+                            bg: SpotColors.surfaceHigh,
                           ),
                         ],
                         if (onDelete != null || onReport != null) ...[
@@ -568,6 +573,31 @@ class _GpsRow extends StatelessWidget {
               overflow: TextOverflow.ellipsis),
         ),
       ],
+    );
+  }
+}
+
+// ── Post badge ────────────────────────────────────────────────────────────────
+
+class _PostBadge extends StatelessWidget {
+  const _PostBadge({
+    required this.label,
+    required this.color,
+    required this.bg,
+  });
+  final String label;
+  final Color color;
+  final Color bg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(SpotRadius.xs),
+      ),
+      child: Text(label, style: SpotType.label.copyWith(color: color)),
     );
   }
 }

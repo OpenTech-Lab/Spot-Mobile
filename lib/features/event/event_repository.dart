@@ -391,6 +391,10 @@ class EventRepository {
       eventTag: hashtag,
       isDangerMode: event.getTagValue('danger') == '1',
       isVirtual: event.getTagValue('virtual') == '1',
+      isAiGenerated: event.getTagValue('ai_content') == '1',
+      sourceType: event.getTagValue('source') == 'secondhand'
+          ? PostSourceType.secondhand
+          : PostSourceType.firsthand,
       caption: caption,
       replyToId: replyToId,
       tags: event.tags

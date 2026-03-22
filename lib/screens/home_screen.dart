@@ -1,12 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import 'package:mobile/features/camera/camera_screen.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/event/event_screen.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/feed_screen.dart';
+import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/profile_screen.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
@@ -51,14 +51,12 @@ class _HomeScreenState extends State<HomeScreen> {
     ProfileScreen(wallet: widget.wallet, nostrService: _nostrService),
   ];
 
-  void _openCamera() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => CameraScreen(
-          wallet: widget.wallet,
-          nostrService: _nostrService,
-        ),
-      ),
+  void _openComposer() {
+    showPostComposer(
+      context,
+      wallet: widget.wallet,
+      nostrService: _nostrService,
+      eventRepo: _eventRepo,
     );
   }
 
@@ -85,7 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: IndexedStack(index: _selectedTab, children: _tabs),
       bottomNavigationBar: _buildBottomNav(),
       floatingActionButton: _selectedTab != 0 ? null : GestureDetector(
-        onTap: _openCamera,
+        onTap: _openComposer,
         child: Container(
           width: 48,
           height: 48,

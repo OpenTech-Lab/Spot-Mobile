@@ -1,3 +1,12 @@
+/// Whether the content is the author's own direct experience or secondhand.
+enum PostSourceType {
+  /// The author personally witnessed / experienced this event.
+  firsthand,
+
+  /// The author is sharing or reporting on someone else's account.
+  secondhand,
+}
+
 /// Represents a geo-tagged media post (photo or video).
 /// GPS coordinates are locked at the moment of capture.
 class MediaPost {
@@ -31,6 +40,12 @@ class MediaPost {
   /// Whether this was recorded in Danger Mode (face blur + GPS stripped)
   final bool isDangerMode;
 
+  /// Whether the media/text was generated or significantly assisted by AI.
+  final bool isAiGenerated;
+
+  /// Whether this is the author's own account or a secondhand report.
+  final PostSourceType sourceType;
+
   /// Whether this post is virtual (game screenshot, artwork, fictional content —
   /// not a real-world event).  GPS is recorded internally but NOT published to
   /// Nostr and NOT shown to other users in the feed.
@@ -60,6 +75,8 @@ class MediaPost {
     this.eventTag,
     this.isDangerMode = false,
     this.isVirtual = false,
+    this.isAiGenerated = false,
+    this.sourceType = PostSourceType.firsthand,
     this.caption,
     this.replyToId,
     this.tags = const [],
@@ -90,6 +107,8 @@ class MediaPost {
         'eventTag': eventTag,
         'isDangerMode': isDangerMode,
         'isVirtual': isVirtual,
+        'isAiGenerated': isAiGenerated,
+        'sourceType': sourceType.name,
         'caption': caption,
         'replyToId': replyToId,
         'tags': tags,
@@ -113,6 +132,8 @@ class MediaPost {
         eventTag: json['eventTag'] as String?,
         isDangerMode: json['isDangerMode'] as bool? ?? false,
         isVirtual: json['isVirtual'] as bool? ?? false,
+        isAiGenerated: json['isAiGenerated'] as bool? ?? false,
+        sourceType: _parseSourceType(json['sourceType'] as String?),
         caption: json['caption'] as String?,
         replyToId: json['replyToId'] as String?,
         tags: List<String>.from(json['tags'] as List? ?? []),
@@ -135,6 +156,8 @@ class MediaPost {
     List<String>? tags,
     String? nostrEventId,
     bool? isVirtual,
+    bool? isAiGenerated,
+    PostSourceType? sourceType,
   }) =>
       MediaPost(
         id: id ?? this.id,
@@ -148,11 +171,19 @@ class MediaPost {
         eventTag: eventTag ?? this.eventTag,
         isDangerMode: isDangerMode ?? this.isDangerMode,
         isVirtual: isVirtual ?? this.isVirtual,
+        isAiGenerated: isAiGenerated ?? this.isAiGenerated,
+        sourceType: sourceType ?? this.sourceType,
         caption: caption ?? this.caption,
         replyToId: replyToId ?? this.replyToId,
         tags: tags ?? this.tags,
         nostrEventId: nostrEventId ?? this.nostrEventId,
       );
+
+  static PostSourceType _parseSourceType(String? value) =>
+      switch (value) {
+        'secondhand' => PostSourceType.secondhand,
+        _ => PostSourceType.firsthand,
+      };
 
   @override
   String toString() =>

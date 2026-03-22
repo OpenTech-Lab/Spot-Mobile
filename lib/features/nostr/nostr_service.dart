@@ -124,6 +124,8 @@ class NostrService {
       if (post.ipfsCid != null) ['ipfs', post.ipfsCid!],
       if (post.isDangerMode) ['danger', '1'],
       if (post.isVirtual) ['virtual', '1'],
+      if (post.isAiGenerated) ['ai_content', '1'],
+      ['source', post.sourceType.name],
     ];
 
     // Build a placeholder event to compute its ID
