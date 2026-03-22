@@ -1,5 +1,5 @@
-/// Nostr protocol type definitions.
-/// See https://github.com/nostr-protocol/nostr for the full specification.
+// Nostr protocol type definitions.
+// See https://github.com/nostr-protocol/nostr for the full specification.
 
 // ── Filter ────────────────────────────────────────────────────────────────
 

@@ -13,6 +13,7 @@ import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/camera_service.dart';
+import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
@@ -832,19 +833,8 @@ class _PreviewScreenState extends State<_PreviewScreen> {
                   icon: widget.isDangerMode
                       ? CupertinoIcons.shield
                       : CupertinoIcons.location_fill,
-                  label: widget.isDangerMode
-                      ? () {
-                          final lat = _coarseCoord(widget.gpsLock?.latitude);
-                          final lon = _coarseCoord(widget.gpsLock?.longitude);
-                          return lat != null
-                              ? 'Approx. ${lat.toStringAsFixed(1)}, '
-                                '${lon!.toStringAsFixed(1)}  (±55 km, faces blurred)'
-                              : 'Faces blurred · no location';
-                        }()
-                      : widget.gpsLock != null
-                          ? '${widget.gpsLock!.latitude.toStringAsFixed(4)}, '
-                            '${widget.gpsLock!.longitude.toStringAsFixed(4)}'
-                          : 'No location',
+                  label: _buildGpsLabel(
+                      widget.isDangerMode, widget.gpsLock),
                   color: widget.isDangerMode
                       ? SpotColors.danger
                       : SpotColors.success,
@@ -966,6 +956,29 @@ String _shortPubkey(String pubkey) {
 /// Rounds a coordinate to the nearest 0.5° (≈55 km) for city-level privacy.
 double? _coarseCoord(double? v) =>
     v == null ? null : (v * 2).roundToDouble() / 2.0;
+
+/// Builds the GPS label shown in the preview screen metadata row.
+/// Normal:    "Japan/Tokyo(35.6897,139.6922)"
+/// Protected: "Japan/Tokyo  (±55 km, faces blurred)" — no exact coords
+String _buildGpsLabel(bool isDangerMode, GpsLock? gpsLock) {
+  if (isDangerMode) {
+    final lat = _coarseCoord(gpsLock?.latitude);
+    final lon = _coarseCoord(gpsLock?.longitude);
+    if (lat == null) return 'Faces blurred · no location';
+    final geo = GeoLookup.instance.nearest(lat, lon!);
+    final place = geo != null ? '${geo.country}/${geo.city}' : '${lat.toStringAsFixed(1)}, ${lon.toStringAsFixed(1)}';
+    return '$place  (±55 km, faces blurred)';
+  }
+  if (gpsLock == null) return 'No location';
+  final lat = gpsLock.latitude;
+  final lon = gpsLock.longitude;
+  final geo = GeoLookup.instance.nearest(lat, lon);
+  if (geo != null) {
+    return '${geo.country}/${geo.city}'
+        '(${lat.toStringAsFixed(4)},${lon.toStringAsFixed(4)})';
+  }
+  return '${lat.toStringAsFixed(4)}, ${lon.toStringAsFixed(4)}';
+}
 
 class _PreviewMetaRow extends StatelessWidget {
   const _PreviewMetaRow({

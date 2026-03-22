@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:mobile/models/media_post.dart';
+import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
 /// Twitter/Threads-style thread row for a single [MediaPost].
@@ -234,25 +235,7 @@ class PostThreadRow extends StatelessWidget {
                     _PostMedia(post: post),
                     const SizedBox(height: SpotSpacing.sm),
                     // GPS row
-                    Row(
-                      children: [
-                        Icon(
-                          post.hasGps ? CupertinoIcons.location_fill : CupertinoIcons.location_slash,
-                          size: 11,
-                          color: post.hasGps
-                              ? SpotColors.success.withAlpha(160)
-                              : SpotColors.textTertiary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          post.hasGps
-                              ? '${post.latitude!.toStringAsFixed(3)}, '
-                                  '${post.longitude!.toStringAsFixed(3)}'
-                              : 'Location hidden',
-                          style: SpotType.caption,
-                        ),
-                      ],
-                    ),
+                    _GpsRow(post: post),
                     // Reply button
                     if (onReply != null) ...[
                       const SizedBox(height: SpotSpacing.xs),
@@ -509,6 +492,71 @@ class PubkeyAvatar extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Private helpers ────────────────────────────────────────────────────────────
+
+// ── GPS row ───────────────────────────────────────────────────────────────────
+
+/// Displays location as "Country/City(lat,lon)" in normal mode and
+/// "Country/City" in protected (danger) mode.
+class _GpsRow extends StatelessWidget {
+  const _GpsRow({required this.post});
+  final MediaPost post;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!post.hasGps) {
+      return Row(
+        children: [
+          const Icon(CupertinoIcons.location_slash,
+              size: 11, color: SpotColors.textTertiary),
+          const SizedBox(width: 4),
+          Text('Location hidden', style: SpotType.caption),
+        ],
+      );
+    }
+
+    final lat = post.latitude!;
+    final lon = post.longitude!;
+    final geo = GeoLookup.instance.nearest(lat, lon);
+
+    final String label;
+    if (geo != null) {
+      if (post.isDangerMode) {
+        // Protected mode: country/city only, no coordinates
+        label = '${geo.country}/${geo.city}';
+      } else {
+        // Normal mode: country/city(lat,lon)
+        label = '${geo.country}/${geo.city}'
+            '(${lat.toStringAsFixed(3)},${lon.toStringAsFixed(3)})';
+      }
+    } else {
+      // GeoLookup not ready yet — fall back to raw coordinates
+      label = post.isDangerMode
+          ? '${lat.toStringAsFixed(1)}, ${lon.toStringAsFixed(1)}'
+          : '${lat.toStringAsFixed(3)}, ${lon.toStringAsFixed(3)}';
+    }
+
+    return Row(
+      children: [
+        Icon(
+          post.isDangerMode
+              ? CupertinoIcons.location
+              : CupertinoIcons.location_fill,
+          size: 11,
+          color: post.isDangerMode
+              ? SpotColors.warning.withAlpha(160)
+              : SpotColors.success.withAlpha(160),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(label, style: SpotType.caption, maxLines: 1,
+              overflow: TextOverflow.ellipsis),
+        ),
+      ],
     );
   }
 }
