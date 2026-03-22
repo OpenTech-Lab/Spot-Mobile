@@ -58,7 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
     try {
       await widget.nostrService.connect();
-      _sub = _repo.subscribeToEvents().listen(_onEvent);
+      _sub = _repo.subscribeToAuthorPosts(widget.wallet.publicKeyHex).listen(_onEvent);
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
@@ -82,6 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _refresh() async {
     await _sub?.cancel();
+    _repo.reset();
     setState(() => _posts = []);
     await _initFeed();
   }

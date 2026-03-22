@@ -173,10 +173,7 @@ class _CameraScreenState extends State<CameraScreen>
       await CacheManager.instance.addToCache(contentHash, mediaFile.path);
       await P2PService.instance.seedMedia(mediaFile.path, contentHash);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Published')),
-        );
-        setState(() => _capturedFile = null);
+        Navigator.of(context).pop();
       }
     } catch (e) {
       _showError('Publish failed: $e');

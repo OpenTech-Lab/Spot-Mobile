@@ -93,26 +93,64 @@ class WalletService {
     return EncryptionUtils.sha256Hex(serialized);
   }
 
-  /// Signs a Nostr event with the given private key.
-  /// Returns the ECDSA signature as a hex string.
-  ///
-  /// TODO: Replace with Schnorr (BIP340) for full Nostr compliance.
+  /// Signs a Nostr event using BIP340 Schnorr over secp256k1.
+  /// Returns the 64-byte signature as a hex string.
   static String signNostrEvent(NostrEvent event, String privKeyHex) {
+    final msgBytes = EncryptionUtils.hexToBytes(event.id);
     final privBytes = EncryptionUtils.hexToBytes(privKeyHex);
-    final privInt = _bytesToBigInt(privBytes);
+    return _schnorrSign(msgBytes, privBytes);
+  }
 
-    final eventIdBytes = EncryptionUtils.hexToBytes(event.id);
+  /// BIP340 Schnorr signing.
+  static String _schnorrSign(Uint8List msg, Uint8List privBytes) {
+    final n = _curve.n;
 
-    final signer = ECDSASigner(null, HMac(SHA256Digest(), 64));
-    final privKey = ECPrivateKey(privInt, _curve);
-    final params = PrivateKeyParameter<ECPrivateKey>(privKey);
-    signer.init(true, params);
+    var sk = _bytesToBigInt(privBytes);
 
-    final signature = signer.generateSignature(eventIdBytes) as ECSignature;
-    final rBytes = _bigIntToBytes(signature.r, 32);
-    final sBytes = _bigIntToBytes(signature.s, 32);
+    // P = sk·G
+    final P = (_curve.G * sk)!;
+    final px = _bigIntToBytes(P.x!.toBigInteger()!, 32);
 
-    return EncryptionUtils.bytesToHex(Uint8List.fromList([...rBytes, ...sBytes]));
+    // If P.y is odd, negate sk so the public key has even y (BIP340 §3)
+    if (P.y!.toBigInteger()!.isOdd) sk = n - sk;
+    final skBytes = _bigIntToBytes(sk, 32);
+
+    // t = sk ⊕ tagged_hash("BIP0340/aux", zeros)
+    final auxHash = _taggedHash('BIP0340/aux', Uint8List(32));
+    final t = Uint8List(32);
+    for (var i = 0; i < 32; i++) {
+      t[i] = skBytes[i] ^ auxHash[i];
+    }
+
+    // rand = tagged_hash("BIP0340/nonce", t ‖ px ‖ msg)
+    final rand = _taggedHash(
+        'BIP0340/nonce', Uint8List.fromList([...t, ...px, ...msg]));
+    var k = _bytesToBigInt(rand) % n;
+    if (k == BigInt.zero) k = BigInt.one; // astronomically unlikely
+
+    // R = k·G
+    final r = (_curve.G * k)!;
+    final rx = _bigIntToBytes(r.x!.toBigInteger()!, 32);
+
+    // If R.y is odd, negate k
+    if (r.y!.toBigInteger()!.isOdd) k = n - k;
+
+    // e = int(tagged_hash("BIP0340/challenge", rx ‖ px ‖ msg)) mod n
+    final eBytes = _taggedHash(
+        'BIP0340/challenge', Uint8List.fromList([...rx, ...px, ...msg]));
+    final e = _bytesToBigInt(eBytes) % n;
+
+    // sig = rx ‖ (k + e·sk) mod n
+    final sigS = _bigIntToBytes((k + e * sk) % n, 32);
+    return EncryptionUtils.bytesToHex(Uint8List.fromList([...rx, ...sigS]));
+  }
+
+  /// BIP340 tagged hash: SHA256(SHA256(tag) ‖ SHA256(tag) ‖ data)
+  static Uint8List _taggedHash(String tag, Uint8List data) {
+    final tagBytes = Uint8List.fromList(utf8.encode(tag));
+    final tagHash = SHA256Digest().process(tagBytes);
+    return SHA256Digest()
+        .process(Uint8List.fromList([...tagHash, ...tagHash, ...data]));
   }
 
   // ── Wallet persistence ────────────────────────────────────────────────────

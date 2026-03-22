@@ -24,6 +24,7 @@ class EventRepository {
   final _controller = StreamController<CivicEvent>.broadcast();
 
   String? _globalSubId;
+  final List<String> _authorSubIds = [];
 
   // ── Subscription ──────────────────────────────────────────────────────────
 
@@ -92,6 +93,41 @@ class EventRepository {
     return result;
   }
 
+  /// Subscribes to posts by a specific [authorPubkey] (e.g. for profile screen).
+  /// Uses an author filter so the relay returns only that user's posts even on
+  /// busy relays where a generic `limit: 50` would miss them.
+  Stream<CivicEvent> subscribeToAuthorPosts(String authorPubkey) {
+    final subId = _nostr.subscribe(
+      [
+        NostrFilter(
+          kinds: [1],
+          limit: 200,
+          authors: [authorPubkey],
+          tags: {'app': ['spot']},
+        ),
+        NostrFilter(kinds: [5, 1984], limit: 50, authors: [authorPubkey]),
+      ],
+      _handleNostrEvent,
+    );
+    _authorSubIds.add(subId);
+    return _controller.stream;
+  }
+
+  /// Clears all cached events and unsubscribes from the relay so that the
+  /// next [subscribeToEvents] / [subscribeToAuthorPosts] call issues a fresh
+  /// REQ and the relay re-delivers stored events.
+  void reset() {
+    if (_globalSubId != null) {
+      _nostr.unsubscribe(_globalSubId!);
+      _globalSubId = null;
+    }
+    for (final id in _authorSubIds) {
+      _nostr.unsubscribe(id);
+    }
+    _authorSubIds.clear();
+    _cache.clear();
+  }
+
   /// Returns a snapshot of all cached [CivicEvent]s, newest-first.
   List<CivicEvent> getAllEvents() {
     final events = _cache.values.toList();
@@ -115,6 +151,10 @@ class EventRepository {
       _nostr.unsubscribe(_globalSubId!);
       _globalSubId = null;
     }
+    for (final id in _authorSubIds) {
+      _nostr.unsubscribe(id);
+    }
+    _authorSubIds.clear();
     await _controller.close();
   }
 

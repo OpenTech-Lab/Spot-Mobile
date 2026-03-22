@@ -77,6 +77,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Future<void> _refresh() async {
     await _sub?.cancel();
+    _repo.reset();
     setState(() => _posts = []);
     await _initFeed();
   }

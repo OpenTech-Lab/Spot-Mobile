@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -228,43 +230,8 @@ class PostThreadRow extends StatelessWidget {
                       Text(post.caption!, style: SpotType.body),
                     ],
                     const SizedBox(height: SpotSpacing.sm),
-                    // Media placeholder
-                    Container(
-                      height: 140,
-                      decoration: BoxDecoration(
-                        color: SpotColors.surface,
-                        borderRadius: BorderRadius.circular(SpotRadius.md),
-                        border: Border.all(
-                          color: SpotColors.border,
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Center(
-                        child: post.isDangerMode
-                            ? Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    CupertinoIcons.shield,
-                                    color: SpotColors.danger.withAlpha(120),
-                                    size: 22,
-                                  ),
-                                  const SizedBox(height: SpotSpacing.xs),
-                                  Text(
-                                    'Content protected',
-                                    style: SpotType.caption.copyWith(
-                                      color: SpotColors.textTertiary,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : const Icon(
-                                CupertinoIcons.photo,
-                                color: SpotColors.overlay,
-                                size: 26,
-                              ),
-                      ),
-                    ),
+                    // Media
+                    _PostMedia(post: post),
                     const SizedBox(height: SpotSpacing.sm),
                     // GPS row
                     Row(
@@ -315,6 +282,144 @@ class PostThreadRow extends StatelessWidget {
                     ],
                   ],
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Post media ────────────────────────────────────────────────────────────────
+
+class _PostMedia extends StatelessWidget {
+  const _PostMedia({required this.post});
+  final MediaPost post;
+
+  @override
+  Widget build(BuildContext context) {
+    // Danger mode: content protected
+    if (post.isDangerMode) {
+      return _mediaShell(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(CupertinoIcons.shield,
+                color: SpotColors.danger.withAlpha(120), size: 22),
+            const SizedBox(height: SpotSpacing.xs),
+            Text('Content protected',
+                style: SpotType.caption
+                    .copyWith(color: SpotColors.textTertiary)),
+          ],
+        ),
+      );
+    }
+
+    final path = post.mediaPath;
+
+    // Local file available
+    if (path != null && File(path).existsSync()) {
+      if (_isVideo(path)) {
+        return _VideoThumb(path: path);
+      }
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(SpotRadius.md),
+        child: Image.file(
+          File(path),
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (ctx, err, stack) => _mediaShell(
+            child: const Icon(CupertinoIcons.photo,
+                color: SpotColors.overlay, size: 26),
+          ),
+        ),
+      );
+    }
+
+    // No local file (remote post, P2P not yet fetched)
+    return _mediaShell(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(CupertinoIcons.photo,
+              color: SpotColors.overlay, size: 26),
+          const SizedBox(height: SpotSpacing.xs),
+          Text('Media not cached',
+              style:
+                  SpotType.caption.copyWith(color: SpotColors.textTertiary)),
+        ],
+      ),
+    );
+  }
+
+  Widget _mediaShell({required Widget child}) => Container(
+        height: 160,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: SpotColors.surface,
+          borderRadius: BorderRadius.circular(SpotRadius.md),
+          border: Border.all(color: SpotColors.border, width: 0.5),
+        ),
+        child: Center(child: child),
+      );
+
+  static bool _isVideo(String path) {
+    final p = path.toLowerCase();
+    return p.endsWith('.mp4') ||
+        p.endsWith('.mov') ||
+        p.endsWith('.avi') ||
+        p.endsWith('.mkv');
+  }
+}
+
+// ── Video thumbnail ───────────────────────────────────────────────────────────
+
+class _VideoThumb extends StatelessWidget {
+  const _VideoThumb({required this.path});
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 160,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: SpotColors.surface,
+        borderRadius: BorderRadius.circular(SpotRadius.md),
+        border: Border.all(color: SpotColors.border, width: 0.5),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(SpotRadius.md),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Dark background
+            Container(color: const Color(0xFF111111)),
+            // Play icon
+            const Center(
+              child: Icon(
+                CupertinoIcons.play_circle_fill,
+                color: Colors.white54,
+                size: 44,
+              ),
+            ),
+            // "Video" label bottom-left
+            Positioned(
+              bottom: SpotSpacing.sm,
+              left: SpotSpacing.sm,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius:
+                      BorderRadius.circular(SpotRadius.xs),
+                ),
+                child: const Text('Video',
+                    style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11)),
               ),
             ),
           ],
