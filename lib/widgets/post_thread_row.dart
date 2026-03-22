@@ -316,10 +316,45 @@ class _PostMedia extends StatelessWidget {
       );
     }
 
-    final path = post.mediaPath;
+    // Collect all locally available paths
+    final availablePaths = post.mediaPaths
+        .where((p) => File(p).existsSync())
+        .toList();
 
-    // Local file available
-    if (path != null && File(path).existsSync()) {
+    // Multiple files: horizontal scrollable strip
+    if (availablePaths.length > 1) {
+      return SizedBox(
+        height: 160,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: availablePaths.length,
+          separatorBuilder: (ctx, i) => const SizedBox(width: 6),
+          itemBuilder: (ctx, i) {
+            final path = availablePaths[i];
+            final w = availablePaths.length == 2 ? 160.0 : 140.0;
+            return SizedBox(
+              width: w,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(SpotRadius.sm),
+                child: _isVideo(path)
+                    ? _VideoThumb(path: path, compact: true)
+                    : Image.file(File(path),
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, err, stack) => Container(
+                          color: SpotColors.surface,
+                          child: const Icon(CupertinoIcons.photo,
+                              color: SpotColors.overlay, size: 22),
+                        )),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    // Single file
+    final path = availablePaths.isEmpty ? null : availablePaths.first;
+    if (path != null) {
       if (_isVideo(path)) {
         return _VideoThumb(path: path);
       }
@@ -376,8 +411,9 @@ class _PostMedia extends StatelessWidget {
 // ── Video thumbnail ───────────────────────────────────────────────────────────
 
 class _VideoThumb extends StatelessWidget {
-  const _VideoThumb({required this.path});
+  const _VideoThumb({required this.path, this.compact = false});
   final String path;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {

@@ -7,11 +7,11 @@ class MediaPost {
   /// Author's Nostr public key hex
   final String pubkey;
 
-  /// SHA-256 hash of the raw media file bytes (hex encoded)
-  final String contentHash;
+  /// SHA-256 hashes of all media files (hex encoded). First entry is primary.
+  final List<String> contentHashes;
 
-  /// Absolute local file path on this device (null if not locally available)
-  final String? mediaPath;
+  /// Absolute local file paths on this device (one per media file).
+  final List<String> mediaPaths;
 
   /// IPFS Content Identifier, set after pinning to IPFS (null if not pinned)
   final String? ipfsCid;
@@ -46,8 +46,8 @@ class MediaPost {
   const MediaPost({
     required this.id,
     required this.pubkey,
-    required this.contentHash,
-    this.mediaPath,
+    required this.contentHashes,
+    this.mediaPaths = const [],
     this.ipfsCid,
     this.latitude,
     this.longitude,
@@ -60,11 +60,23 @@ class MediaPost {
     required this.nostrEventId,
   });
 
+  // ── Convenience getters (backward compatibility) ───────────────────────────
+
+  /// Primary content hash (first in [contentHashes]).
+  String get contentHash => contentHashes.first;
+
+  /// Primary local file path (first in [mediaPaths]), null if not cached.
+  String? get mediaPath => mediaPaths.isEmpty ? null : mediaPaths.first;
+
+  bool get hasGps => latitude != null && longitude != null;
+
+  // ── Serialisation ──────────────────────────────────────────────────────────
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'pubkey': pubkey,
-        'contentHash': contentHash,
-        'mediaPath': mediaPath,
+        'contentHashes': contentHashes,
+        'mediaPaths': mediaPaths,
         'ipfsCid': ipfsCid,
         'latitude': latitude,
         'longitude': longitude,
@@ -80,8 +92,13 @@ class MediaPost {
   factory MediaPost.fromJson(Map<String, dynamic> json) => MediaPost(
         id: json['id'] as String,
         pubkey: json['pubkey'] as String,
-        contentHash: json['contentHash'] as String,
-        mediaPath: json['mediaPath'] as String?,
+        // Support both old single-hash format and new list format
+        contentHashes: json['contentHashes'] != null
+            ? List<String>.from(json['contentHashes'] as List)
+            : [json['contentHash'] as String],
+        mediaPaths: json['mediaPaths'] != null
+            ? List<String>.from(json['mediaPaths'] as List)
+            : (json['mediaPath'] != null ? [json['mediaPath'] as String] : []),
         ipfsCid: json['ipfsCid'] as String?,
         latitude: (json['latitude'] as num?)?.toDouble(),
         longitude: (json['longitude'] as num?)?.toDouble(),
@@ -97,8 +114,8 @@ class MediaPost {
   MediaPost copyWith({
     String? id,
     String? pubkey,
-    String? contentHash,
-    String? mediaPath,
+    List<String>? contentHashes,
+    List<String>? mediaPaths,
     String? ipfsCid,
     double? latitude,
     double? longitude,
@@ -113,8 +130,8 @@ class MediaPost {
       MediaPost(
         id: id ?? this.id,
         pubkey: pubkey ?? this.pubkey,
-        contentHash: contentHash ?? this.contentHash,
-        mediaPath: mediaPath ?? this.mediaPath,
+        contentHashes: contentHashes ?? this.contentHashes,
+        mediaPaths: mediaPaths ?? this.mediaPaths,
         ipfsCid: ipfsCid ?? this.ipfsCid,
         latitude: latitude ?? this.latitude,
         longitude: longitude ?? this.longitude,
@@ -127,9 +144,8 @@ class MediaPost {
         nostrEventId: nostrEventId ?? this.nostrEventId,
       );
 
-  bool get hasGps => latitude != null && longitude != null;
-
   @override
   String toString() =>
-      'MediaPost(id: ${id.substring(0, 8)}..., eventTag: $eventTag, isDangerMode: $isDangerMode)';
+      'MediaPost(id: ${id.substring(0, 8)}..., eventTag: $eventTag, '
+      'files: ${contentHashes.length}, isDangerMode: $isDangerMode)';
 }

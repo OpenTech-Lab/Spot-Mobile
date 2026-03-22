@@ -72,6 +72,17 @@ class NostrEvent {
     return null;
   }
 
+  /// Returns all values for a given tag name (e.g. multiple media_hash tags).
+  List<String> getAllTagValues(String name) {
+    final result = <String>[];
+    for (final tag in tags) {
+      if (tag.isNotEmpty && tag[0] == name && tag.length > 1) {
+        result.add(tag[1]);
+      }
+    }
+    return result;
+  }
+
   @override
   String toString() =>
       'NostrEvent(id: ${id.substring(0, 8)}..., kind: $kind, pubkey: ${pubkey.substring(0, 8)}...)';

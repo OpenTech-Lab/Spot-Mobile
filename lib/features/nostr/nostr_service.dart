@@ -117,7 +117,7 @@ class NostrService {
       if (post.eventTag != null) ['t', post.eventTag!],
       if (post.latitude != null && post.longitude != null)
         ['geo', post.latitude.toString(), post.longitude.toString()],
-      ['media_hash', post.contentHash],
+      for (final hash in post.contentHashes) ['media_hash', hash],
       if (post.ipfsCid != null) ['ipfs', post.ipfsCid!],
       if (post.isDangerMode) ['danger', '1'],
     ];

@@ -176,40 +176,41 @@ class EventRepository {
 
   /// Spec v1.4 §12 "Deletion Flow" step 2: hide revoked content immediately.
   void _handleRevocation(NostrEvent event) {
-    final contentHash = event.getTagValue('media_hash');
-    if (contentHash != null) {
-      CacheManager.instance.block(contentHash); // local block
-      P2PService.instance.dropFromCache(contentHash); // drop swarm cache
-      // Remove any in-memory posts matching this content hash
-      for (final key in _cache.keys.toList()) {
-        final civic = _cache[key]!;
-        final updated =
-            civic.posts.where((p) => p.contentHash != contentHash).toList();
-        if (updated.length != civic.posts.length) {
-          _cache[key] = civic.copyWith(
-            posts: updated,
-            participantCount:
-                updated.map((p) => p.pubkey).toSet().length,
-          );
-          if (!_controller.isClosed) _controller.add(_cache[key]!);
-        }
+    final hashes = event.getAllTagValues('media_hash');
+    if (hashes.isEmpty) return;
+    for (final hash in hashes) {
+      CacheManager.instance.block(hash);
+      P2PService.instance.dropFromCache(hash);
+    }
+    // Remove in-memory posts that share any revoked hash
+    for (final key in _cache.keys.toList()) {
+      final civic = _cache[key]!;
+      final updated = civic.posts
+          .where((p) => p.contentHashes.every((h) => !hashes.contains(h)))
+          .toList();
+      if (updated.length != civic.posts.length) {
+        _cache[key] = civic.copyWith(
+          posts: updated,
+          participantCount: updated.map((p) => p.pubkey).toSet().length,
+        );
+        if (!_controller.isClosed) _controller.add(_cache[key]!);
       }
     }
   }
 
   /// Spec v1.4 §12.B: propagate community reports to local blocklist.
   void _handleReport(NostrEvent event) {
-    final contentHash = event.getTagValue('media_hash');
-    if (contentHash != null) {
-      CacheManager.instance.block(contentHash);
-      P2PService.instance.dropFromCache(contentHash);
+    for (final hash in event.getAllTagValues('media_hash')) {
+      CacheManager.instance.block(hash);
+      P2PService.instance.dropFromCache(hash);
     }
   }
 
   void _handleMediaPost(NostrEvent event) {
-    final contentHash = event.getTagValue('media_hash') ?? event.id;
-    // Client-side blocklist filter (spec v1.4 §12.B)
-    if (CacheManager.instance.isBlocked(contentHash)) return;
+    final hashes = event.getAllTagValues('media_hash');
+    if (hashes.isEmpty) hashes.add(event.id);
+    // Client-side blocklist filter: drop if any file hash is blocked
+    if (hashes.any(CacheManager.instance.isBlocked)) return;
 
     final hashtag = event.getTagValue('t');
     // Posts without an event tag go into '_unsorted' so they still appear in
@@ -281,8 +282,9 @@ class EventRepository {
       }
     }
 
-    final contentHash =
-        event.getTagValue('media_hash') ?? event.id;
+    // Collect all media hashes (supports multi-file posts)
+    final allHashes = event.getAllTagValues('media_hash');
+    if (allHashes.isEmpty) allHashes.add(event.id);
 
     // Parse replyToId from ["e", ...] NIP-10 tag
     String? replyToId;
@@ -304,14 +306,17 @@ class EventRepository {
       if (joined.isNotEmpty) caption = joined;
     }
 
-    // Look up local file from cache (covers self-delivered and previously cached posts)
-    final cachedFile = CacheManager.instance.getCached(contentHash);
+    // Look up cached local paths for each hash
+    final cachedPaths = allHashes
+        .map((h) => CacheManager.instance.getCached(h)?.path)
+        .whereType<String>()
+        .toList();
 
     return MediaPost(
       id: event.id,
       pubkey: event.pubkey,
-      contentHash: contentHash,
-      mediaPath: cachedFile?.path,
+      contentHashes: allHashes,
+      mediaPaths: cachedPaths,
       latitude: latitude,
       longitude: longitude,
       capturedAt:
