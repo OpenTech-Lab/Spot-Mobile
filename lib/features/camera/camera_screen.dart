@@ -13,6 +13,7 @@ import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/camera_service.dart';
+import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
 /// Full-screen camera UI.
@@ -41,16 +42,16 @@ class _CameraScreenState extends State<CameraScreen>
   List<CameraDescription> _cameras = [];
 
   bool _isInitialized = false;
-  bool _isRecording   = false;
-  bool _isDangerMode  = false;
-  bool _isCapturing   = false;
-  bool _gpsFetched    = false;
+  bool _isRecording = false;
+  bool _isDangerMode = false;
+  bool _isCapturing = false;
+  bool _gpsFetched = false;
 
   GpsLock? _gpsLock;
   String _eventTag = '';
   // Accumulated media files — up to 4 items per post
   final List<XFile> _capturedFiles = [];
-  final List<bool>  _capturedIsVideos = [];
+  final List<bool> _capturedIsVideos = [];
 
   final _tagController = TextEditingController();
 
@@ -97,7 +98,12 @@ class _CameraScreenState extends State<CameraScreen>
 
   Future<void> _fetchGps() async {
     final lock = await CameraService.instance.lockGPS();
-    if (mounted) setState(() { _gpsLock = lock; _gpsFetched = true; });
+    if (mounted) {
+      setState(() {
+        _gpsLock = lock;
+        _gpsFetched = true;
+      });
+    }
   }
 
   Future<void> _capturePhoto() async {
@@ -178,18 +184,18 @@ class _CameraScreenState extends State<CameraScreen>
     final paths = processedFiles.map((f) => f.path).toList();
 
     final post = MediaPost(
-      id:            primaryHash,
-      pubkey:        widget.wallet.publicKeyHex,
+      id: primaryHash,
+      pubkey: widget.wallet.publicKeyHex,
       contentHashes: hashes,
-      mediaPaths:    paths,
-      latitude:      _isDangerMode ? null : _gpsLock?.latitude,
-      longitude:     _isDangerMode ? null : _gpsLock?.longitude,
-      capturedAt:    _gpsLock?.timestamp ?? DateTime.now().toUtc(),
-      eventTag:      effectiveTag,
-      isDangerMode:  _isDangerMode,
-      caption:       caption.isEmpty ? null : caption,
-      replyToId:     widget.replyToPost?.nostrEventId,
-      nostrEventId:  primaryHash,
+      mediaPaths: paths,
+      latitude: _isDangerMode ? null : _gpsLock?.latitude,
+      longitude: _isDangerMode ? null : _gpsLock?.longitude,
+      capturedAt: _gpsLock?.timestamp ?? DateTime.now().toUtc(),
+      eventTag: effectiveTag,
+      isDangerMode: _isDangerMode,
+      caption: caption.isEmpty ? null : caption,
+      replyToId: widget.replyToPost?.nostrEventId,
+      nostrEventId: primaryHash,
     );
 
     try {
@@ -197,11 +203,25 @@ class _CameraScreenState extends State<CameraScreen>
       for (var i = 0; i < hashes.length; i++) {
         await CacheManager.instance.addToCache(hashes[i], paths[i]);
       }
-      await widget.nostrService.publishMediaPost(post, widget.wallet);
+      final signed = await widget.nostrService.publishMediaPost(
+        post,
+        widget.wallet,
+      );
+      await LocalPostStore.instance.savePost(
+        post.copyWith(
+          id: signed.id,
+          nostrEventId: signed.id,
+          capturedAt: DateTime.fromMillisecondsSinceEpoch(
+            signed.createdAt * 1000,
+          ),
+        ),
+      );
       for (var i = 0; i < hashes.length; i++) {
         await P2PService.instance.seedMedia(paths[i], hashes[i]);
       }
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
     } catch (e) {
       _showError('Publish failed: $e');
     }
@@ -224,7 +244,8 @@ class _CameraScreenState extends State<CameraScreen>
     setState(() {
       for (final media in picked) {
         final path = media.path.toLowerCase();
-        final isVideo = media.mimeType?.startsWith('video') == true ||
+        final isVideo =
+            media.mimeType?.startsWith('video') == true ||
             path.endsWith('.mp4') ||
             path.endsWith('.mov') ||
             path.endsWith('.avi') ||
@@ -249,7 +270,10 @@ class _CameraScreenState extends State<CameraScreen>
           child: SizedBox(
             width: 18,
             height: 18,
-            child: CircularProgressIndicator(color: SpotColors.accent, strokeWidth: 1),
+            child: CircularProgressIndicator(
+              color: SpotColors.accent,
+              strokeWidth: 1,
+            ),
           ),
         ),
       );
@@ -257,14 +281,16 @@ class _CameraScreenState extends State<CameraScreen>
 
     if (_capturedFiles.isNotEmpty) {
       return _PreviewScreen(
-        files:        _capturedFiles,
-        isVideos:     _capturedIsVideos,
+        files: _capturedFiles,
+        isVideos: _capturedIsVideos,
         isDangerMode: _isDangerMode,
-        gpsLock:      _gpsLock,
-        eventTag:     _eventTag.isNotEmpty ? _eventTag : widget.replyToPost?.eventTag,
-        replyToPost:  widget.replyToPost,
-        onConfirm:    _publishPost,
-        onDiscard:    _discardCapture,
+        gpsLock: _gpsLock,
+        eventTag: _eventTag.isNotEmpty
+            ? _eventTag
+            : widget.replyToPost?.eventTag,
+        replyToPost: widget.replyToPost,
+        onConfirm: _publishPost,
+        onDiscard: _discardCapture,
         onAddMore: _capturedFiles.length < 4 ? _pickFromGallery : null,
       );
     }
@@ -334,17 +360,20 @@ class _CameraScreenState extends State<CameraScreen>
 
           // Controls
           Positioned(
-            left: 0, right: 0, bottom: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             child: _ControlsPanel(
-              isDangerMode:     _isDangerMode,
-              isRecording:      _isRecording,
-              tagController:    _tagController,
-              onDangerToggle:   () => setState(() => _isDangerMode = !_isDangerMode),
-              onTagChanged:     (v) => _eventTag = v.replaceAll('#', '').trim(),
-              onTap:            _capturePhoto,
+              isDangerMode: _isDangerMode,
+              isRecording: _isRecording,
+              tagController: _tagController,
+              onDangerToggle: () =>
+                  setState(() => _isDangerMode = !_isDangerMode),
+              onTagChanged: (v) => _eventTag = v.replaceAll('#', '').trim(),
+              onTap: _capturePhoto,
               onLongPressStart: (_) => _startRecording(),
-              onLongPressEnd:   (_) => _stopRecording(),
-              onGallery:        _pickFromGallery,
+              onLongPressEnd: (_) => _stopRecording(),
+              onGallery: _pickFromGallery,
             ),
           ),
         ],
@@ -369,7 +398,8 @@ class _GpsIndicator extends StatelessWidget {
     if (gpsLock != null) {
       icon = CupertinoIcons.location_fill;
       iconColor = SpotColors.success;
-      label = '${gpsLock!.latitude.toStringAsFixed(4)}, '
+      label =
+          '${gpsLock!.latitude.toStringAsFixed(4)}, '
           '${gpsLock!.longitude.toStringAsFixed(4)}';
     } else if (!fetched) {
       icon = CupertinoIcons.location;
@@ -395,10 +425,7 @@ class _GpsIndicator extends StatelessWidget {
         children: [
           Icon(icon, color: iconColor, size: 12),
           const SizedBox(width: SpotSpacing.xs),
-          Text(
-            label,
-            style: SpotType.caption.copyWith(color: Colors.white70),
-          ),
+          Text(label, style: SpotType.caption.copyWith(color: Colors.white70)),
         ],
       ),
     );
@@ -488,9 +515,7 @@ class _ControlsPanel extends StatelessWidget {
                         ? SpotColors.danger.withAlpha(40)
                         : Colors.transparent,
                     border: Border.all(
-                      color: isDangerMode
-                          ? SpotColors.danger
-                          : Colors.white24,
+                      color: isDangerMode ? SpotColors.danger : Colors.white24,
                       width: 0.5,
                     ),
                   ),
@@ -513,13 +538,12 @@ class _ControlsPanel extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: isRecording ? SpotColors.danger : Colors.white,
-                    border: Border.all(
-                      color: Colors.white54,
-                      width: 2,
-                    ),
+                    border: Border.all(color: Colors.white54, width: 2),
                   ),
                   child: Icon(
-                    isRecording ? CupertinoIcons.stop_fill : CupertinoIcons.circle_fill,
+                    isRecording
+                        ? CupertinoIcons.stop_fill
+                        : CupertinoIcons.circle_fill,
                     color: isRecording ? Colors.white : Colors.black,
                     size: isRecording ? 28 : 32,
                   ),
@@ -536,7 +560,11 @@ class _ControlsPanel extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white24, width: 0.5),
                   ),
-                  child: const Icon(CupertinoIcons.photo, color: Colors.white54, size: 20),
+                  child: const Icon(
+                    CupertinoIcons.photo,
+                    color: Colors.white54,
+                    size: 20,
+                  ),
                 ),
               ),
             ],
@@ -544,9 +572,7 @@ class _ControlsPanel extends StatelessWidget {
 
           const SizedBox(height: SpotSpacing.sm),
           Text(
-            isRecording
-                ? 'Release to stop'
-                : 'Tap · photo   Hold · video',
+            isRecording ? 'Release to stop' : 'Tap · photo   Hold · video',
             style: SpotType.caption.copyWith(color: Colors.white38),
           ),
         ],
@@ -581,6 +607,7 @@ class _PreviewScreen extends StatefulWidget {
   final MediaPost? replyToPost;
   final void Function(String caption) onConfirm;
   final VoidCallback onDiscard;
+
   /// Null when already at 4-item limit.
   final VoidCallback? onAddMore;
 
@@ -622,7 +649,8 @@ class _PreviewScreenState extends State<_PreviewScreen> {
             child: GestureDetector(
               onHorizontalDragEnd: (d) {
                 if (widget.files.length <= 1) return;
-                if (d.primaryVelocity! < 0 && _selectedIndex < widget.files.length - 1) {
+                if (d.primaryVelocity! < 0 &&
+                    _selectedIndex < widget.files.length - 1) {
                   setState(() => _selectedIndex++);
                 } else if (d.primaryVelocity! > 0 && _selectedIndex > 0) {
                   setState(() => _selectedIndex--);
@@ -636,13 +664,18 @@ class _PreviewScreenState extends State<_PreviewScreen> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(CupertinoIcons.videocam,
-                                  color: Colors.white38, size: 48),
+                              const Icon(
+                                CupertinoIcons.videocam,
+                                color: Colors.white38,
+                                size: 48,
+                              ),
                               const SizedBox(height: SpotSpacing.sm),
                               Text(
                                 'Video ${_selectedIndex + 1} of ${widget.files.length}',
                                 style: const TextStyle(
-                                    color: Colors.white54, fontSize: 13),
+                                  color: Colors.white54,
+                                  fontSize: 13,
+                                ),
                               ),
                             ],
                           ),
@@ -708,8 +741,9 @@ class _PreviewScreenState extends State<_PreviewScreen> {
                               width: 52,
                               height: 52,
                               decoration: BoxDecoration(
-                                borderRadius:
-                                    BorderRadius.circular(SpotRadius.xs),
+                                borderRadius: BorderRadius.circular(
+                                  SpotRadius.xs,
+                                ),
                                 border: Border.all(
                                   color: i == _selectedIndex
                                       ? SpotColors.accent
@@ -718,15 +752,17 @@ class _PreviewScreenState extends State<_PreviewScreen> {
                                 ),
                               ),
                               child: ClipRRect(
-                                borderRadius:
-                                    BorderRadius.circular(SpotRadius.xs),
+                                borderRadius: BorderRadius.circular(
+                                  SpotRadius.xs,
+                                ),
                                 child: widget.isVideos[i]
                                     ? Container(
                                         color: const Color(0xFF222222),
                                         child: const Icon(
-                                            CupertinoIcons.play_circle,
-                                            color: Colors.white54,
-                                            size: 22),
+                                          CupertinoIcons.play_circle,
+                                          color: Colors.white54,
+                                          size: 22,
+                                        ),
                                       )
                                     : Image.file(
                                         File(widget.files[i].path),
@@ -745,14 +781,20 @@ class _PreviewScreenState extends State<_PreviewScreen> {
                             width: 52,
                             height: 52,
                             decoration: BoxDecoration(
-                              borderRadius:
-                                  BorderRadius.circular(SpotRadius.xs),
+                              borderRadius: BorderRadius.circular(
+                                SpotRadius.xs,
+                              ),
                               border: Border.all(
-                                  color: SpotColors.border, width: 0.5),
+                                color: SpotColors.border,
+                                width: 0.5,
+                              ),
                               color: SpotColors.bg,
                             ),
-                            child: const Icon(CupertinoIcons.plus,
-                                color: SpotColors.textTertiary, size: 20),
+                            child: const Icon(
+                              CupertinoIcons.plus,
+                              color: SpotColors.textTertiary,
+                              size: 20,
+                            ),
                           ),
                         ),
                       ],
@@ -765,8 +807,11 @@ class _PreviewScreenState extends State<_PreviewScreen> {
                 if (widget.replyToPost != null) ...[
                   Row(
                     children: [
-                      const Icon(CupertinoIcons.arrow_turn_up_left,
-                          size: 12, color: SpotColors.textTertiary),
+                      const Icon(
+                        CupertinoIcons.arrow_turn_up_left,
+                        size: 12,
+                        color: SpotColors.textTertiary,
+                      ),
                       const SizedBox(width: SpotSpacing.xs),
                       Text(
                         'Replying to ${_shortPubkey(widget.replyToPost!.pubkey)}',
@@ -785,9 +830,9 @@ class _PreviewScreenState extends State<_PreviewScreen> {
                   label: widget.isDangerMode
                       ? 'Protected — location and faces hidden'
                       : widget.gpsLock != null
-                          ? '${widget.gpsLock!.latitude.toStringAsFixed(4)}, '
+                      ? '${widget.gpsLock!.latitude.toStringAsFixed(4)}, '
                             '${widget.gpsLock!.longitude.toStringAsFixed(4)}'
-                          : 'No location',
+                      : 'No location',
                   color: widget.isDangerMode
                       ? SpotColors.danger
                       : SpotColors.success,
@@ -812,11 +857,14 @@ class _PreviewScreenState extends State<_PreviewScreen> {
                       maxLength: _kCaptionLimit,
                       style: SpotType.body,
                       decoration: InputDecoration(
-                        hintText: 'Add a caption… (optional, max $_kCaptionLimit chars)',
-                        hintStyle: SpotType.body
-                            .copyWith(color: SpotColors.textTertiary),
-                        counterText:
-                            len > (_kCaptionLimit - 30) ? '$len/$_kCaptionLimit' : '',
+                        hintText:
+                            'Add a caption… (optional, max $_kCaptionLimit chars)',
+                        hintStyle: SpotType.body.copyWith(
+                          color: SpotColors.textTertiary,
+                        ),
+                        counterText: len > (_kCaptionLimit - 30)
+                            ? '$len/$_kCaptionLimit'
+                            : '',
                         counterStyle: SpotType.caption.copyWith(
                           color: len >= _kCaptionLimit
                               ? SpotColors.danger
@@ -827,17 +875,23 @@ class _PreviewScreenState extends State<_PreviewScreen> {
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(SpotRadius.sm),
                           borderSide: const BorderSide(
-                              color: SpotColors.border, width: 0.5),
+                            color: SpotColors.border,
+                            width: 0.5,
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(SpotRadius.sm),
                           borderSide: const BorderSide(
-                              color: SpotColors.border, width: 0.5),
+                            color: SpotColors.border,
+                            width: 0.5,
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(SpotRadius.sm),
                           borderSide: const BorderSide(
-                              color: SpotColors.accent, width: 0.5),
+                            color: SpotColors.accent,
+                            width: 0.5,
+                          ),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: SpotSpacing.md,
@@ -857,7 +911,8 @@ class _PreviewScreenState extends State<_PreviewScreen> {
                         onPressed: widget.onDiscard,
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
-                              vertical: SpotSpacing.md),
+                            vertical: SpotSpacing.md,
+                          ),
                         ),
                         child: const Text('Discard'),
                       ),
@@ -870,7 +925,8 @@ class _PreviewScreenState extends State<_PreviewScreen> {
                             widget.onConfirm(_captionController.text.trim()),
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
-                              vertical: SpotSpacing.md),
+                            vertical: SpotSpacing.md,
+                          ),
                         ),
                         child: Text(
                           widget.files.length > 1

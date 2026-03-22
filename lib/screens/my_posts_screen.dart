@@ -8,6 +8,8 @@ import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/services/cache_manager.dart';
+import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
@@ -54,6 +56,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
       _error = null;
     });
     try {
+      await _loadPersistedPosts();
       await widget.nostrService.connect();
       _sub = _repo.subscribeToEvents().listen(_onEvent);
     } catch (e) {
@@ -69,11 +72,8 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
         .where((p) => p.pubkey == widget.wallet.publicKeyHex)
         .toList();
     if (mine.isEmpty) return;
-    final existingIds = {for (final p in _posts) p.id};
-    final incoming = mine.where((p) => !existingIds.contains(p.id)).toList();
-    if (incoming.isEmpty) return;
-    final merged = [..._posts, ...incoming]
-      ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+    final merged = _mergePosts(_posts, mine);
+    if (merged.length == _posts.length) return;
     setState(() => _posts = merged);
   }
 
@@ -81,6 +81,34 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
     await _sub?.cancel();
     setState(() => _posts = []);
     await _initFeed();
+  }
+
+  Future<void> _loadPersistedPosts() async {
+    final persisted = await LocalPostStore.instance.loadPosts(
+      authorPubkey: widget.wallet.publicKeyHex,
+    );
+    final visible = persisted
+        .where(
+          (post) => post.contentHashes.every(
+            (hash) => !CacheManager.instance.isBlocked(hash),
+          ),
+        )
+        .toList();
+    if (!mounted || visible.isEmpty) return;
+    setState(() => _posts = _mergePosts(_posts, visible));
+  }
+
+  List<MediaPost> _mergePosts(
+    List<MediaPost> current,
+    Iterable<MediaPost> incoming,
+  ) {
+    final byId = {for (final post in current) post.id: post};
+    for (final post in incoming) {
+      byId[post.id] = post;
+    }
+    final merged = byId.values.toList()
+      ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+    return merged;
   }
 
   @override
@@ -134,10 +162,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
                 size: 32,
               ),
               const SizedBox(height: SpotSpacing.xl),
-              const Text(
-                'Could not load posts',
-                style: SpotType.bodySecondary,
-              ),
+              const Text('Could not load posts', style: SpotType.bodySecondary),
               const SizedBox(height: SpotSpacing.xl),
               GestureDetector(
                 onTap: _refresh,
@@ -172,8 +197,9 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
             const SizedBox(height: SpotSpacing.lg),
             Text(
               'No posts yet',
-              style: SpotType.bodySecondary
-                  .copyWith(fontWeight: FontWeight.w300),
+              style: SpotType.bodySecondary.copyWith(
+                fontWeight: FontWeight.w300,
+              ),
             ),
             const SizedBox(height: SpotSpacing.xs),
             const Text(
@@ -196,10 +222,8 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
           bottom: SpotSpacing.xl,
         ),
         itemCount: _posts.length,
-        itemBuilder: (ctx, i) => PostThreadRow(
-          post: _posts[i],
-          isLast: i == _posts.length - 1,
-        ),
+        itemBuilder: (ctx, i) =>
+            PostThreadRow(post: _posts[i], isLast: i == _posts.length - 1),
       ),
     );
   }

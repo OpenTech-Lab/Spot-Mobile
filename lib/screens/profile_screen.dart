@@ -11,6 +11,8 @@ import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/wallet_screen.dart';
+import 'package:mobile/services/cache_manager.dart';
+import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
@@ -57,8 +59,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _error = null;
     });
     try {
+      await _loadPersistedPosts();
       await widget.nostrService.connect();
-      _sub = _repo.subscribeToAuthorPosts(widget.wallet.publicKeyHex).listen(_onEvent);
+      _sub = _repo
+          .subscribeToAuthorPosts(widget.wallet.publicKeyHex)
+          .listen(_onEvent);
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
@@ -72,11 +77,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         .where((p) => p.pubkey == widget.wallet.publicKeyHex)
         .toList();
     if (mine.isEmpty) return;
-    final existingIds = {for (final p in _posts) p.id};
-    final incoming = mine.where((p) => !existingIds.contains(p.id)).toList();
-    if (incoming.isEmpty) return;
-    final merged = [..._posts, ...incoming]
-      ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+    final merged = _mergePosts(_posts, mine);
+    if (merged.length == _posts.length) return;
     setState(() => _posts = merged);
   }
 
@@ -87,9 +89,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _initFeed();
   }
 
+  Future<void> _loadPersistedPosts() async {
+    final persisted = await LocalPostStore.instance.loadPosts(
+      authorPubkey: widget.wallet.publicKeyHex,
+    );
+    final visible = persisted
+        .where(
+          (post) => post.contentHashes.every(
+            (hash) => !CacheManager.instance.isBlocked(hash),
+          ),
+        )
+        .toList();
+    if (!mounted || visible.isEmpty) return;
+    setState(() => _posts = _mergePosts(_posts, visible));
+  }
+
+  List<MediaPost> _mergePosts(
+    List<MediaPost> current,
+    Iterable<MediaPost> incoming,
+  ) {
+    final byId = {for (final post in current) post.id: post};
+    for (final post in incoming) {
+      byId[post.id] = post;
+    }
+    final merged = byId.values.toList()
+      ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+    return merged;
+  }
+
   Future<void> _deletePost(MediaPost post) async {
     // Optimistic removal from UI
     setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
+    await LocalPostStore.instance.removePost(post.id);
     try {
       // Publish revocation event (kind-5) with content hash (spec v1.4 §12)
       await widget.nostrService.deletePost(
@@ -107,16 +138,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
     } catch (e) {
+      await LocalPostStore.instance.savePost(post);
       // Restore post on failure
       if (mounted) {
         setState(() {
-          final restored = [..._posts, post]
-            ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
-          _posts = restored;
+          _posts = _mergePosts(_posts, [post]);
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to delete post')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Failed to delete post')));
       }
     }
   }
@@ -141,9 +171,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _openSettings() {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => WalletScreen(wallet: widget.wallet),
-      ),
+      MaterialPageRoute(builder: (_) => WalletScreen(wallet: widget.wallet)),
     );
   }
 
@@ -179,9 +207,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
 
             // ── Divider ────────────────────────────────────────────────────
-            const SliverToBoxAdapter(
-              child: Divider(height: 1, thickness: 0.5),
-            ),
+            const SliverToBoxAdapter(child: Divider(height: 1, thickness: 0.5)),
 
             // ── Posts ──────────────────────────────────────────────────────
             if (_isLoading && _posts.isEmpty)
@@ -220,8 +246,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: SpotSpacing.lg),
                       Text(
                         'No posts yet',
-                        style: SpotType.bodySecondary
-                            .copyWith(fontWeight: FontWeight.w300),
+                        style: SpotType.bodySecondary.copyWith(
+                          fontWeight: FontWeight.w300,
+                        ),
                       ),
                       const SizedBox(height: SpotSpacing.xs),
                       const Text(
@@ -234,27 +261,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
               )
             else
               SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (ctx, i) {
-                    final post = _posts[i];
-                    return PostThreadRow(
-                      post: post,
-                      isLast: i == _posts.length - 1,
-                      onReply: () => Navigator.of(ctx).push(
-                        MaterialPageRoute(
-                          builder: (_) => CameraScreen(
-                            wallet: widget.wallet,
-                            nostrService: widget.nostrService,
-                            replyToPost: post,
-                          ),
+                delegate: SliverChildBuilderDelegate((ctx, i) {
+                  final post = _posts[i];
+                  return PostThreadRow(
+                    post: post,
+                    isLast: i == _posts.length - 1,
+                    onReply: () => Navigator.of(ctx).push(
+                      MaterialPageRoute(
+                        builder: (_) => CameraScreen(
+                          wallet: widget.wallet,
+                          nostrService: widget.nostrService,
+                          replyToPost: post,
                         ),
                       ),
-                      onDelete: () => _deletePost(post),
-                      onReport: () => _reportPost(post),
-                    );
-                  },
-                  childCount: _posts.length,
-                ),
+                    ),
+                    onDelete: () => _deletePost(post),
+                    onReport: () => _reportPost(post),
+                  );
+                }, childCount: _posts.length),
               ),
           ],
         ),
@@ -293,10 +317,7 @@ class _ProfileHeader extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(
-                    '$postCount',
-                    style: SpotType.subheading,
-                  ),
+                  Text('$postCount', style: SpotType.subheading),
                   const SizedBox(height: 2),
                   const Text('Posts', style: SpotType.caption),
                 ],
