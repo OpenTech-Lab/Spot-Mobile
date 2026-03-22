@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:mobile/core/encryption.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
@@ -169,6 +170,21 @@ class _CameraScreenState extends State<CameraScreen>
 
   void _discardCapture() => setState(() => _capturedFile = null);
 
+  Future<void> _pickFromGallery() async {
+    final media = await ImagePicker().pickMedia();
+    if (media == null || !mounted) return;
+    final path = media.path.toLowerCase();
+    final isVideo = media.mimeType?.startsWith('video') == true ||
+        path.endsWith('.mp4') ||
+        path.endsWith('.mov') ||
+        path.endsWith('.avi') ||
+        path.endsWith('.mkv');
+    setState(() {
+      _capturedFile = media;
+      _capturedIsVideo = isVideo;
+    });
+  }
+
   void _showError(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -207,6 +223,28 @@ class _CameraScreenState extends State<CameraScreen>
         fit: StackFit.expand,
         children: [
           CameraPreview(_controller!),
+
+          // Back button
+          Positioned(
+            top: MediaQuery.of(context).padding.top + SpotSpacing.sm,
+            left: SpotSpacing.md,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.black.withAlpha(120),
+                ),
+                child: const Icon(
+                  CupertinoIcons.chevron_back,
+                  color: Colors.white70,
+                  size: 18,
+                ),
+              ),
+            ),
+          ),
 
           // Danger mode banner
           if (_isDangerMode)
@@ -254,6 +292,7 @@ class _CameraScreenState extends State<CameraScreen>
               onTap:            _capturePhoto,
               onLongPressStart: (_) => _startRecording(),
               onLongPressEnd:   (_) => _stopRecording(),
+              onGallery:        _pickFromGallery,
             ),
           ),
         ],
@@ -314,6 +353,7 @@ class _ControlsPanel extends StatelessWidget {
     required this.onTap,
     required this.onLongPressStart,
     required this.onLongPressEnd,
+    required this.onGallery,
   });
 
   final bool isDangerMode;
@@ -324,6 +364,7 @@ class _ControlsPanel extends StatelessWidget {
   final VoidCallback onTap;
   final GestureLongPressStartCallback onLongPressStart;
   final GestureLongPressEndCallback onLongPressEnd;
+  final VoidCallback onGallery;
 
   @override
   Widget build(BuildContext context) {
@@ -422,7 +463,18 @@ class _ControlsPanel extends StatelessWidget {
               ),
 
               // Placeholder — future flip-camera
-              const SizedBox(width: 44),
+              GestureDetector(
+                onTap: onGallery,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white24, width: 0.5),
+                  ),
+                  child: const Icon(CupertinoIcons.photo, color: Colors.white54, size: 20),
+                ),
+              ),
             ],
           ),
 
