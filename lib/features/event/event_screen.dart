@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -115,7 +116,7 @@ class _EventHeader extends StatelessWidget {
                   ? Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.location_on_outlined,
+                        const Icon(CupertinoIcons.location,
                             color: SpotColors.textTertiary, size: 20),
                         const SizedBox(height: SpotSpacing.xs),
                         Text(
@@ -190,8 +191,8 @@ class _PostCard extends StatelessWidget {
             child: Center(
               child: Icon(
                 post.isDangerMode
-                    ? Icons.shield_outlined
-                    : Icons.image_outlined,
+                    ? CupertinoIcons.shield
+                    : CupertinoIcons.photo,
                 color: post.isDangerMode
                     ? SpotColors.danger.withAlpha(160)
                     : SpotColors.overlay,
@@ -229,7 +230,7 @@ class _PostCard extends StatelessWidget {
                   Row(
                     children: [
                       Icon(
-                        post.hasGps ? Icons.gps_fixed : Icons.gps_off,
+                        post.hasGps ? CupertinoIcons.location_fill : CupertinoIcons.location_slash,
                         color: post.hasGps
                             ? SpotColors.success.withAlpha(160)
                             : SpotColors.textTertiary,
@@ -250,7 +251,7 @@ class _PostCard extends StatelessWidget {
             ),
           ),
 
-          const Icon(Icons.chevron_right, color: SpotColors.overlay, size: 16),
+          const Icon(CupertinoIcons.chevron_right, color: SpotColors.overlay, size: 16),
           const SizedBox(width: SpotSpacing.sm),
         ],
       ),

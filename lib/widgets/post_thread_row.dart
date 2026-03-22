@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
 
 import 'package:mobile/models/media_post.dart';
@@ -118,7 +118,7 @@ class PostThreadRow extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    Icons.shield_outlined,
+                                    CupertinoIcons.shield,
                                     color: SpotColors.danger.withAlpha(120),
                                     size: 22,
                                   ),
@@ -132,7 +132,7 @@ class PostThreadRow extends StatelessWidget {
                                 ],
                               )
                             : const Icon(
-                                Icons.image_outlined,
+                                CupertinoIcons.photo,
                                 color: SpotColors.overlay,
                                 size: 26,
                               ),
@@ -143,7 +143,7 @@ class PostThreadRow extends StatelessWidget {
                     Row(
                       children: [
                         Icon(
-                          post.hasGps ? Icons.gps_fixed : Icons.gps_off,
+                          post.hasGps ? CupertinoIcons.location_fill : CupertinoIcons.location_slash,
                           size: 11,
                           color: post.hasGps
                               ? SpotColors.success.withAlpha(160)

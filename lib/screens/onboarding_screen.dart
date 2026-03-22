@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -318,7 +319,7 @@ class _SuccessStep extends StatelessWidget {
                     child: Text(wallet.npub, style: SpotType.mono, overflow: TextOverflow.fade),
                   ),
                   const SizedBox(width: SpotSpacing.sm),
-                  const Icon(Icons.copy_outlined, color: SpotColors.textTertiary, size: 13),
+                  const Icon(CupertinoIcons.doc_on_doc, color: SpotColors.textTertiary, size: 13),
                 ],
               ),
             ),

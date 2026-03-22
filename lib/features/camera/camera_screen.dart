@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:camera/camera.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -283,7 +284,7 @@ class _GpsIndicator extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            locked ? Icons.gps_fixed : Icons.gps_not_fixed,
+            locked ? CupertinoIcons.location_fill : CupertinoIcons.location,
             color: locked ? SpotColors.success : SpotColors.warning,
             size: 12,
           ),
@@ -389,7 +390,7 @@ class _ControlsPanel extends StatelessWidget {
                     ),
                   ),
                   child: Icon(
-                    Icons.shield_outlined,
+                    CupertinoIcons.shield,
                     color: isDangerMode ? SpotColors.danger : Colors.white38,
                     size: 20,
                   ),
@@ -413,7 +414,7 @@ class _ControlsPanel extends StatelessWidget {
                     ),
                   ),
                   child: Icon(
-                    isRecording ? Icons.stop_rounded : Icons.circle,
+                    isRecording ? CupertinoIcons.stop_fill : CupertinoIcons.circle_fill,
                     color: isRecording ? Colors.white : Colors.black,
                     size: isRecording ? 28 : 32,
                   ),
@@ -471,7 +472,7 @@ class _PreviewScreen extends StatelessWidget {
           style: SpotType.subheading.copyWith(color: Colors.white),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.close, size: 20),
+          icon: const Icon(CupertinoIcons.xmark, size: 20),
           onPressed: onDiscard,
         ),
       ),
@@ -483,7 +484,7 @@ class _PreviewScreen extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.videocam_outlined, color: Colors.white38, size: 48),
+                        const Icon(CupertinoIcons.videocam, color: Colors.white38, size: 48),
                         const SizedBox(height: SpotSpacing.sm),
                         const Text(
                           'Video captured',
@@ -508,7 +509,7 @@ class _PreviewScreen extends StatelessWidget {
               children: [
                 // GPS / protection info
                 _PreviewMetaRow(
-                  icon: isDangerMode ? Icons.shield_outlined : Icons.gps_fixed,
+                  icon: isDangerMode ? CupertinoIcons.shield : CupertinoIcons.location_fill,
                   label: isDangerMode
                       ? 'Protected — location and faces hidden'
                       : gpsLock != null
@@ -519,7 +520,7 @@ class _PreviewScreen extends StatelessWidget {
                 ),
                 if (eventTag.isNotEmpty)
                   _PreviewMetaRow(
-                    icon: Icons.tag,
+                    icon: CupertinoIcons.tag,
                     label: '#$eventTag',
                     color: SpotColors.textSecondary,
                   ),

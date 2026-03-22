@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/camera/camera_screen.dart';
@@ -70,11 +71,16 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
         backgroundColor: SpotColors.bg,
-        title: const Text('Spot', style: SpotType.wordmark),
+        centerTitle: true,
+        title: Image.asset(
+          'assets/logo_transparent.png',
+          height: 28,
+          fit: BoxFit.contain,
+        ),
         actions: _selectedTab == 2
             ? [
                 IconButton(
-                  icon: const Icon(Icons.grid_on_outlined, size: 18),
+                  icon: const Icon(CupertinoIcons.square_grid_2x2, size: 18),
                   color: SpotColors.textSecondary,
                   tooltip: 'My Posts',
                   onPressed: () => Navigator.of(context).push(
@@ -102,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
             border: Border.all(color: SpotColors.border, width: 0.5),
           ),
           child: const Icon(
-            Icons.add,
+            CupertinoIcons.plus,
             color: SpotColors.textSecondary,
             size: 22,
           ),
@@ -125,19 +131,19 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _NavItem(
-                icon: Icons.view_stream_outlined,
-                label: 'Feed',
+                icon: CupertinoIcons.list_bullet,
+                label: 'Home',
                 selected: _selectedTab == 0,
                 onTap: () => setState(() => _selectedTab = 0),
               ),
               _NavItem(
-                icon: Icons.folder_open_outlined,
+                icon: CupertinoIcons.folder,
                 label: 'Events',
                 selected: _selectedTab == 1,
                 onTap: () => setState(() => _selectedTab = 1),
               ),
               _NavItem(
-                icon: Icons.person_outline,
+                icon: CupertinoIcons.person,
                 label: 'Identity',
                 selected: _selectedTab == 2,
                 onTap: () => setState(() => _selectedTab = 2),
@@ -202,7 +208,7 @@ class _EventsListTab extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.folder_open_outlined, color: SpotColors.overlay, size: 40),
+            const Icon(CupertinoIcons.folder, color: SpotColors.overlay, size: 40),
             const SizedBox(height: SpotSpacing.lg),
             Text(
               'No events yet',
@@ -248,7 +254,7 @@ class _EventsListTab extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: SpotColors.overlay, size: 16),
+                const Icon(CupertinoIcons.chevron_right, color: SpotColors.overlay, size: 16),
               ],
             ),
           ),

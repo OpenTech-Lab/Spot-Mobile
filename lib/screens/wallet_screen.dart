@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -96,7 +97,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 decoration: SpotDecoration.danger(),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline, color: SpotColors.danger, size: 16),
+                    const Icon(CupertinoIcons.info, color: SpotColors.danger, size: 16),
                     const SizedBox(width: SpotSpacing.sm),
                     Expanded(
                       child: Text(
@@ -140,7 +141,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       ),
                     ),
                     const SizedBox(width: SpotSpacing.sm),
-                    const Icon(Icons.copy_outlined, color: SpotColors.textTertiary, size: 13),
+                    const Icon(CupertinoIcons.doc_on_doc, color: SpotColors.textTertiary, size: 13),
                   ],
                 ),
               ),

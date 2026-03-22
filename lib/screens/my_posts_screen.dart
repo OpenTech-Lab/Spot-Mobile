@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
@@ -89,7 +90,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
       appBar: AppBar(
         backgroundColor: SpotColors.bg,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 16),
+          icon: const Icon(CupertinoIcons.chevron_back, size: 16),
           color: SpotColors.textSecondary,
           onPressed: () => Navigator.of(context).pop(),
         ),
@@ -128,7 +129,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(
-                Icons.wifi_off_outlined,
+                CupertinoIcons.wifi_slash,
                 color: SpotColors.textTertiary,
                 size: 32,
               ),
@@ -164,7 +165,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(
-              Icons.camera_outlined,
+              CupertinoIcons.camera,
               color: SpotColors.overlay,
               size: 36,
             ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
@@ -128,7 +129,7 @@ class _FeedScreenState extends State<FeedScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(
-                Icons.wifi_off_outlined,
+                CupertinoIcons.wifi_slash,
                 color: SpotColors.textTertiary,
                 size: 32,
               ),
@@ -162,7 +163,7 @@ class _FeedScreenState extends State<FeedScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(
-              Icons.inbox_outlined,
+              CupertinoIcons.tray,
               color: SpotColors.overlay,
               size: 36,
             ),
