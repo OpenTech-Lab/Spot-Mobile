@@ -266,66 +266,68 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
+    final mq = MediaQuery.of(context);
+    final sheetHeight = mq.size.height * 0.92;
+    final bottomInset = mq.viewInsets.bottom;
+    return SizedBox(
+      height: sheetHeight,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
           const _SheetHandle(),
           const SizedBox(height: SpotSpacing.sm),
 
-          // ── Caption + avatar ────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                PubkeyAvatar(pubkey: widget.wallet.publicKeyHex),
-                const SizedBox(width: SpotSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (widget.replyToPost != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Row(
-                            children: [
-                              const Icon(CupertinoIcons.arrow_turn_up_left,
-                                  size: 11,
-                                  color: SpotColors.textTertiary),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Reply to ${_shortKey(widget.replyToPost!.nostrEventId)}',
-                                style: SpotType.caption.copyWith(
+          // ── Caption + avatar (fills remaining space) ─────────────────────
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  PubkeyAvatar(pubkey: widget.wallet.publicKeyHex),
+                  const SizedBox(width: SpotSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (widget.replyToPost != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Row(
+                              children: [
+                                const Icon(CupertinoIcons.arrow_turn_up_left,
+                                    size: 11,
                                     color: SpotColors.textTertiary),
-                              ),
-                            ],
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Reply to ${_shortKey(widget.replyToPost!.nostrEventId)}',
+                                  style: SpotType.caption.copyWith(
+                                      color: SpotColors.textTertiary),
+                                ),
+                              ],
+                            ),
                           ),
+                        TextField(
+                          controller: _captionCtrl,
+                          focusNode: _captionFocus,
+                          maxLines: null,
+                          style: SpotType.body,
+                          decoration: InputDecoration(
+                            hintText: widget.replyToPost != null
+                                ? 'Write a reply…'
+                                : 'What\'s happening?',
+                            hintStyle: SpotType.body.copyWith(
+                                color: SpotColors.textTertiary),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            isDense: true,
+                          ),
+                          onChanged: (_) => setState(() {}),
                         ),
-                      TextField(
-                        controller: _captionCtrl,
-                        focusNode: _captionFocus,
-                        maxLines: null,
-                        minLines: 3,
-                        style: SpotType.body,
-                        decoration: InputDecoration(
-                          hintText: widget.replyToPost != null
-                              ? 'Write a reply…'
-                              : 'What\'s happening?',
-                          hintStyle: SpotType.body.copyWith(
-                              color: SpotColors.textTertiary),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.zero,
-                          isDense: true,
-                        ),
-                        onChanged: (_) => setState(() {}),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
 
@@ -459,7 +461,14 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
               ],
             ),
           ),
-          const SizedBox(height: SpotSpacing.md),
+          // Keyboard spacer — grows as keyboard slides up so toolbar
+          // always stays visible above it.
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 80),
+            height: bottomInset > 0
+                ? bottomInset
+                : SpotSpacing.md,
+          ),
         ],
       ),
     );

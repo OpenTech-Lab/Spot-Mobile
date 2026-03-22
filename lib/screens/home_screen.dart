@@ -90,7 +90,6 @@ class _HomeScreenState extends State<HomeScreen> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: SpotColors.bg,
-            border: Border.all(color: SpotColors.border, width: 0.5),
           ),
           child: const Icon(
             CupertinoIcons.plus,
