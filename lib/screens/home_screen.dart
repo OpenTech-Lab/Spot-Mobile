@@ -40,18 +40,12 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  Widget _buildCurrentTab() {
-    switch (_selectedTab) {
-      case 0:
-        return FeedScreen(nostrService: _nostrService, wallet: widget.wallet);
-      case 1:
-        return _EventsListTab(eventRepo: _eventRepo);
-      case 2:
-        return ProfileScreen(wallet: widget.wallet, nostrService: _nostrService);
-      default:
-        return FeedScreen(nostrService: _nostrService, wallet: widget.wallet);
-    }
-  }
+  // Tabs built once and preserved via IndexedStack
+  late final List<Widget> _tabs = [
+    FeedScreen(nostrService: _nostrService, wallet: widget.wallet),
+    _EventsListTab(eventRepo: _eventRepo),
+    ProfileScreen(wallet: widget.wallet, nostrService: _nostrService),
+  ];
 
   void _openCamera() {
     Navigator.of(context).push(
@@ -84,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   backgroundColor: SpotColors.bg,
                   title: const Text('Events', style: SpotType.subheading),
                 ),
-      body: _buildCurrentTab(),
+      body: IndexedStack(index: _selectedTab, children: _tabs),
       bottomNavigationBar: _buildBottomNav(),
       floatingActionButton: _selectedTab != 0 ? null : GestureDetector(
         onTap: _openCamera,

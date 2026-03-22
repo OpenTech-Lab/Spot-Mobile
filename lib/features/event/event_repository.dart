@@ -304,10 +304,14 @@ class EventRepository {
       if (joined.isNotEmpty) caption = joined;
     }
 
+    // Look up local file from cache (covers self-delivered and previously cached posts)
+    final cachedFile = CacheManager.instance.getCached(contentHash);
+
     return MediaPost(
       id: event.id,
       pubkey: event.pubkey,
       contentHash: contentHash,
+      mediaPath: cachedFile?.path,
       latitude: latitude,
       longitude: longitude,
       capturedAt:

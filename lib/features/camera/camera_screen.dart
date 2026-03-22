@@ -168,9 +168,9 @@ class _CameraScreenState extends State<CameraScreen>
     );
 
     try {
-      await widget.nostrService.publishMediaPost(post, widget.wallet);
-      // Register in local cache (enforces 5 GB cap) then seed to swarm
+      // Register in local cache BEFORE publish so self-delivery finds the file
       await CacheManager.instance.addToCache(contentHash, mediaFile.path);
+      await widget.nostrService.publishMediaPost(post, widget.wallet);
       await P2PService.instance.seedMedia(mediaFile.path, contentHash);
       if (mounted) {
         Navigator.of(context).pop();
