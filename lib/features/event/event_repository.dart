@@ -261,7 +261,8 @@ class EventRepository {
     // Posts without an event tag go into '_unsorted' so they still appear in
     // the feed — spec does not require a hashtag on every post.
     final bucket = hashtag ?? '_unsorted';
-    final post = _nostrEventToMediaPost(event, hashtag);
+    final allTags = event.getAllTagValues('t');
+    final post = _nostrEventToMediaPost(event, allTags);
     _mergePost(bucket, post);
   }
 
@@ -335,10 +336,10 @@ class EventRepository {
   /// Public static helper used by [FeedScreen] to convert raw Nostr events
   /// received via ad-hoc subscriptions into [MediaPost] objects.
   static MediaPost nostrEventToPost(NostrEvent event, String? hashtag) =>
-      _nostrEventToMediaPost(event, hashtag);
+      _nostrEventToMediaPost(event, hashtag != null ? [hashtag] : []);
 
   static MediaPost _nostrEventToMediaPost(
-      NostrEvent event, String? hashtag) {
+      NostrEvent event, List<String> eventTags) {
     // geo tag format: ["geo", "lat", "lon"]
     double? latitude, longitude;
     for (final tag in event.tags) {
@@ -388,7 +389,7 @@ class EventRepository {
       longitude: longitude,
       capturedAt:
           DateTime.fromMillisecondsSinceEpoch(event.createdAt * 1000),
-      eventTag: hashtag,
+      eventTags: eventTags,
       isDangerMode: event.getTagValue('danger') == '1',
       isVirtual: event.getTagValue('virtual') == '1',
       isAiGenerated: event.getTagValue('ai_content') == '1',

@@ -13,6 +13,7 @@ import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/camera_service.dart';
+import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
@@ -62,11 +63,13 @@ class PostComposerSheet extends StatefulWidget {
 
 class _PostComposerSheetState extends State<PostComposerSheet> {
   final _captionCtrl = TextEditingController();
-  final _tagCtrl = TextEditingController();
+  final _tagInputCtrl = TextEditingController();
   final _captionFocus = FocusNode();
+  final _tagFocus = FocusNode();
   final _picker = ImagePicker();
 
   final List<XFile> _mediaFiles = [];
+  final List<String> _tags = [];
   GpsLock? _gpsLock;
 
   bool _isDangerMode = false;
@@ -79,6 +82,10 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
   @override
   void initState() {
     super.initState();
+    // Pre-fill tag from reply parent
+    if (widget.replyToPost?.eventTag != null) {
+      _tags.add(widget.replyToPost!.eventTag!);
+    }
     _fetchGps();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _captionFocus.requestFocus();
@@ -88,10 +95,25 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
   @override
   void dispose() {
     _captionCtrl.dispose();
-    _tagCtrl.dispose();
+    _tagInputCtrl.dispose();
     _captionFocus.dispose();
+    _tagFocus.dispose();
     super.dispose();
   }
+
+  void _addTag(String raw) {
+    final tag = raw.trim().replaceAll('#', '').toLowerCase();
+    if (tag.isEmpty || _tags.contains(tag)) {
+      _tagInputCtrl.clear();
+      return;
+    }
+    setState(() {
+      _tags.add(tag);
+      _tagInputCtrl.clear();
+    });
+  }
+
+  void _removeTag(String tag) => setState(() => _tags.remove(tag));
 
   Future<void> _fetchGps() async {
     final lock = await CameraService.instance.lockGPS();
@@ -191,9 +213,12 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
             '${widget.wallet.publicKeyHex}:$caption:${DateTime.now().millisecondsSinceEpoch}'));
       }
 
-      final effectiveTag = _tagCtrl.text.trim().isNotEmpty
-          ? _tagCtrl.text.trim().replaceAll('#', '').trim()
-          : widget.replyToPost?.eventTag;
+      // Commit any tag that's still in the input field
+      final pendingTag = _tagInputCtrl.text.trim().replaceAll('#', '').trim();
+      final effectiveTags = [
+        ..._tags,
+        if (pendingTag.isNotEmpty && !_tags.contains(pendingTag)) pendingTag,
+      ];
 
       final caption = _captionCtrl.text.trim();
 
@@ -209,7 +234,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
             ? _coarseCoord(_gpsLock?.longitude)
             : _gpsLock?.longitude,
         capturedAt: _gpsLock?.timestamp ?? DateTime.now().toUtc(),
-        eventTag: effectiveTag,
+        eventTags: effectiveTags,
         isDangerMode: _isDangerMode,
         isVirtual: _isVirtual,
         isAiGenerated: _isAiGenerated,
@@ -339,30 +364,57 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
           const SizedBox(height: SpotSpacing.sm),
 
-          // ── Tag input ───────────────────────────────────────────────────────
+          // ── Tag chips + input ───────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
-            child: Row(
+            child: Wrap(
+              spacing: SpotSpacing.xs,
+              runSpacing: SpotSpacing.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 const Icon(CupertinoIcons.number,
-                    size: 14, color: SpotColors.textTertiary),
-                const SizedBox(width: 6),
-                Expanded(
+                    size: 13, color: SpotColors.textTertiary),
+                // Existing tag chips
+                for (final tag in _tags)
+                  _TagChip(tag: tag, onRemove: () => _removeTag(tag)),
+                // Input for new tag
+                IntrinsicWidth(
                   child: TextField(
-                    controller: _tagCtrl,
+                    controller: _tagInputCtrl,
+                    focusNode: _tagFocus,
                     style: SpotType.caption
                         .copyWith(color: SpotColors.textSecondary),
                     decoration: InputDecoration(
-                      hintText: 'Add event tag (e.g. protest2024)',
+                      hintText: _tags.isEmpty
+                          ? 'Add tags (e.g. protest2024)'
+                          : 'Add another tag…',
                       hintStyle: SpotType.caption
                           .copyWith(color: SpotColors.textTertiary),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.zero,
                       isDense: true,
                     ),
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: _addTag,
+                    // Also add on comma or space
+                    onChanged: (v) {
+                      if (v.endsWith(' ') || v.endsWith(',')) {
+                        _addTag(v.replaceAll(',', ''));
+                      }
+                    },
                   ),
                 ),
               ],
+            ),
+          ),
+
+          // ── Location row ────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
+            child: _LocationRow(
+              gpsLock: _gpsLock,
+              isVirtual: _isVirtual,
+              isDangerMode: _isDangerMode,
             ),
           ),
 
@@ -969,6 +1021,123 @@ class _LegalCheckbox extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Tag chip ──────────────────────────────────────────────────────────────────
+
+class _TagChip extends StatelessWidget {
+  const _TagChip({required this.tag, required this.onRemove});
+  final String tag;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: SpotSpacing.sm, vertical: 2),
+      decoration: BoxDecoration(
+        color: SpotColors.accentSubtle,
+        borderRadius: BorderRadius.circular(SpotRadius.full),
+        border: Border.all(
+            color: SpotColors.accent.withAlpha(60), width: 0.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('#$tag',
+              style: SpotType.label
+                  .copyWith(color: SpotColors.accent)),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onRemove,
+            child: const Icon(CupertinoIcons.xmark,
+                size: 10, color: SpotColors.accent),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Location row ──────────────────────────────────────────────────────────────
+
+class _LocationRow extends StatelessWidget {
+  const _LocationRow({
+    required this.gpsLock,
+    required this.isVirtual,
+    required this.isDangerMode,
+  });
+
+  final GpsLock? gpsLock;
+  final bool isVirtual;
+  final bool isDangerMode;
+
+  @override
+  Widget build(BuildContext context) {
+    // Virtual mode
+    if (isVirtual) {
+      return Row(
+        children: [
+          const Icon(CupertinoIcons.gamecontroller,
+              size: 12, color: SpotColors.accent),
+          const SizedBox(width: 5),
+          Text('Virtual — location not published',
+              style: SpotType.caption.copyWith(color: SpotColors.accent)),
+        ],
+      );
+    }
+
+    // Still fetching
+    if (gpsLock == null) {
+      return Row(
+        children: [
+          const SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              color: SpotColors.textTertiary,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text('Locating…', style: SpotType.caption),
+        ],
+      );
+    }
+
+    final lat = gpsLock!.latitude;
+    final lon = gpsLock!.longitude;
+    final geo = GeoLookup.instance.nearest(lat, lon);
+
+    final IconData icon;
+    final Color iconColor;
+    final String label;
+
+    if (isDangerMode) {
+      icon = CupertinoIcons.location;
+      iconColor = SpotColors.warning.withAlpha(160);
+      label = geo != null
+          ? '${geo.country} / ${geo.city}  ·  Protected'
+          : '${lat.toStringAsFixed(1)}, ${lon.toStringAsFixed(1)}  ·  Protected';
+    } else {
+      icon = CupertinoIcons.location_fill;
+      iconColor = SpotColors.success.withAlpha(160);
+      label = geo != null
+          ? '${geo.country} / ${geo.city}'
+          : '${lat.toStringAsFixed(3)}, ${lon.toStringAsFixed(3)}';
+    }
+
+    return Row(
+      children: [
+        Icon(icon, size: 12, color: iconColor),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(label,
+              style: SpotType.caption, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+      ],
     );
   }
 }

@@ -222,12 +222,19 @@ class PostThreadRow extends StatelessWidget {
                         ],
                       ),
                     ],
-                    // Event hashtag
-                    if (post.eventTag != null) ...[
+                    // Event hashtags
+                    if (post.eventTags.isNotEmpty) ...[
                       const SizedBox(height: 3),
-                      Text(
-                        '#${post.eventTag}',
-                        style: SpotType.body.copyWith(color: SpotColors.accent),
+                      Wrap(
+                        spacing: SpotSpacing.sm,
+                        children: [
+                          for (final t in post.eventTags)
+                            Text(
+                              '#$t',
+                              style: SpotType.body
+                                  .copyWith(color: SpotColors.accent),
+                            ),
+                        ],
                       ),
                     ],
                     // Caption

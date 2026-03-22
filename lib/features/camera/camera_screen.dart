@@ -200,7 +200,7 @@ class _CameraScreenState extends State<CameraScreen>
           ? _coarseCoord(_gpsLock?.longitude)
           : _gpsLock?.longitude,
       capturedAt: _gpsLock?.timestamp ?? DateTime.now().toUtc(),
-      eventTag: effectiveTag,
+      eventTags: effectiveTag != null ? [effectiveTag] : const [],
       isDangerMode: _isDangerMode,
       isVirtual: _isVirtualMode,
       caption: caption.isEmpty ? null : caption,

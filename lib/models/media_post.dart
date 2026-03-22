@@ -34,8 +34,9 @@ class MediaPost {
   /// Exact timestamp when the camera shutter fired / recording started
   final DateTime capturedAt;
 
-  /// Optional event hashtag this post belongs to (without the '#' prefix)
-  final String? eventTag;
+  /// All hashtag event tags this post belongs to (without the '#' prefix).
+  /// The first entry is the primary tag used for CivicEvent bucketing.
+  final List<String> eventTags;
 
   /// Whether this was recorded in Danger Mode (face blur + GPS stripped)
   final bool isDangerMode;
@@ -72,7 +73,7 @@ class MediaPost {
     this.latitude,
     this.longitude,
     required this.capturedAt,
-    this.eventTag,
+    this.eventTags = const [],
     this.isDangerMode = false,
     this.isVirtual = false,
     this.isAiGenerated = false,
@@ -83,7 +84,10 @@ class MediaPost {
     required this.nostrEventId,
   });
 
-  // ── Convenience getters (backward compatibility) ───────────────────────────
+  // ── Convenience getters ────────────────────────────────────────────────────
+
+  /// Primary event tag (first in [eventTags]), null if none.
+  String? get eventTag => eventTags.isEmpty ? null : eventTags.first;
 
   /// Primary content hash (first in [contentHashes]).
   String get contentHash => contentHashes.first;
@@ -104,7 +108,7 @@ class MediaPost {
         'latitude': latitude,
         'longitude': longitude,
         'capturedAt': capturedAt.toIso8601String(),
-        'eventTag': eventTag,
+        'eventTags': eventTags,
         'isDangerMode': isDangerMode,
         'isVirtual': isVirtual,
         'isAiGenerated': isAiGenerated,
@@ -129,7 +133,10 @@ class MediaPost {
         latitude: (json['latitude'] as num?)?.toDouble(),
         longitude: (json['longitude'] as num?)?.toDouble(),
         capturedAt: DateTime.parse(json['capturedAt'] as String),
-        eventTag: json['eventTag'] as String?,
+        // Backward compat: read new list field, fall back to old single string
+        eventTags: json['eventTags'] != null
+            ? List<String>.from(json['eventTags'] as List)
+            : (json['eventTag'] != null ? [json['eventTag'] as String] : []),
         isDangerMode: json['isDangerMode'] as bool? ?? false,
         isVirtual: json['isVirtual'] as bool? ?? false,
         isAiGenerated: json['isAiGenerated'] as bool? ?? false,
@@ -149,7 +156,7 @@ class MediaPost {
     double? latitude,
     double? longitude,
     DateTime? capturedAt,
-    String? eventTag,
+    List<String>? eventTags,
     bool? isDangerMode,
     String? caption,
     String? replyToId,
@@ -168,7 +175,7 @@ class MediaPost {
         latitude: latitude ?? this.latitude,
         longitude: longitude ?? this.longitude,
         capturedAt: capturedAt ?? this.capturedAt,
-        eventTag: eventTag ?? this.eventTag,
+        eventTags: eventTags ?? this.eventTags,
         isDangerMode: isDangerMode ?? this.isDangerMode,
         isVirtual: isVirtual ?? this.isVirtual,
         isAiGenerated: isAiGenerated ?? this.isAiGenerated,
@@ -187,6 +194,6 @@ class MediaPost {
 
   @override
   String toString() =>
-      'MediaPost(id: ${id.substring(0, 8)}..., eventTag: $eventTag, '
+      'MediaPost(id: ${id.substring(0, 8)}..., eventTags: $eventTags, '
       'files: ${contentHashes.length}, isDangerMode: $isDangerMode)';
 }

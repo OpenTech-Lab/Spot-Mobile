@@ -105,16 +105,18 @@ class NostrService {
       MediaPost post, WalletModel wallet) async {
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-    // Build content: optional caption + optional #tag
+    // Build content: optional caption + optional #tag lines
     final contentParts = <String>[];
     if (post.caption?.isNotEmpty == true) contentParts.add(post.caption!);
-    if (post.eventTag != null) contentParts.add('#${post.eventTag}');
+    for (final t in post.eventTags) {
+      contentParts.add('#$t');
+    }
     final content = contentParts.join('\n');
 
     final tags = <List<String>>[
       ['app', 'spot'], // identifies events originating from the Spot app
       if (post.replyToId != null) ['e', post.replyToId!, '', 'reply'],
-      if (post.eventTag != null) ['t', post.eventTag!],
+      for (final t in post.eventTags) ['t', t],
       // Virtual posts: GPS is recorded locally but NOT published to Nostr.
       if (!post.isVirtual &&
           post.latitude != null &&
