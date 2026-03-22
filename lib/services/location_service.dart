@@ -49,20 +49,28 @@ class LocationService {
   /// Returns null if permission is denied, location services are disabled,
   /// or a timeout occurs.
   Future<Position?> getCurrentPosition() async {
-    final granted = await isPermissionGranted();
+    // Request permission if not yet granted (not just check).
+    final granted = await requestPermission();
     if (!granted) return null;
 
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return null;
 
     try {
+      // Use medium accuracy with a short timeout for snappy camera UX.
+      // Geolocator will still use GPS hardware — medium just allows faster
+      // network-assisted fixes in addition to satellite.
       return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 8),
       );
     } catch (_) {
-      // Timeout or platform error — return null so callers can handle gracefully.
-      return null;
+      // Timeout or platform error — try last known position as fallback.
+      try {
+        return await Geolocator.getLastKnownPosition();
+      } catch (_) {
+        return null;
+      }
     }
   }
 

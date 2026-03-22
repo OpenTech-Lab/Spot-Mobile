@@ -44,6 +44,7 @@ class _CameraScreenState extends State<CameraScreen>
   bool _isRecording   = false;
   bool _isDangerMode  = false;
   bool _isCapturing   = false;
+  bool _gpsFetched    = false;
 
   GpsLock? _gpsLock;
   String _eventTag = '';
@@ -95,7 +96,7 @@ class _CameraScreenState extends State<CameraScreen>
 
   Future<void> _fetchGps() async {
     final lock = await CameraService.instance.lockGPS();
-    if (mounted) setState(() => _gpsLock = lock);
+    if (mounted) setState(() { _gpsLock = lock; _gpsFetched = true; });
   }
 
   Future<void> _capturePhoto() async {
@@ -292,7 +293,7 @@ class _CameraScreenState extends State<CameraScreen>
           Positioned(
             top: MediaQuery.of(context).padding.top + 60,
             left: SpotSpacing.lg,
-            child: _GpsIndicator(gpsLock: _gpsLock),
+            child: _GpsIndicator(gpsLock: _gpsLock, fetched: _gpsFetched),
           ),
 
           // Controls
@@ -319,12 +320,31 @@ class _CameraScreenState extends State<CameraScreen>
 // ── GPS indicator ──────────────────────────────────────────────────────────────
 
 class _GpsIndicator extends StatelessWidget {
-  const _GpsIndicator({this.gpsLock});
+  const _GpsIndicator({this.gpsLock, required this.fetched});
   final GpsLock? gpsLock;
+  final bool fetched;
 
   @override
   Widget build(BuildContext context) {
-    final locked = gpsLock != null;
+    final IconData icon;
+    final Color iconColor;
+    final String label;
+
+    if (gpsLock != null) {
+      icon = CupertinoIcons.location_fill;
+      iconColor = SpotColors.success;
+      label = '${gpsLock!.latitude.toStringAsFixed(4)}, '
+          '${gpsLock!.longitude.toStringAsFixed(4)}';
+    } else if (!fetched) {
+      icon = CupertinoIcons.location;
+      iconColor = SpotColors.warning;
+      label = 'Locating…';
+    } else {
+      icon = CupertinoIcons.location_slash;
+      iconColor = SpotColors.textTertiary;
+      label = 'No GPS';
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: SpotSpacing.sm,
@@ -337,17 +357,10 @@ class _GpsIndicator extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            locked ? CupertinoIcons.location_fill : CupertinoIcons.location,
-            color: locked ? SpotColors.success : SpotColors.warning,
-            size: 12,
-          ),
+          Icon(icon, color: iconColor, size: 12),
           const SizedBox(width: SpotSpacing.xs),
           Text(
-            locked
-                ? '${gpsLock!.latitude.toStringAsFixed(4)}, '
-                  '${gpsLock!.longitude.toStringAsFixed(4)}'
-                : 'Locating…',
+            label,
             style: SpotType.caption.copyWith(color: Colors.white70),
           ),
         ],

@@ -158,6 +158,13 @@ class NostrService {
     );
 
     publishEvent(signed);
+
+    // Self-deliver immediately so the post appears in the feed without
+    // waiting for a relay echo (many relays delay or filter kind-1 events).
+    for (final sub in _subscriptions.values) {
+      sub.onEvent(signed);
+    }
+
     return signed;
   }
 

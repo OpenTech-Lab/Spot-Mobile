@@ -167,15 +167,16 @@ class EventRepository {
   }
 
   void _handleMediaPost(NostrEvent event) {
-    final hashtag = event.getTagValue('t');
-    if (hashtag == null) return;
-
     final contentHash = event.getTagValue('media_hash') ?? event.id;
     // Client-side blocklist filter (spec v1.4 §12.B)
     if (CacheManager.instance.isBlocked(contentHash)) return;
 
+    final hashtag = event.getTagValue('t');
+    // Posts without an event tag go into '_unsorted' so they still appear in
+    // the feed — spec does not require a hashtag on every post.
+    final bucket = hashtag ?? '_unsorted';
     final post = _nostrEventToMediaPost(event, hashtag);
-    _mergePost(hashtag, post);
+    _mergePost(bucket, post);
   }
 
   void _mergePost(String hashtag, MediaPost post) {
@@ -229,7 +230,7 @@ class EventRepository {
   }
 
   static MediaPost _nostrEventToMediaPost(
-      NostrEvent event, String hashtag) {
+      NostrEvent event, String? hashtag) {
     // geo tag format: ["geo", "lat", "lon"]
     double? latitude, longitude;
     for (final tag in event.tags) {
