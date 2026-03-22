@@ -1,4 +1,4 @@
-package com.example.mobile
+package com.icyanstudio.spot
 
 import io.flutter.embedding.android.FlutterActivity
 

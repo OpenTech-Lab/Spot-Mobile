@@ -1,0 +1,179 @@
+require 'base64'
+require 'tmpdir'
+require 'timeout'
+
+default_platform(:ios)
+
+platform :ios do
+  desc "Build Flutter iOS app and upload to TestFlight"
+  lane :release do
+    ios_root = if ENV["GITHUB_WORKSPACE"].to_s.empty?
+      File.expand_path("..", __dir__)
+    else
+      File.join(ENV.fetch("GITHUB_WORKSPACE"), "ios")
+    end
+    project_root = File.expand_path("..", ios_root)
+    pubspec_file = File.join(project_root, "pubspec.yaml")
+    runner_xcodeproj = File.join(ios_root, "Runner.xcodeproj")
+    runner_xcodeproj_file = File.join(runner_xcodeproj, "project.pbxproj")
+    runner_workspace = File.join(ios_root, "Runner.xcworkspace")
+
+    parse_positive_integer = lambda do |name, default|
+      raw = ENV.fetch(name, default).to_s.strip
+      UI.user_error!("#{name} must be a positive integer, got #{raw.inspect}") unless raw.match?(/\A\d+\z/) && raw.to_i > 0
+      raw.to_i
+    end
+
+    version_line = File.foreach(pubspec_file).find { |line| line.start_with?("version:") }
+    UI.user_error!("Unable to find version in #{pubspec_file}") if version_line.to_s.strip.empty?
+
+    release_version = version_line.sub("version:", "").strip
+    release_version_name, release_build_number = release_version.split("+", 2)
+    if release_version_name.to_s.empty? || release_build_number.to_s.empty?
+      UI.user_error!("pubspec.yaml version must include a build number like x.y.z+n, got #{release_version.inspect}")
+    end
+
+    requested_ios_build_number = ENV["IOS_BUILD_NUMBER"].to_s.strip
+    if !requested_ios_build_number.empty? && requested_ios_build_number != release_build_number
+      UI.user_error!(
+        "IOS_BUILD_NUMBER (#{requested_ios_build_number}) does not match pubspec build number (#{release_build_number}). " \
+        "Update pubspec.yaml or CI env so Fastlane waits for the build that Flutter actually uploads."
+      )
+    end
+
+    wait_timeout_seconds = parse_positive_integer.call("TESTFLIGHT_WAIT_TIMEOUT", "900")
+    wait_interval_seconds = parse_positive_integer.call("TESTFLIGHT_WAIT_INTERVAL", "30")
+    upload_timeout_buffer_seconds = parse_positive_integer.call("TESTFLIGHT_UPLOAD_TIMEOUT_BUFFER", "300")
+
+    UI.message(
+      "Preparing TestFlight release #{release_version_name} (build #{release_build_number}); " \
+      "wait timeout #{wait_timeout_seconds}s, poll interval #{wait_interval_seconds}s."
+    )
+
+    # --- Apple API key (App Store Connect) ---
+    api_key_path = File.join(Dir.tmpdir, "apple_api_key_#{ENV['APPLE_API_KEY_ID']}.p8")
+    File.write(api_key_path, Base64.decode64(ENV.fetch("APPLE_API_PRIVATE_KEY_BASE64")))
+
+    api_key = app_store_connect_api_key(
+      key_id:     ENV.fetch("APPLE_API_KEY_ID"),
+      issuer_id:  ENV.fetch("APPLE_API_ISSUER_ID"),
+      key_filepath: api_key_path,
+      duration:   1200,
+      in_house:   false,
+    )
+
+    # --- Build number ---
+    increment_build_number(
+      build_number: release_build_number,
+      xcodeproj:    runner_xcodeproj,
+    )
+
+    # --- Prepare Flutter iOS build config without signing ---
+    # `xcode_backend.sh build` can fail in archive when iOS config artifacts are
+    # not prepared up front on CI. Generate config only, no archive/signing here.
+    Dir.chdir(project_root) do
+      sh("flutter pub get")
+      sh("flutter precache --ios")
+      sh("flutter build ios --release --no-codesign --config-only --build-name #{release_version_name} --build-number #{release_build_number}")
+    end
+
+    # --- Archive & export (manual signing; profile already installed by CI) ---
+    # xcargs must be a Hash so fastlane shell-quotes each value individually.
+    # Passing a joined String breaks when the profile name contains spaces.
+    app_identifier = CredentialsManager::AppfileConfig.try_fetch_value(:app_identifier)
+    if app_identifier.to_s.empty?
+      UI.user_error!("app_identifier is missing. Set it in ios/fastlane/Appfile")
+    end
+
+    project_bundle_id = File
+      .read(runner_xcodeproj_file)
+      .scan(/PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);/)
+      .flatten
+      .find { |identifier| !identifier.end_with?(".RunnerTests") }
+
+    if project_bundle_id.to_s.empty?
+      UI.user_error!("Unable to determine Runner PRODUCT_BUNDLE_IDENTIFIER from #{runner_xcodeproj_file}")
+    end
+
+    if app_identifier != project_bundle_id
+      UI.user_error!(
+        "Appfile app_identifier (#{app_identifier}) does not match Runner bundle identifier (#{project_bundle_id})"
+      )
+    end
+
+    profile_name = ENV.fetch("IOS_PROVISIONING_PROFILE_NAME")
+    profile_uuid = ENV.fetch("IOS_PROVISIONING_PROFILE_UUID")
+    # fastlane 2.232.2 still validates gym export_method against the older
+    # app-store token even though xcodebuild warns that it is deprecated.
+    export_method = "app-store"
+
+    begin
+      gym(
+        workspace:     runner_workspace,
+        scheme:        "Runner",
+        configuration: "Release",
+        clean:         false,
+        export_method: export_method,
+        codesigning_identity: "Apple Distribution",
+        suppress_xcode_output: false,
+        xcargs: {
+          "DEVELOPMENT_TEAM"               => ENV.fetch("IOS_TEAM_ID"),
+          "CODE_SIGN_STYLE"                => "Manual",
+          "PROVISIONING_PROFILE_SPECIFIER" => profile_name,
+          "PROVISIONING_PROFILE"           => profile_uuid,
+        },
+        export_options: {
+          method:               export_method,
+          teamID:               ENV.fetch("IOS_TEAM_ID"),
+          signingStyle:         "manual",
+          provisioningProfiles: {
+            app_identifier => profile_name,
+          },
+          uploadSymbols:        true,
+        },
+      )
+    rescue => e
+      gym_log = File.expand_path("~/Library/Logs/gym/Runner-Runner.log")
+      if File.exist?(gym_log)
+        UI.important("Printing tail of #{gym_log} for root-cause diagnostics")
+        UI.message(File.readlines(gym_log).last(300).join)
+      end
+      raise e
+    end
+
+    # --- Upload to TestFlight ---
+    changelog = ENV["TESTFLIGHT_CHANGELOG"].to_s.strip
+    testflight_groups = ENV.fetch("TESTFLIGHT_GROUPS", "")
+      .split(",")
+      .map(&:strip)
+      .reject(&:empty?)
+
+    upload_options = {
+      api_key: api_key,
+      skip_waiting_for_build_processing: false,
+      wait_processing_interval: wait_interval_seconds,
+      wait_processing_timeout_duration: wait_timeout_seconds,
+    }
+
+    upload_options[:changelog] = changelog unless changelog.empty?
+
+    if testflight_groups.empty?
+      UI.important("TESTFLIGHT_GROUPS not set; build will upload and finish processing, but tester assignment remains manual in App Store Connect.")
+    else
+      UI.message("Distributing build to TestFlight groups: #{testflight_groups.join(', ')}")
+      upload_options[:groups] = testflight_groups
+      upload_options[:distribute_external] = false
+    end
+
+    begin
+      Timeout.timeout(wait_timeout_seconds + upload_timeout_buffer_seconds) do
+        upload_to_testflight(**upload_options)
+      end
+    rescue Timeout::Error
+      UI.user_error!(
+        "Timed out after #{wait_timeout_seconds + upload_timeout_buffer_seconds}s while waiting for TestFlight processing. " \
+        "The upload may still have succeeded. Check App Store Connect TestFlight activity and Apple processing emails."
+      )
+    end
+  end
+end
