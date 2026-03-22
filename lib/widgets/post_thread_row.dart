@@ -297,26 +297,12 @@ class _PostMedia extends StatelessWidget {
   const _PostMedia({required this.post});
   final MediaPost post;
 
+  // Max height for a single image — keeps tall portraits from dominating the feed.
+  static const double _maxImageHeight = 200;
+
   @override
   Widget build(BuildContext context) {
-    // Danger mode: content protected
-    if (post.isDangerMode) {
-      return _mediaShell(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(CupertinoIcons.shield,
-                color: SpotColors.danger.withAlpha(120), size: 22),
-            const SizedBox(height: SpotSpacing.xs),
-            Text('Content protected',
-                style: SpotType.caption
-                    .copyWith(color: SpotColors.textTertiary)),
-          ],
-        ),
-      );
-    }
-
-    // Collect all locally available paths
+    // Collect all locally available paths (danger-mode images show blurred)
     final availablePaths = post.mediaPaths
         .where((p) => File(p).existsSync())
         .toList();
@@ -324,14 +310,14 @@ class _PostMedia extends StatelessWidget {
     // Multiple files: horizontal scrollable strip
     if (availablePaths.length > 1) {
       return SizedBox(
-        height: 160,
+        height: _maxImageHeight,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: availablePaths.length,
           separatorBuilder: (ctx, i) => const SizedBox(width: 6),
           itemBuilder: (ctx, i) {
             final path = availablePaths[i];
-            final w = availablePaths.length == 2 ? 160.0 : 140.0;
+            final w = availablePaths.length == 2 ? 200.0 : 160.0;
             return SizedBox(
               width: w,
               child: ClipRRect(
@@ -358,15 +344,18 @@ class _PostMedia extends StatelessWidget {
       if (_isVideo(path)) {
         return _VideoThumb(path: path);
       }
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(SpotRadius.md),
-        child: Image.file(
-          File(path),
-          width: double.infinity,
-          fit: BoxFit.cover,
-          errorBuilder: (ctx, err, stack) => _mediaShell(
-            child: const Icon(CupertinoIcons.photo,
-                color: SpotColors.overlay, size: 26),
+      return ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: _maxImageHeight),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(SpotRadius.md),
+          child: Image.file(
+            File(path),
+            width: double.infinity,
+            fit: BoxFit.cover,
+            errorBuilder: (ctx, err, stack) => _mediaShell(
+              child: const Icon(CupertinoIcons.photo,
+                  color: SpotColors.overlay, size: 26),
+            ),
           ),
         ),
       );
@@ -389,7 +378,7 @@ class _PostMedia extends StatelessWidget {
   }
 
   Widget _mediaShell({required Widget child}) => Container(
-        height: 160,
+        height: _maxImageHeight,
         width: double.infinity,
         decoration: BoxDecoration(
           color: SpotColors.surface,
@@ -418,7 +407,7 @@ class _VideoThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 160,
+      height: compact ? double.infinity : _PostMedia._maxImageHeight,
       width: double.infinity,
       decoration: BoxDecoration(
         color: SpotColors.surface,

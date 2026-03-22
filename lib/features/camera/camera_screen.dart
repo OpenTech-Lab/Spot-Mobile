@@ -188,8 +188,13 @@ class _CameraScreenState extends State<CameraScreen>
       pubkey: widget.wallet.publicKeyHex,
       contentHashes: hashes,
       mediaPaths: paths,
-      latitude: _isDangerMode ? null : _gpsLock?.latitude,
-      longitude: _isDangerMode ? null : _gpsLock?.longitude,
+      // Danger mode: coarsen to ~0.5° (≈55 km) instead of stripping entirely
+      latitude: _isDangerMode
+          ? _coarseCoord(_gpsLock?.latitude)
+          : _gpsLock?.latitude,
+      longitude: _isDangerMode
+          ? _coarseCoord(_gpsLock?.longitude)
+          : _gpsLock?.longitude,
       capturedAt: _gpsLock?.timestamp ?? DateTime.now().toUtc(),
       eventTag: effectiveTag,
       isDangerMode: _isDangerMode,
@@ -828,11 +833,18 @@ class _PreviewScreenState extends State<_PreviewScreen> {
                       ? CupertinoIcons.shield
                       : CupertinoIcons.location_fill,
                   label: widget.isDangerMode
-                      ? 'Protected — location and faces hidden'
+                      ? () {
+                          final lat = _coarseCoord(widget.gpsLock?.latitude);
+                          final lon = _coarseCoord(widget.gpsLock?.longitude);
+                          return lat != null
+                              ? 'Approx. ${lat.toStringAsFixed(1)}, '
+                                '${lon!.toStringAsFixed(1)}  (±55 km, faces blurred)'
+                              : 'Faces blurred · no location';
+                        }()
                       : widget.gpsLock != null
-                      ? '${widget.gpsLock!.latitude.toStringAsFixed(4)}, '
+                          ? '${widget.gpsLock!.latitude.toStringAsFixed(4)}, '
                             '${widget.gpsLock!.longitude.toStringAsFixed(4)}'
-                      : 'No location',
+                          : 'No location',
                   color: widget.isDangerMode
                       ? SpotColors.danger
                       : SpotColors.success,
@@ -950,6 +962,10 @@ String _shortPubkey(String pubkey) {
   if (pubkey.length <= 12) return pubkey;
   return '${pubkey.substring(0, 6)}…${pubkey.substring(pubkey.length - 4)}';
 }
+
+/// Rounds a coordinate to the nearest 0.5° (≈55 km) for city-level privacy.
+double? _coarseCoord(double? v) =>
+    v == null ? null : (v * 2).roundToDouble() / 2.0;
 
 class _PreviewMetaRow extends StatelessWidget {
   const _PreviewMetaRow({
