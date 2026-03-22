@@ -7,8 +7,7 @@ import 'package:mobile/features/event/event_screen.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/feed_screen.dart';
-import 'package:mobile/screens/my_posts_screen.dart';
-import 'package:mobile/screens/wallet_screen.dart';
+import 'package:mobile/screens/profile_screen.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
 /// Main app shell with bottom navigation.
@@ -48,7 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 1:
         return _EventsListTab(eventRepo: _eventRepo);
       case 2:
-        return WalletScreen(wallet: widget.wallet);
+        return ProfileScreen(wallet: widget.wallet, nostrService: _nostrService);
       default:
         return FeedScreen(nostrService: _nostrService);
     }
@@ -69,35 +68,25 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SpotColors.bg,
-      appBar: AppBar(
-        backgroundColor: SpotColors.bg,
-        centerTitle: true,
-        title: Image.asset(
-          'assets/logo_transparent.png',
-          height: 28,
-          fit: BoxFit.contain,
-        ),
-        actions: _selectedTab == 2
-            ? [
-                IconButton(
-                  icon: const Icon(CupertinoIcons.square_grid_2x2, size: 18),
-                  color: SpotColors.textSecondary,
-                  tooltip: 'My Posts',
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => MyPostsScreen(
-                        wallet: widget.wallet,
-                        nostrService: _nostrService,
-                      ),
-                    ),
+      appBar: _selectedTab == 2
+          ? null // ProfileScreen provides its own AppBar with settings button
+          : _selectedTab == 0
+              ? AppBar(
+                  backgroundColor: SpotColors.bg,
+                  centerTitle: true,
+                  title: Image.asset(
+                    'assets/logo_transparent.png',
+                    height: 28,
+                    fit: BoxFit.contain,
                   ),
+                )
+              : AppBar(
+                  backgroundColor: SpotColors.bg,
+                  title: const Text('Events', style: SpotType.subheading),
                 ),
-              ]
-            : const [],
-      ),
       body: _buildCurrentTab(),
       bottomNavigationBar: _buildBottomNav(),
-      floatingActionButton: GestureDetector(
+      floatingActionButton: _selectedTab != 0 ? null : GestureDetector(
         onTap: _openCamera,
         child: Container(
           width: 48,
@@ -114,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButtonLocation: _selectedTab != 0 ? null : FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -144,7 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               _NavItem(
                 icon: CupertinoIcons.person,
-                label: 'Identity',
+                label: 'Profile',
                 selected: _selectedTab == 2,
                 onTap: () => setState(() => _selectedTab = 2),
               ),

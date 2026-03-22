@@ -1,0 +1,317 @@
+import 'dart:async';
+
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import 'package:mobile/features/event/event_repository.dart';
+import 'package:mobile/features/nostr/nostr_service.dart';
+import 'package:mobile/models/event_model.dart';
+import 'package:mobile/models/media_post.dart';
+import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/screens/wallet_screen.dart';
+import 'package:mobile/theme/spot_theme.dart';
+import 'package:mobile/widgets/post_thread_row.dart';
+
+/// Profile screen — shows identity summary and the user's own posts.
+class ProfileScreen extends StatefulWidget {
+  const ProfileScreen({
+    super.key,
+    required this.wallet,
+    required this.nostrService,
+  });
+
+  final WalletModel wallet;
+  final NostrService nostrService;
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  late final EventRepository _repo;
+  StreamSubscription<CivicEvent>? _sub;
+
+  List<MediaPost> _posts = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _repo = EventRepository(nostrService: widget.nostrService);
+    _initFeed();
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    _repo.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initFeed() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      await widget.nostrService.connect();
+      _sub = _repo.subscribeToEvents().listen(_onEvent);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _onEvent(CivicEvent event) {
+    if (!mounted) return;
+    final mine = event.posts
+        .where((p) => p.pubkey == widget.wallet.publicKeyHex)
+        .toList();
+    if (mine.isEmpty) return;
+    final existingIds = {for (final p in _posts) p.id};
+    final incoming = mine.where((p) => !existingIds.contains(p.id)).toList();
+    if (incoming.isEmpty) return;
+    final merged = [..._posts, ...incoming]
+      ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+    setState(() => _posts = merged);
+  }
+
+  Future<void> _refresh() async {
+    await _sub?.cancel();
+    setState(() => _posts = []);
+    await _initFeed();
+  }
+
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => WalletScreen(wallet: widget.wallet),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: SpotColors.bg,
+      appBar: AppBar(
+        backgroundColor: SpotColors.bg,
+        title: const Text('Profile', style: SpotType.subheading),
+        actions: [
+          IconButton(
+            icon: const Icon(CupertinoIcons.settings, size: 20),
+            color: SpotColors.textSecondary,
+            tooltip: 'Settings',
+            onPressed: _openSettings,
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        color: SpotColors.accent,
+        backgroundColor: SpotColors.surface,
+        displacement: 28,
+        onRefresh: _refresh,
+        child: CustomScrollView(
+          slivers: [
+            // ── Profile header ─────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: _ProfileHeader(
+                wallet: widget.wallet,
+                postCount: _posts.length,
+              ),
+            ),
+
+            // ── Divider ────────────────────────────────────────────────────
+            const SliverToBoxAdapter(
+              child: Divider(height: 1, thickness: 0.5),
+            ),
+
+            // ── Posts ──────────────────────────────────────────────────────
+            if (_isLoading && _posts.isEmpty)
+              const SliverFillRemaining(
+                child: Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      color: SpotColors.accent,
+                      strokeWidth: 1,
+                    ),
+                  ),
+                ),
+              )
+            else if (_error != null && _posts.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: Text(
+                    'Could not load posts',
+                    style: SpotType.bodySecondary,
+                  ),
+                ),
+              )
+            else if (_posts.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        CupertinoIcons.camera,
+                        color: SpotColors.overlay,
+                        size: 32,
+                      ),
+                      const SizedBox(height: SpotSpacing.lg),
+                      Text(
+                        'No posts yet',
+                        style: SpotType.bodySecondary
+                            .copyWith(fontWeight: FontWeight.w300),
+                      ),
+                      const SizedBox(height: SpotSpacing.xs),
+                      const Text(
+                        'Capture a moment to see it here',
+                        style: SpotType.caption,
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (ctx, i) => PostThreadRow(
+                    post: _posts[i],
+                    isLast: i == _posts.length - 1,
+                  ),
+                  childCount: _posts.length,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Profile header ─────────────────────────────────────────────────────────────
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({required this.wallet, required this.postCount});
+
+  final WalletModel wallet;
+  final int postCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        SpotSpacing.lg,
+        SpotSpacing.xl,
+        SpotSpacing.lg,
+        SpotSpacing.lg,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Avatar
+              _LargeAvatar(pubkeyHex: wallet.publicKeyHex),
+              const Spacer(),
+              // Post count
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    '$postCount',
+                    style: SpotType.subheading,
+                  ),
+                  const SizedBox(height: 2),
+                  const Text('Posts', style: SpotType.caption),
+                ],
+              ),
+              const SizedBox(width: SpotSpacing.xl),
+            ],
+          ),
+          const SizedBox(height: SpotSpacing.md),
+          // npub
+          GestureDetector(
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: wallet.npub));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Copied to clipboard')),
+              );
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(wallet.npubShort, style: SpotType.mono),
+                const SizedBox(width: SpotSpacing.xs),
+                const Icon(
+                  CupertinoIcons.doc_on_doc,
+                  color: SpotColors.textTertiary,
+                  size: 11,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: SpotSpacing.xs),
+          // Device
+          Text(
+            wallet.deviceId.length > 20
+                ? '${wallet.deviceId.substring(0, 14)}…'
+                : wallet.deviceId,
+            style: SpotType.caption,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Large avatar ───────────────────────────────────────────────────────────────
+
+class _LargeAvatar extends StatelessWidget {
+  const _LargeAvatar({required this.pubkeyHex});
+
+  final String pubkeyHex;
+
+  @override
+  Widget build(BuildContext context) {
+    final hex = pubkeyHex.length >= 6 ? pubkeyHex.substring(0, 6) : '888480';
+    final value = int.tryParse(hex, radix: 16) ?? 0x888480;
+    final r = ((value >> 16) & 0xFF);
+    final g = ((value >> 8) & 0xFF);
+    final b = (value & 0xFF);
+    final accent = Color.fromARGB(
+      255,
+      r.clamp(80, 200),
+      g.clamp(80, 180),
+      b.clamp(60, 160),
+    );
+
+    return Container(
+      width: 72,
+      height: 72,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: SpotColors.surface,
+        border: Border.all(color: accent.withAlpha(120), width: 1),
+      ),
+      child: Center(
+        child: Text(
+          pubkeyHex.substring(0, 2).toUpperCase(),
+          style: TextStyle(
+            color: accent,
+            fontSize: 26,
+            fontWeight: FontWeight.w300,
+            fontFamily: 'monospace',
+          ),
+        ),
+      ),
+    );
+  }
+}
