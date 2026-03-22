@@ -31,6 +31,11 @@ class MediaPost {
   /// Whether this was recorded in Danger Mode (face blur + GPS stripped)
   final bool isDangerMode;
 
+  /// Whether this post is virtual (game screenshot, artwork, fictional content —
+  /// not a real-world event).  GPS is recorded internally but NOT published to
+  /// Nostr and NOT shown to other users in the feed.
+  final bool isVirtual;
+
   /// Optional text caption added by the author at publish time.
   final String? caption;
 
@@ -54,6 +59,7 @@ class MediaPost {
     required this.capturedAt,
     this.eventTag,
     this.isDangerMode = false,
+    this.isVirtual = false,
     this.caption,
     this.replyToId,
     this.tags = const [],
@@ -83,6 +89,7 @@ class MediaPost {
         'capturedAt': capturedAt.toIso8601String(),
         'eventTag': eventTag,
         'isDangerMode': isDangerMode,
+        'isVirtual': isVirtual,
         'caption': caption,
         'replyToId': replyToId,
         'tags': tags,
@@ -105,6 +112,7 @@ class MediaPost {
         capturedAt: DateTime.parse(json['capturedAt'] as String),
         eventTag: json['eventTag'] as String?,
         isDangerMode: json['isDangerMode'] as bool? ?? false,
+        isVirtual: json['isVirtual'] as bool? ?? false,
         caption: json['caption'] as String?,
         replyToId: json['replyToId'] as String?,
         tags: List<String>.from(json['tags'] as List? ?? []),
@@ -126,6 +134,7 @@ class MediaPost {
     String? replyToId,
     List<String>? tags,
     String? nostrEventId,
+    bool? isVirtual,
   }) =>
       MediaPost(
         id: id ?? this.id,
@@ -138,6 +147,7 @@ class MediaPost {
         capturedAt: capturedAt ?? this.capturedAt,
         eventTag: eventTag ?? this.eventTag,
         isDangerMode: isDangerMode ?? this.isDangerMode,
+        isVirtual: isVirtual ?? this.isVirtual,
         caption: caption ?? this.caption,
         replyToId: replyToId ?? this.replyToId,
         tags: tags ?? this.tags,

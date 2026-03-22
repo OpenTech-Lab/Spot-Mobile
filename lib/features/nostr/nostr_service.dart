@@ -115,11 +115,15 @@ class NostrService {
       ['app', 'spot'], // identifies events originating from the Spot app
       if (post.replyToId != null) ['e', post.replyToId!, '', 'reply'],
       if (post.eventTag != null) ['t', post.eventTag!],
-      if (post.latitude != null && post.longitude != null)
+      // Virtual posts: GPS is recorded locally but NOT published to Nostr.
+      if (!post.isVirtual &&
+          post.latitude != null &&
+          post.longitude != null)
         ['geo', post.latitude.toString(), post.longitude.toString()],
       for (final hash in post.contentHashes) ['media_hash', hash],
       if (post.ipfsCid != null) ['ipfs', post.ipfsCid!],
       if (post.isDangerMode) ['danger', '1'],
+      if (post.isVirtual) ['virtual', '1'],
     ];
 
     // Build a placeholder event to compute its ID

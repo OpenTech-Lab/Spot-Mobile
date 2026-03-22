@@ -390,6 +390,7 @@ class EventRepository {
           DateTime.fromMillisecondsSinceEpoch(event.createdAt * 1000),
       eventTag: hashtag,
       isDangerMode: event.getTagValue('danger') == '1',
+      isVirtual: event.getTagValue('virtual') == '1',
       caption: caption,
       replyToId: replyToId,
       tags: event.tags

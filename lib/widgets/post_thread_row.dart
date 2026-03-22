@@ -508,6 +508,17 @@ class _GpsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (post.isVirtual) {
+      return Row(
+        children: [
+          const Icon(CupertinoIcons.gamecontroller,
+              size: 11, color: SpotColors.textTertiary),
+          const SizedBox(width: 4),
+          Text('Virtual', style: SpotType.caption),
+        ],
+      );
+    }
+
     if (!post.hasGps) {
       return Row(
         children: [

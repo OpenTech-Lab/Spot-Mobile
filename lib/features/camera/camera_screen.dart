@@ -45,6 +45,7 @@ class _CameraScreenState extends State<CameraScreen>
   bool _isInitialized = false;
   bool _isRecording = false;
   bool _isDangerMode = false;
+  bool _isVirtualMode = false;
   bool _isCapturing = false;
   bool _gpsFetched = false;
 
@@ -189,7 +190,9 @@ class _CameraScreenState extends State<CameraScreen>
       pubkey: widget.wallet.publicKeyHex,
       contentHashes: hashes,
       mediaPaths: paths,
-      // Danger mode: coarsen to ~0.5° (≈55 km) instead of stripping entirely
+      // Danger mode: coarsen to ~0.5° (≈55 km) instead of stripping entirely.
+      // Virtual mode: GPS is stored locally (for internal use) but the
+      // NostrService will NOT include geo tags in the published event.
       latitude: _isDangerMode
           ? _coarseCoord(_gpsLock?.latitude)
           : _gpsLock?.latitude,
@@ -199,6 +202,7 @@ class _CameraScreenState extends State<CameraScreen>
       capturedAt: _gpsLock?.timestamp ?? DateTime.now().toUtc(),
       eventTag: effectiveTag,
       isDangerMode: _isDangerMode,
+      isVirtual: _isVirtualMode,
       caption: caption.isEmpty ? null : caption,
       replyToId: widget.replyToPost?.nostrEventId,
       nostrEventId: primaryHash,
@@ -290,6 +294,7 @@ class _CameraScreenState extends State<CameraScreen>
         files: _capturedFiles,
         isVideos: _capturedIsVideos,
         isDangerMode: _isDangerMode,
+        isVirtualMode: _isVirtualMode,
         gpsLock: _gpsLock,
         eventTag: _eventTag.isNotEmpty
             ? _eventTag
@@ -330,8 +335,8 @@ class _CameraScreenState extends State<CameraScreen>
             ),
           ),
 
-          // Danger mode banner
-          if (_isDangerMode)
+          // Mode banner (Danger or Virtual)
+          if (_isDangerMode || _isVirtualMode)
             Positioned(
               top: MediaQuery.of(context).padding.top + SpotSpacing.md,
               left: 0,
@@ -343,13 +348,17 @@ class _CameraScreenState extends State<CameraScreen>
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: SpotColors.danger.withAlpha(220),
+                    color: _isVirtualMode
+                        ? SpotColors.accent.withAlpha(220)
+                        : SpotColors.danger.withAlpha(220),
                     borderRadius: BorderRadius.circular(SpotRadius.xs),
                   ),
                   child: Text(
-                    'Protected mode',
+                    _isVirtualMode ? 'Virtual · no location published' : 'Protected mode',
                     style: SpotType.label.copyWith(
-                      color: SpotColors.onDanger,
+                      color: _isVirtualMode
+                          ? SpotColors.onAccent
+                          : SpotColors.onDanger,
                       letterSpacing: 1,
                     ),
                   ),
@@ -371,10 +380,17 @@ class _CameraScreenState extends State<CameraScreen>
             bottom: 0,
             child: _ControlsPanel(
               isDangerMode: _isDangerMode,
+              isVirtualMode: _isVirtualMode,
               isRecording: _isRecording,
               tagController: _tagController,
-              onDangerToggle: () =>
-                  setState(() => _isDangerMode = !_isDangerMode),
+              onDangerToggle: () => setState(() {
+                _isDangerMode = !_isDangerMode;
+                if (_isDangerMode) _isVirtualMode = false;
+              }),
+              onVirtualToggle: () => setState(() {
+                _isVirtualMode = !_isVirtualMode;
+                if (_isVirtualMode) _isDangerMode = false;
+              }),
               onTagChanged: (v) => _eventTag = v.replaceAll('#', '').trim(),
               onTap: _capturePhoto,
               onLongPressStart: (_) => _startRecording(),
@@ -443,9 +459,11 @@ class _GpsIndicator extends StatelessWidget {
 class _ControlsPanel extends StatelessWidget {
   const _ControlsPanel({
     required this.isDangerMode,
+    required this.isVirtualMode,
     required this.isRecording,
     required this.tagController,
     required this.onDangerToggle,
+    required this.onVirtualToggle,
     required this.onTagChanged,
     required this.onTap,
     required this.onLongPressStart,
@@ -454,9 +472,11 @@ class _ControlsPanel extends StatelessWidget {
   });
 
   final bool isDangerMode;
+  final bool isVirtualMode;
   final bool isRecording;
   final TextEditingController tagController;
   final VoidCallback onDangerToggle;
+  final VoidCallback onVirtualToggle;
   final ValueChanged<String> onTagChanged;
   final VoidCallback onTap;
   final GestureLongPressStartCallback onLongPressStart;
@@ -504,6 +524,30 @@ class _ControlsPanel extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: SpotSpacing.md),
+
+          // Mode selector pill — Real / Virtual
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _ModePill(
+                label: 'REAL',
+                icon: CupertinoIcons.location_fill,
+                active: !isVirtualMode,
+                activeColor: SpotColors.success,
+                onTap: isVirtualMode ? onVirtualToggle : null,
+              ),
+              const SizedBox(width: 2),
+              _ModePill(
+                label: 'VIRTUAL',
+                icon: CupertinoIcons.gamecontroller,
+                active: isVirtualMode,
+                activeColor: SpotColors.accent,
+                onTap: !isVirtualMode ? onVirtualToggle : null,
+              ),
+            ],
+          ),
+
           const SizedBox(height: SpotSpacing.lg),
 
           Row(
@@ -556,7 +600,7 @@ class _ControlsPanel extends StatelessWidget {
                 ),
               ),
 
-              // Placeholder — future flip-camera
+              // Gallery picker
               GestureDetector(
                 onTap: onGallery,
                 child: Container(
@@ -597,6 +641,7 @@ class _PreviewScreen extends StatefulWidget {
     required this.files,
     required this.isVideos,
     required this.isDangerMode,
+    required this.isVirtualMode,
     this.gpsLock,
     this.eventTag,
     this.replyToPost,
@@ -608,6 +653,7 @@ class _PreviewScreen extends StatefulWidget {
   final List<XFile> files;
   final List<bool> isVideos;
   final bool isDangerMode;
+  final bool isVirtualMode;
   final GpsLock? gpsLock;
   final String? eventTag;
   final MediaPost? replyToPost;
@@ -828,17 +874,23 @@ class _PreviewScreenState extends State<_PreviewScreen> {
                   const SizedBox(height: SpotSpacing.xs),
                 ],
 
-                // GPS / protection info
-                _PreviewMetaRow(
-                  icon: widget.isDangerMode
-                      ? CupertinoIcons.shield
-                      : CupertinoIcons.location_fill,
-                  label: _buildGpsLabel(
-                      widget.isDangerMode, widget.gpsLock),
-                  color: widget.isDangerMode
-                      ? SpotColors.danger
-                      : SpotColors.success,
-                ),
+                // Mode / GPS info
+                if (widget.isVirtualMode)
+                  _PreviewMetaRow(
+                    icon: CupertinoIcons.gamecontroller,
+                    label: 'Virtual · location not published',
+                    color: SpotColors.accent,
+                  )
+                else
+                  _PreviewMetaRow(
+                    icon: widget.isDangerMode
+                        ? CupertinoIcons.shield
+                        : CupertinoIcons.location_fill,
+                    label: _buildGpsLabel(widget.isDangerMode, widget.gpsLock),
+                    color: widget.isDangerMode
+                        ? SpotColors.danger
+                        : SpotColors.success,
+                  ),
                 if (widget.eventTag?.isNotEmpty == true)
                   _PreviewMetaRow(
                     icon: CupertinoIcons.tag,
@@ -1006,6 +1058,61 @@ class _PreviewMetaRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Mode pill ──────────────────────────────────────────────────────────────────
+
+/// A selectable pill used in the REAL / VIRTUAL mode selector row.
+class _ModePill extends StatelessWidget {
+  const _ModePill({
+    required this.label,
+    required this.icon,
+    required this.active,
+    required this.activeColor,
+    this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool active;
+  final Color activeColor;
+
+  /// Null when already selected (no-op).
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? activeColor : Colors.white38;
+    final bg = active ? activeColor.withAlpha(35) : Colors.transparent;
+    final border = active ? activeColor.withAlpha(160) : Colors.white24;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(
+          horizontal: SpotSpacing.md,
+          vertical: 5,
+        ),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(SpotRadius.full),
+          border: Border.all(color: border, width: 0.5),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 12),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: SpotType.label.copyWith(color: color, letterSpacing: 0.8),
+            ),
+          ],
+        ),
       ),
     );
   }
