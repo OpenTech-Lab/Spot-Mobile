@@ -7,8 +7,9 @@ import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/event/event_screen.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/event_model.dart';
+import 'package:mobile/theme/spot_theme.dart';
 
-/// Main content feed — subscribes to Nostr relays and shows live [CivicEvent]s.
+/// Main content feed — live [CivicEvent] stream from Nostr relays.
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key, required this.nostrService});
 
@@ -41,31 +42,22 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   Future<void> _initFeed() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
+    setState(() { _isLoading = true; _error = null; });
     try {
       await widget.nostrService.connect();
       _sub = _repo.subscribeToEvents().listen((event) {
-        if (mounted) {
-          setState(() {
-            // Upsert by hashtag
-            final idx =
-                _events.indexWhere((e) => e.hashtag == event.hashtag);
-            if (idx == -1) {
-              _events = [event, ..._events];
-            } else {
-              final updated = List<CivicEvent>.from(_events);
-              updated[idx] = event;
-              _events = updated;
-            }
-            // Sort newest first
-            _events.sort(
-                (a, b) => b.firstSeen.compareTo(a.firstSeen));
-          });
-        }
+        if (!mounted) return;
+        setState(() {
+          final idx = _events.indexWhere((e) => e.hashtag == event.hashtag);
+          if (idx == -1) {
+            _events = [event, ..._events];
+          } else {
+            final updated = List<CivicEvent>.from(_events);
+            updated[idx] = event;
+            _events = updated;
+          }
+          _events.sort((a, b) => b.firstSeen.compareTo(a.firstSeen));
+        });
       });
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -83,26 +75,7 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0D0D0D),
-        title: const Text(
-          'SPOT',
-          style: TextStyle(
-            color: Color(0xFFFF4444),
-            fontWeight: FontWeight.bold,
-            letterSpacing: 4,
-            fontFamily: 'monospace',
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white54),
-            onPressed: _refresh,
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
+      backgroundColor: SpotColors.bg,
       body: _buildBody(),
     );
   }
@@ -113,10 +86,16 @@ class _FeedScreenState extends State<FeedScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(color: Color(0xFFFF4444)),
-            SizedBox(height: 16),
-            Text('Connecting to relays...',
-                style: TextStyle(color: Colors.white54)),
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                color: SpotColors.accent,
+                strokeWidth: 1,
+              ),
+            ),
+            SizedBox(height: SpotSpacing.xl),
+            Text('Connecting', style: SpotType.label),
           ],
         ),
       );
@@ -125,21 +104,27 @@ class _FeedScreenState extends State<FeedScreen> {
     if (_error != null && _events.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(SpotSpacing.xxxl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.wifi_off, color: Colors.white30, size: 48),
-              const SizedBox(height: 16),
-              Text('Connection failed: $_error',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white54)),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _refresh,
-                style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF4444)),
-                child: const Text('Retry'),
+              const Icon(Icons.wifi_off_outlined, color: SpotColors.textTertiary, size: 32),
+              const SizedBox(height: SpotSpacing.xl),
+              const Text('Could not connect to relays', style: SpotType.bodySecondary),
+              const SizedBox(height: SpotSpacing.xl),
+              GestureDetector(
+                onTap: _refresh,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: SpotSpacing.xl,
+                    vertical: SpotSpacing.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: SpotColors.border, width: 0.5),
+                    borderRadius: BorderRadius.circular(SpotRadius.sm),
+                  ),
+                  child: const Text('Retry', style: SpotType.bodySecondary),
+                ),
               ),
             ],
           ),
@@ -148,35 +133,38 @@ class _FeedScreenState extends State<FeedScreen> {
     }
 
     if (_events.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.inbox, color: Colors.white24, size: 56),
-            SizedBox(height: 16),
-            Text('No events yet.',
-                style: TextStyle(color: Colors.white54, fontSize: 16)),
-            SizedBox(height: 8),
-            Text('Be the first to post!',
-                style: TextStyle(color: Colors.white30)),
+            const Icon(Icons.inbox_outlined, color: SpotColors.overlay, size: 36),
+            const SizedBox(height: SpotSpacing.lg),
+            Text(
+              'No posts yet',
+              style: SpotType.bodySecondary.copyWith(fontWeight: FontWeight.w300),
+            ),
+            const SizedBox(height: SpotSpacing.xs),
+            const Text('Be the first to record', style: SpotType.caption),
           ],
         ),
       );
     }
 
     return RefreshIndicator(
-      color: const Color(0xFFFF4444),
-      backgroundColor: const Color(0xFF1A1A1A),
+      color: SpotColors.accent,
+      backgroundColor: SpotColors.surface,
+      displacement: 28,
       onRefresh: _refresh,
       child: ListView.builder(
-        padding: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.only(
+          top: SpotSpacing.md,
+          bottom: SpotSpacing.xl,
+        ),
         itemCount: _events.length,
         itemBuilder: (ctx, i) => _FeedCard(
           event: _events[i],
           onTap: () => Navigator.of(ctx).push(
-            MaterialPageRoute(
-              builder: (_) => EventScreen(event: _events[i]),
-            ),
+            MaterialPageRoute(builder: (_) => EventScreen(event: _events[i])),
           ),
         ),
       ),
@@ -184,7 +172,7 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 }
 
-// ── Feed card ─────────────────────────────────────────────────────────────────
+// ── Feed card ──────────────────────────────────────────────────────────────────
 
 class _FeedCard extends StatelessWidget {
   const _FeedCard({required this.event, required this.onTap});
@@ -196,110 +184,93 @@ class _FeedCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final df = DateFormat('MMM d · HH:mm');
     final latest = event.latestPost;
+    final isDanger = latest?.isDangerMode ?? false;
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF2A2A2A)),
+        margin: const EdgeInsets.symmetric(
+          horizontal: SpotSpacing.lg,
+          vertical: 4,
         ),
+        decoration: SpotDecoration.card(radius: SpotRadius.sm),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Thumbnail placeholder
+            // Media placeholder area
             Container(
-              height: 160,
+              height: 144,
               decoration: BoxDecoration(
-                color: const Color(0xFF0D0D0D),
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(12)),
+                color: SpotColors.bg,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(SpotRadius.sm),
+                ),
               ),
               child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      latest?.isDangerMode ?? false
-                          ? Icons.shield
-                          : Icons.photo_camera,
-                      color: latest?.isDangerMode ?? false
-                          ? const Color(0xFFFF4444)
-                          : Colors.white24,
-                      size: 40,
-                    ),
-                    if (latest?.isDangerMode ?? false)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 6),
-                        child: Text(
-                          'DANGER MODE',
-                          style: TextStyle(
-                            color: Color(0xFFFF4444),
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                child: isDanger
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.shield_outlined,
+                            color: SpotColors.danger.withAlpha(140),
+                            size: 24,
                           ),
-                        ),
+                          const SizedBox(height: SpotSpacing.sm),
+                          Text(
+                            'Protected',
+                            style: SpotType.label.copyWith(
+                              color: SpotColors.danger.withAlpha(140),
+                            ),
+                          ),
+                        ],
+                      )
+                    : const Icon(
+                        Icons.photo_camera_outlined,
+                        color: SpotColors.overlay,
+                        size: 24,
                       ),
-                  ],
-                ),
               ),
             ),
 
+            // Info row
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(
+                SpotSpacing.lg,
+                SpotSpacing.md,
+                SpotSpacing.lg,
+                SpotSpacing.lg,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Hashtag
-                  Text(
-                    '#${event.hashtag}',
-                    style: const TextStyle(
-                      color: Color(0xFFFF4444),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
+                  Text('#${event.hashtag}', style: SpotType.body),
+                  const SizedBox(height: SpotSpacing.sm),
+                  Wrap(
+                    spacing: SpotSpacing.xs,
+                    runSpacing: SpotSpacing.xs,
                     children: [
-                      // GPS badge
-                      if (event.centerLat != null)
-                        _Badge(
-                          icon: Icons.location_on,
-                          label:
-                              '${event.centerLat!.toStringAsFixed(2)}, ${event.centerLon!.toStringAsFixed(2)}',
-                          color: Colors.greenAccent,
-                        )
-                      else
-                        const _Badge(
-                          icon: Icons.location_off,
-                          label: 'GPS hidden',
-                          color: Colors.white38,
-                        ),
-                      const SizedBox(width: 8),
-                      // Post count
-                      _Badge(
-                        icon: Icons.image,
-                        label: '${event.posts.length}',
-                        color: Colors.white54,
+                      _Tag(
+                        event.centerLat != null
+                            ? '${event.centerLat!.toStringAsFixed(2)}, '
+                                '${event.centerLon!.toStringAsFixed(2)}'
+                            : 'Location hidden',
                       ),
+                      _Tag('${event.posts.length} posts'),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: SpotSpacing.sm),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '${event.participantCount} contributor${event.participantCount == 1 ? '' : 's'}',
-                        style: const TextStyle(
-                            color: Colors.white54, fontSize: 12),
+                        '${event.participantCount} '
+                        'contributor${event.participantCount == 1 ? '' : 's'}',
+                        style: SpotType.caption,
                       ),
                       Text(
                         df.format(event.firstSeen.toLocal()),
-                        style: const TextStyle(
-                            color: Colors.white38, fontSize: 11),
+                        style: SpotType.caption,
                       ),
                     ],
                   ),
@@ -313,23 +284,23 @@ class _FeedCard extends StatelessWidget {
   }
 }
 
-class _Badge extends StatelessWidget {
-  const _Badge(
-      {required this.icon, required this.label, required this.color});
+class _Tag extends StatelessWidget {
+  const _Tag(this.label);
 
-  final IconData icon;
   final String label;
-  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: color, size: 12),
-        const SizedBox(width: 3),
-        Text(label, style: TextStyle(color: color, fontSize: 11)),
-      ],
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpotSpacing.sm,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: SpotColors.surfaceHigh,
+        borderRadius: BorderRadius.circular(SpotRadius.xs),
+      ),
+      child: Text(label, style: SpotType.caption),
     );
   }
 }

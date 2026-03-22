@@ -7,14 +7,9 @@ import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/feed_screen.dart';
 import 'package:mobile/screens/wallet_screen.dart';
+import 'package:mobile/theme/spot_theme.dart';
 
 /// Main app shell with bottom navigation.
-///
-/// Tab layout:
-///   0 — Feed
-///   1 — Camera (prominent center button)
-///   2 — Events list
-///   3 — Wallet / Identity
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.wallet});
 
@@ -26,8 +21,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0;
-  bool _isDangerModeGlobal = false;
-
   late final NostrService _nostrService;
   late final EventRepository _eventRepo;
 
@@ -46,22 +39,14 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  // ── Tab screens ───────────────────────────────────────────────────────────
-
   Widget _buildCurrentTab() {
     switch (_selectedTab) {
       case 0:
         return FeedScreen(nostrService: _nostrService);
       case 1:
-        return CameraScreen(
-          wallet: widget.wallet,
-          nostrService: _nostrService,
-        );
+        return CameraScreen(wallet: widget.wallet, nostrService: _nostrService);
       case 2:
-        return _EventsListTab(
-          eventRepo: _eventRepo,
-          nostrService: _nostrService,
-        );
+        return _EventsListTab(eventRepo: _eventRepo);
       case 3:
         return WalletScreen(wallet: widget.wallet);
       default:
@@ -72,52 +57,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: SpotColors.bg,
       appBar: _selectedTab == 1
-          ? null // Camera screen is full-screen
+          ? null
           : AppBar(
-              backgroundColor: const Color(0xFF0D0D0D),
-              elevation: 0,
-              title: const Text(
-                'SPOT',
-                style: TextStyle(
-                  color: Color(0xFFFF4444),
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 4,
-                  fontFamily: 'monospace',
-                ),
-              ),
-              actions: [
-                if (_isDangerModeGlobal)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF4444),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.shield,
-                              color: Colors.white, size: 14),
-                          SizedBox(width: 4),
-                          Text(
-                            'DANGER',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
+              backgroundColor: SpotColors.bg,
+              title: const Text('Spot', style: SpotType.wordmark),
+              actions: const [],
             ),
       body: _buildCurrentTab(),
       bottomNavigationBar: _buildBottomNav(),
@@ -127,54 +73,55 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBottomNav() {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF111111),
-        border: Border(top: BorderSide(color: Color(0xFF2A2A2A))),
+        color: SpotColors.bg,
+        border: Border(top: BorderSide(color: SpotColors.border, width: 0.5)),
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.symmetric(vertical: SpotSpacing.sm),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _NavItem(
-                icon: Icons.feed,
+                icon: Icons.view_stream_outlined,
                 label: 'Feed',
                 selected: _selectedTab == 0,
                 onTap: () => setState(() => _selectedTab = 0),
               ),
-
-              // Center camera button (prominent)
+              // Capture button — center focal point
               GestureDetector(
                 onTap: () => setState(() => _selectedTab = 1),
                 child: Container(
-                  width: 56,
-                  height: 56,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: _selectedTab == 1
-                        ? const Color(0xFFFF4444)
-                        : const Color(0xFF2A2A2A),
+                    color: _selectedTab == 1 ? SpotColors.accent : Colors.transparent,
                     border: Border.all(
                       color: _selectedTab == 1
-                          ? const Color(0xFFFF4444)
-                          : const Color(0xFF3A3A3A),
-                      width: 2,
+                          ? SpotColors.accent
+                          : SpotColors.border,
+                      width: 0.5,
                     ),
                   ),
-                  child: const Icon(Icons.camera_alt,
-                      color: Colors.white, size: 26),
+                  child: Icon(
+                    Icons.radio_button_unchecked,
+                    color: _selectedTab == 1
+                        ? SpotColors.onAccent
+                        : SpotColors.textSecondary,
+                    size: 22,
+                  ),
                 ),
               ),
-
               _NavItem(
-                icon: Icons.event,
+                icon: Icons.folder_open_outlined,
                 label: 'Events',
                 selected: _selectedTab == 2,
                 onTap: () => setState(() => _selectedTab = 2),
               ),
               _NavItem(
-                icon: Icons.account_circle,
-                label: 'Wallet',
+                icon: Icons.person_outline,
+                label: 'Identity',
                 selected: _selectedTab == 3,
                 onTap: () => setState(() => _selectedTab = 3),
               ),
@@ -203,80 +150,89 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? const Color(0xFFFF4444) : Colors.white38;
+    final color = selected ? SpotColors.accent : SpotColors.textSecondary;
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 2),
-          Text(label, style: TextStyle(color: color, fontSize: 10)),
-        ],
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg, vertical: SpotSpacing.xs),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 3),
+            Text(label, style: SpotType.caption.copyWith(color: color)),
+          ],
+        ),
       ),
     );
   }
 }
 
-// ── Events list tab ───────────────────────────────────────────────────────────
+// ── Events list tab ────────────────────────────────────────────────────────────
 
-class _EventsListTab extends StatefulWidget {
-  const _EventsListTab({
-    required this.eventRepo,
-    required this.nostrService,
-  });
+class _EventsListTab extends StatelessWidget {
+  const _EventsListTab({required this.eventRepo});
 
   final EventRepository eventRepo;
-  final NostrService nostrService;
 
-  @override
-  State<_EventsListTab> createState() => _EventsListTabState();
-}
-
-class _EventsListTabState extends State<_EventsListTab> {
   @override
   Widget build(BuildContext context) {
-    final events = widget.eventRepo.getAllEvents();
+    final events = eventRepo.getAllEvents();
 
     if (events.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.event_busy, color: Colors.white24, size: 56),
-            SizedBox(height: 16),
-            Text('No events tracked yet.',
-                style: TextStyle(color: Colors.white54)),
+            const Icon(Icons.folder_open_outlined, color: SpotColors.overlay, size: 40),
+            const SizedBox(height: SpotSpacing.lg),
+            Text(
+              'No events yet',
+              style: SpotType.bodySecondary.copyWith(fontWeight: FontWeight.w300),
+            ),
           ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpotSpacing.lg,
+        vertical: SpotSpacing.lg,
+      ),
       itemCount: events.length,
+      separatorBuilder: (context, i) => const SizedBox(height: SpotSpacing.xs),
       itemBuilder: (ctx, i) {
         final event = events[i];
-        return ListTile(
-          tileColor: const Color(0xFF1A1A1A),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: const Icon(Icons.tag, color: Color(0xFFFF4444)),
-          title: Text(
-            '#${event.hashtag}',
-            style: const TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          subtitle: Text(
-            '${event.posts.length} posts · ${event.participantCount} contributors',
-            style: const TextStyle(color: Colors.white54, fontSize: 12),
-          ),
-          trailing: const Icon(Icons.chevron_right, color: Colors.white30),
+        return InkWell(
           onTap: () => Navigator.of(ctx).push(
-            MaterialPageRoute(
-              builder: (_) => EventScreen(event: event),
+            MaterialPageRoute(builder: (_) => EventScreen(event: event)),
+          ),
+          borderRadius: BorderRadius.circular(SpotRadius.sm),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: SpotSpacing.lg,
+              vertical: SpotSpacing.md,
+            ),
+            decoration: SpotDecoration.card(radius: SpotRadius.sm),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('#${event.hashtag}', style: SpotType.body),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${event.posts.length} posts · ${event.participantCount} contributors',
+                        style: SpotType.caption,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: SpotColors.overlay, size: 16),
+              ],
             ),
           ),
         );

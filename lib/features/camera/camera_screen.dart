@@ -10,17 +10,10 @@ import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/camera_service.dart';
+import 'package:mobile/theme/spot_theme.dart';
 
-/// Full-screen camera UI for recording geo-tagged media.
-///
-/// Features:
-///   - Live camera preview
-///   - Tap = photo, hold = video recording
-///   - Danger Mode toggle (red shield): face blur + GPS strip
-///   - GPS lock indicator shown at capture time
-///   - Optional #EventTag input
-///   - Post-capture preview with confirm / discard actions
-///   - On confirm, publishes a Nostr event via [NostrService]
+/// Full-screen camera UI.
+/// Tap = photo · Hold = video · Shield = Danger Mode
 class CameraScreen extends StatefulWidget {
   const CameraScreen({
     super.key,
@@ -41,14 +34,14 @@ class _CameraScreenState extends State<CameraScreen>
   List<CameraDescription> _cameras = [];
 
   bool _isInitialized = false;
-  bool _isRecording = false;
-  bool _isDangerMode = false;
-  bool _isCapturing = false;
+  bool _isRecording   = false;
+  bool _isDangerMode  = false;
+  bool _isCapturing   = false;
 
   GpsLock? _gpsLock;
   String _eventTag = '';
   XFile? _capturedFile;
-  bool _capturedIsVideo = false;
+  bool  _capturedIsVideo = false;
 
   final _tagController = TextEditingController();
 
@@ -78,13 +71,10 @@ class _CameraScreenState extends State<CameraScreen>
     super.dispose();
   }
 
-  // ── Initialisation ────────────────────────────────────────────────────────
-
   Future<void> _initCamera() async {
     try {
       _cameras = await CameraService.instance.initialize();
       if (_cameras.isEmpty) return;
-
       _controller = CameraController(
         _cameras.first,
         ResolutionPreset.high,
@@ -92,11 +82,8 @@ class _CameraScreenState extends State<CameraScreen>
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
       await _controller!.initialize();
-
       if (mounted) setState(() => _isInitialized = true);
-    } catch (_) {
-      // Camera unavailable — show error state
-    }
+    } catch (_) {}
   }
 
   Future<void> _fetchGps() async {
@@ -104,27 +91,17 @@ class _CameraScreenState extends State<CameraScreen>
     if (mounted) setState(() => _gpsLock = lock);
   }
 
-  // ── Capture actions ───────────────────────────────────────────────────────
-
   Future<void> _capturePhoto() async {
     if (_controller == null || _isCapturing) return;
     setState(() => _isCapturing = true);
     HapticFeedback.lightImpact();
-
     try {
-      // Lock GPS at shutter press
       final gps = await CameraService.instance.lockGPS();
       if (mounted) setState(() => _gpsLock = gps);
-
       final xfile = await CameraService.instance.capturePhoto(_controller!);
-      if (mounted) {
-        setState(() {
-          _capturedFile = xfile;
-          _capturedIsVideo = false;
-        });
-      }
+      if (mounted) setState(() { _capturedFile = xfile; _capturedIsVideo = false; });
     } catch (e) {
-      _showError('Photo capture failed: $e');
+      _showError('Capture failed: $e');
     } finally {
       if (mounted) setState(() => _isCapturing = false);
     }
@@ -133,11 +110,8 @@ class _CameraScreenState extends State<CameraScreen>
   Future<void> _startRecording() async {
     if (_controller == null || _isRecording) return;
     HapticFeedback.mediumImpact();
-
-    // Lock GPS at recording start
     final gps = await CameraService.instance.lockGPS();
     if (mounted) setState(() => _gpsLock = gps);
-
     await CameraService.instance.startRecording(_controller!);
     if (mounted) setState(() => _isRecording = true);
   }
@@ -145,15 +119,10 @@ class _CameraScreenState extends State<CameraScreen>
   Future<void> _stopRecording() async {
     if (!_isRecording) return;
     HapticFeedback.lightImpact();
-
     try {
       final xfile = await CameraService.instance.stopRecording(_controller!);
       if (mounted) {
-        setState(() {
-          _capturedFile = xfile;
-          _capturedIsVideo = true;
-          _isRecording = false;
-        });
+        setState(() { _capturedFile = xfile; _capturedIsVideo = true; _isRecording = false; });
       }
     } catch (e) {
       _showError('Recording failed: $e');
@@ -161,46 +130,34 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
-  // ── Publish ───────────────────────────────────────────────────────────────
-
   Future<void> _publishPost() async {
     if (_capturedFile == null) return;
-
     File mediaFile = File(_capturedFile!.path);
-
-    // Danger Mode: apply face blur
     if (_isDangerMode) {
       mediaFile = await CameraService.instance.applyFaceBlur(mediaFile);
     }
-
     final bytes = await mediaFile.readAsBytes();
     final contentHash = EncryptionUtils.sha256BytesHex(bytes);
 
     final post = MediaPost(
-      id: contentHash,
-      pubkey: widget.wallet.publicKeyHex,
-      contentHash: contentHash,
-      mediaPath: mediaFile.path,
-      latitude: _isDangerMode ? null : _gpsLock?.latitude,
-      longitude: _isDangerMode ? null : _gpsLock?.longitude,
-      capturedAt: _gpsLock?.timestamp ?? DateTime.now().toUtc(),
-      eventTag: _eventTag.isEmpty ? null : _eventTag,
+      id:           contentHash,
+      pubkey:       widget.wallet.publicKeyHex,
+      contentHash:  contentHash,
+      mediaPath:    mediaFile.path,
+      latitude:     _isDangerMode ? null : _gpsLock?.latitude,
+      longitude:    _isDangerMode ? null : _gpsLock?.longitude,
+      capturedAt:   _gpsLock?.timestamp ?? DateTime.now().toUtc(),
+      eventTag:     _eventTag.isEmpty ? null : _eventTag,
       isDangerMode: _isDangerMode,
-      nostrEventId: contentHash, // will be updated after publish
+      nostrEventId: contentHash,
     );
 
     try {
       await widget.nostrService.publishMediaPost(post, widget.wallet);
-
-      // Seed media via P2P
       await P2PService.instance.seedMedia(mediaFile.path, contentHash);
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Post published!'),
-            backgroundColor: Color(0xFFFF4444),
-          ),
+          const SnackBar(content: Text('Published')),
         );
         setState(() => _capturedFile = null);
       }
@@ -209,32 +166,37 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
-  void _discardCapture() {
-    setState(() => _capturedFile = null);
-  }
+  void _discardCapture() => setState(() => _capturedFile = null);
 
-  // ── UI ────────────────────────────────────────────────────────────────────
+  void _showError(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
 
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized) {
       return const Scaffold(
-        backgroundColor: Color(0xFF0D0D0D),
+        backgroundColor: Colors.black,
         body: Center(
-          child: CircularProgressIndicator(color: Color(0xFFFF4444)),
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(color: SpotColors.accent, strokeWidth: 1),
+          ),
         ),
       );
     }
 
     if (_capturedFile != null) {
       return _PreviewScreen(
-        filePath: _capturedFile!.path,
-        isVideo: _capturedIsVideo,
+        filePath:     _capturedFile!.path,
+        isVideo:      _capturedIsVideo,
         isDangerMode: _isDangerMode,
-        gpsLock: _gpsLock,
-        eventTag: _eventTag,
-        onConfirm: _publishPost,
-        onDiscard: _discardCapture,
+        gpsLock:      _gpsLock,
+        eventTag:     _eventTag,
+        onConfirm:    _publishPost,
+        onDiscard:    _discardCapture,
       );
     }
 
@@ -243,110 +205,95 @@ class _CameraScreenState extends State<CameraScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Camera preview
           CameraPreview(_controller!),
 
-          // Danger Mode badge overlay
+          // Danger mode banner
           if (_isDangerMode)
             Positioned(
-              top: MediaQuery.of(context).padding.top + 12,
+              top: MediaQuery.of(context).padding.top + SpotSpacing.md,
               left: 0,
               right: 0,
               child: Center(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF4444),
-                    borderRadius: BorderRadius.circular(20),
+                    horizontal: SpotSpacing.md,
+                    vertical: 5,
                   ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.shield, color: Colors.white, size: 16),
-                      SizedBox(width: 6),
-                      Text(
-                        'DANGER MODE',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13),
-                      ),
-                    ],
+                  decoration: BoxDecoration(
+                    color: SpotColors.danger.withAlpha(220),
+                    borderRadius: BorderRadius.circular(SpotRadius.xs),
+                  ),
+                  child: Text(
+                    'Protected mode',
+                    style: SpotType.label.copyWith(
+                      color: SpotColors.onDanger,
+                      letterSpacing: 1,
+                    ),
                   ),
                 ),
               ),
             ),
 
-          // GPS indicator
+          // GPS lock indicator
           Positioned(
             top: MediaQuery.of(context).padding.top + 60,
-            left: 16,
+            left: SpotSpacing.lg,
             child: _GpsIndicator(gpsLock: _gpsLock),
           ),
 
-          // Controls overlay
+          // Controls
           Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
+            left: 0, right: 0, bottom: 0,
             child: _ControlsPanel(
-              isDangerMode: _isDangerMode,
-              isRecording: _isRecording,
-              tagController: _tagController,
-              onDangerToggle: () =>
-                  setState(() => _isDangerMode = !_isDangerMode),
-              onTagChanged: (v) => _eventTag = v.replaceAll('#', '').trim(),
-              onTap: _capturePhoto,
+              isDangerMode:     _isDangerMode,
+              isRecording:      _isRecording,
+              tagController:    _tagController,
+              onDangerToggle:   () => setState(() => _isDangerMode = !_isDangerMode),
+              onTagChanged:     (v) => _eventTag = v.replaceAll('#', '').trim(),
+              onTap:            _capturePhoto,
               onLongPressStart: (_) => _startRecording(),
-              onLongPressEnd: (_) => _stopRecording(),
+              onLongPressEnd:   (_) => _stopRecording(),
             ),
           ),
         ],
       ),
     );
   }
-
-  void _showError(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red.shade900,
-      ),
-    );
-  }
 }
 
-// ── GPS indicator ─────────────────────────────────────────────────────────────
+// ── GPS indicator ──────────────────────────────────────────────────────────────
 
 class _GpsIndicator extends StatelessWidget {
   const _GpsIndicator({this.gpsLock});
-
   final GpsLock? gpsLock;
 
   @override
   Widget build(BuildContext context) {
+    final locked = gpsLock != null;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpotSpacing.sm,
+        vertical: 4,
+      ),
       decoration: BoxDecoration(
-        color: Colors.black54,
-        borderRadius: BorderRadius.circular(6),
+        color: Colors.black.withAlpha(140),
+        borderRadius: BorderRadius.circular(SpotRadius.xs),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            gpsLock != null ? Icons.gps_fixed : Icons.gps_not_fixed,
-            color: gpsLock != null ? Colors.greenAccent : Colors.orange,
-            size: 14,
+            locked ? Icons.gps_fixed : Icons.gps_not_fixed,
+            color: locked ? SpotColors.success : SpotColors.warning,
+            size: 12,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: SpotSpacing.xs),
           Text(
-            gpsLock != null
-                ? '${gpsLock!.latitude.toStringAsFixed(4)}, ${gpsLock!.longitude.toStringAsFixed(4)}'
-                : 'Acquiring GPS...',
-            style: const TextStyle(color: Colors.white, fontSize: 11),
+            locked
+                ? '${gpsLock!.latitude.toStringAsFixed(4)}, '
+                  '${gpsLock!.longitude.toStringAsFixed(4)}'
+                : 'Locating…',
+            style: SpotType.caption.copyWith(color: Colors.white70),
           ),
         ],
       ),
@@ -354,7 +301,7 @@ class _GpsIndicator extends StatelessWidget {
   }
 }
 
-// ── Controls panel ────────────────────────────────────────────────────────────
+// ── Controls panel ─────────────────────────────────────────────────────────────
 
 class _ControlsPanel extends StatelessWidget {
   const _ControlsPanel({
@@ -381,56 +328,72 @@ class _ControlsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        bottom: MediaQuery.of(context).padding.bottom + 24,
-        top: 16,
+        left: SpotSpacing.xl,
+        right: SpotSpacing.xl,
+        bottom: MediaQuery.of(context).padding.bottom + SpotSpacing.xl,
+        top: SpotSpacing.lg,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.bottomCenter,
           end: Alignment.topCenter,
-          colors: [Colors.black, Colors.transparent],
+          colors: [Colors.black.withAlpha(200), Colors.transparent],
         ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Event tag field
+          // Event tag input
           TextField(
             controller: tagController,
             onChanged: onTagChanged,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: Colors.white, fontSize: 13),
             decoration: InputDecoration(
-              hintText: '#EventTag (optional)',
-              hintStyle: const TextStyle(color: Colors.white38),
-              prefixIcon:
-                  const Icon(Icons.tag, color: Colors.white38, size: 18),
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 8),
+              hintText: 'Event tag (optional)',
+              hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+              prefixText: '# ',
+              prefixStyle: const TextStyle(color: Colors.white54, fontSize: 13),
               filled: true,
-              fillColor: Colors.black45,
+              fillColor: Colors.black.withAlpha(120),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(SpotRadius.sm),
                 borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: SpotSpacing.md,
+                vertical: SpotSpacing.sm,
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: SpotSpacing.lg),
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // Danger Mode toggle
-              IconButton(
-                onPressed: onDangerToggle,
-                icon: Icon(
-                  Icons.shield,
-                  color: isDangerMode
-                      ? const Color(0xFFFF4444)
-                      : Colors.white38,
-                  size: 32,
+              // Danger toggle
+              GestureDetector(
+                onTap: onDangerToggle,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isDangerMode
+                        ? SpotColors.danger.withAlpha(40)
+                        : Colors.transparent,
+                    border: Border.all(
+                      color: isDangerMode
+                          ? SpotColors.danger
+                          : Colors.white24,
+                      width: 0.5,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.shield_outlined,
+                    color: isDangerMode ? SpotColors.danger : Colors.white38,
+                    size: 20,
+                  ),
                 ),
-                tooltip: 'Danger Mode',
               ),
 
               // Capture button
@@ -439,38 +402,35 @@ class _ControlsPanel extends StatelessWidget {
                 onLongPressStart: onLongPressStart,
                 onLongPressEnd: onLongPressEnd,
                 child: Container(
-                  width: 72,
-                  height: 72,
+                  width: 68,
+                  height: 68,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: isRecording
-                        ? const Color(0xFFFF4444)
-                        : Colors.white,
+                    color: isRecording ? SpotColors.danger : Colors.white,
                     border: Border.all(
-                      color: isRecording
-                          ? Colors.red.shade900
-                          : Colors.white54,
-                      width: 3,
+                      color: Colors.white54,
+                      width: 2,
                     ),
                   ),
                   child: Icon(
-                    isRecording ? Icons.stop : Icons.camera_alt,
+                    isRecording ? Icons.stop_rounded : Icons.circle,
                     color: isRecording ? Colors.white : Colors.black,
-                    size: 30,
+                    size: isRecording ? 28 : 32,
                   ),
                 ),
               ),
 
-              // Placeholder for future flip-camera button
-              const SizedBox(width: 48),
+              // Placeholder — future flip-camera
+              const SizedBox(width: 44),
             ],
           ),
-          const SizedBox(height: 8),
+
+          const SizedBox(height: SpotSpacing.sm),
           Text(
             isRecording
-                ? 'RECORDING — release to stop'
-                : 'Tap for photo · Hold for video',
-            style: const TextStyle(color: Colors.white54, fontSize: 11),
+                ? 'Release to stop'
+                : 'Tap · photo   Hold · video',
+            style: SpotType.caption.copyWith(color: Colors.white38),
           ),
         ],
       ),
@@ -478,7 +438,7 @@ class _ControlsPanel extends StatelessWidget {
   }
 }
 
-// ── Preview screen ────────────────────────────────────────────────────────────
+// ── Preview / publish screen ───────────────────────────────────────────────────
 
 class _PreviewScreen extends StatelessWidget {
   const _PreviewScreen({
@@ -506,9 +466,12 @@ class _PreviewScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: const Text('Review & Publish'),
+        title: Text(
+          'Review',
+          style: SpotType.subheading.copyWith(color: Colors.white),
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.close, size: 20),
           onPressed: onDiscard,
         ),
       ),
@@ -516,77 +479,73 @@ class _PreviewScreen extends StatelessWidget {
         children: [
           Expanded(
             child: isVideo
-                ? const Center(
+                ? Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.videocam,
-                            color: Colors.white54, size: 64),
-                        SizedBox(height: 8),
-                        Text('Video captured',
-                            style: TextStyle(color: Colors.white54)),
-                        Text(
-                            '(Video preview requires video_player package)',
-                            style: TextStyle(
-                                color: Colors.white30, fontSize: 11)),
+                        const Icon(Icons.videocam_outlined, color: Colors.white38, size: 48),
+                        const SizedBox(height: SpotSpacing.sm),
+                        const Text(
+                          'Video captured',
+                          style: TextStyle(color: Colors.white54, fontSize: 13),
+                        ),
                       ],
                     ),
                   )
                 : Image.file(File(filePath), fit: BoxFit.contain),
           ),
+
+          // Metadata + action bar
           Container(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 16,
-              bottom: MediaQuery.of(context).padding.bottom + 16,
+            padding: EdgeInsets.fromLTRB(
+              SpotSpacing.lg,
+              SpotSpacing.lg,
+              SpotSpacing.lg,
+              MediaQuery.of(context).padding.bottom + SpotSpacing.lg,
             ),
-            color: const Color(0xFF1A1A1A),
+            color: SpotColors.surface,
             child: Column(
               children: [
-                // Metadata summary
-                _MetaRow(
-                  icon: isDangerMode ? Icons.shield : Icons.gps_fixed,
+                // GPS / protection info
+                _PreviewMetaRow(
+                  icon: isDangerMode ? Icons.shield_outlined : Icons.gps_fixed,
                   label: isDangerMode
-                      ? 'DANGER MODE — GPS stripped, faces blurred'
+                      ? 'Protected — location and faces hidden'
                       : gpsLock != null
-                          ? '${gpsLock!.latitude.toStringAsFixed(4)}, ${gpsLock!.longitude.toStringAsFixed(4)}'
-                          : 'No GPS',
-                  color: isDangerMode ? const Color(0xFFFF4444) : Colors.greenAccent,
+                          ? '${gpsLock!.latitude.toStringAsFixed(4)}, '
+                            '${gpsLock!.longitude.toStringAsFixed(4)}'
+                          : 'No location',
+                  color: isDangerMode ? SpotColors.danger : SpotColors.success,
                 ),
                 if (eventTag.isNotEmpty)
-                  _MetaRow(
+                  _PreviewMetaRow(
                     icon: Icons.tag,
                     label: '#$eventTag',
-                    color: Colors.white70,
+                    color: SpotColors.textSecondary,
                   ),
-                const SizedBox(height: 12),
+                const SizedBox(height: SpotSpacing.lg),
+
+                // Action buttons
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton(
                         onPressed: onDiscard,
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white54,
-                          side: const BorderSide(color: Colors.white24),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: SpotSpacing.md),
                         ),
                         child: const Text('Discard'),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: SpotSpacing.md),
                     Expanded(
                       flex: 2,
                       child: FilledButton(
                         onPressed: onConfirm,
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFFF4444),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: SpotSpacing.md),
                         ),
-                        child: const Text('Publish',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16)),
+                        child: const Text('Publish'),
                       ),
                     ),
                   ],
@@ -600,9 +559,12 @@ class _PreviewScreen extends StatelessWidget {
   }
 }
 
-class _MetaRow extends StatelessWidget {
-  const _MetaRow(
-      {required this.icon, required this.label, required this.color});
+class _PreviewMetaRow extends StatelessWidget {
+  const _PreviewMetaRow({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
 
   final IconData icon;
   final String label;
@@ -614,11 +576,13 @@ class _MetaRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(width: 8),
+          Icon(icon, color: color, size: 14),
+          const SizedBox(width: SpotSpacing.sm),
           Expanded(
-            child: Text(label,
-                style: TextStyle(color: color, fontSize: 13)),
+            child: Text(
+              label,
+              style: SpotType.bodySecondary.copyWith(color: color),
+            ),
           ),
         ],
       ),

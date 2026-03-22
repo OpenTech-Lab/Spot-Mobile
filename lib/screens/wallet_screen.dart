@@ -4,16 +4,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import 'package:mobile/core/wallet.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/theme/spot_theme.dart';
 
-/// Wallet / Identity screen.
-///
-/// Shows:
-/// - Generated avatar (colour grid derived from pubkey)
-/// - npub (truncated + copy)
-/// - Device ID
-/// - Mnemonic (hidden by default, reveal button)
-/// - "Migrate Identity" button with encrypted QR
-/// - Revocation status
+/// Identity / Wallet screen.
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key, required this.wallet});
 
@@ -24,33 +17,33 @@ class WalletScreen extends StatefulWidget {
 }
 
 class _WalletScreenState extends State<WalletScreen> {
-  bool _mnemonicVisible = false;
+  bool _mnemonicVisible   = false;
   bool _migrationQrVisible = false;
-  bool _isGeneratingQr = false;
+  bool _isGeneratingQr    = false;
   String? _migrationPayload;
 
   Future<void> _revealMnemonic() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text('Reveal Secret Words',
-            style: TextStyle(color: Colors.white)),
+        backgroundColor: SpotColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(SpotRadius.md),
+        ),
+        title: const Text('Show recovery words', style: SpotType.subheading),
         content: const Text(
-          'Your mnemonic is the ONLY recovery backup for your identity. '
+          'Your recovery phrase is the only backup for your identity. '
           'Never share it with anyone.',
-          style: TextStyle(color: Colors.white70),
+          style: SpotType.bodySecondary,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel',
-                style: TextStyle(color: Colors.white54)),
+            child: const Text('Cancel', style: SpotType.bodySecondary),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Reveal',
-                style: TextStyle(color: Color(0xFFFF4444))),
+            child: Text('Show', style: SpotType.body.copyWith(color: SpotColors.accent)),
           ),
         ],
       ),
@@ -63,21 +56,19 @@ class _WalletScreenState extends State<WalletScreen> {
   Future<void> _showMigrationQr() async {
     setState(() => _isGeneratingQr = true);
     try {
-      final payload =
-          await WalletService.createMigrationPayload(widget.wallet);
+      final payload = await WalletService.createMigrationPayload(widget.wallet);
       if (mounted) {
         setState(() {
-          _migrationPayload = payload;
-          _migrationQrVisible = true;
-          _isGeneratingQr = false;
+          _migrationPayload    = payload;
+          _migrationQrVisible  = true;
+          _isGeneratingQr      = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isGeneratingQr = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to generate QR: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed: $e')));
       }
     }
   }
@@ -87,140 +78,119 @@ class _WalletScreenState extends State<WalletScreen> {
     final wallet = widget.wallet;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: SpotColors.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D0D0D),
-        foregroundColor: Colors.white,
-        title: const Text('Identity & Wallet',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: SpotColors.bg,
+        title: const Text('Identity', style: SpotType.subheading),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(SpotSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── Revocation banner ─────────────────────────────────────────
+            // Revocation notice
             if (wallet.isRevoked)
               Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade900.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(10),
-                  border:
-                      Border.all(color: Colors.orange.shade700, width: 1),
-                ),
-                child: const Row(
+                padding: const EdgeInsets.all(SpotSpacing.md),
+                margin: const EdgeInsets.only(bottom: SpotSpacing.lg),
+                decoration: SpotDecoration.danger(),
+                child: Row(
                   children: [
-                    Icon(Icons.warning, color: Colors.orange, size: 18),
-                    SizedBox(width: 8),
+                    const Icon(Icons.info_outline, color: SpotColors.danger, size: 16),
+                    const SizedBox(width: SpotSpacing.sm),
                     Expanded(
                       child: Text(
-                        'This wallet has been revoked (migrated to a new device). '
-                        'Sign in with your new device.',
-                        style: TextStyle(
-                            color: Colors.orange, fontSize: 12),
+                        'This identity has been migrated to a new device.',
+                        style: SpotType.caption.copyWith(color: SpotColors.danger),
                       ),
                     ),
                   ],
                 ),
               ),
 
-            // ── Avatar + pubkey ───────────────────────────────────────────
-            Center(
-              child: _PubkeyAvatar(pubkeyHex: wallet.publicKeyHex),
-            ),
-            const SizedBox(height: 16),
+            // Avatar
+            Center(child: _Avatar(pubkeyHex: wallet.publicKeyHex)),
+            const SizedBox(height: SpotSpacing.lg),
+
+            // npub
             const Center(
-              child: Text('Your Nostr Public Key',
-                  style: TextStyle(color: Colors.white54, fontSize: 12)),
+              child: Text('Public key', style: SpotType.label),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: SpotSpacing.sm),
             GestureDetector(
               onTap: () {
                 Clipboard.setData(ClipboardData(text: wallet.npub));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('npub copied to clipboard')),
-                );
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(const SnackBar(content: Text('Copied to clipboard')));
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(8),
+                  horizontal: SpotSpacing.md,
+                  vertical: SpotSpacing.sm,
                 ),
+                decoration: SpotDecoration.card(),
                 child: Row(
                   children: [
                     Expanded(
                       child: Text(
                         wallet.npub,
-                        style: const TextStyle(
-                          color: Color(0xFFFF4444),
-                          fontFamily: 'monospace',
-                          fontSize: 11,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                        style: SpotType.mono,
+                        overflow: TextOverflow.fade,
+                        softWrap: false,
                       ),
                     ),
-                    const Icon(Icons.copy,
-                        color: Colors.white30, size: 16),
+                    const SizedBox(width: SpotSpacing.sm),
+                    const Icon(Icons.copy_outlined, color: SpotColors.textTertiary, size: 13),
                   ],
                 ),
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: SpotSpacing.lg),
 
-            // ── Device ID ─────────────────────────────────────────────────
-            _InfoRow(
-              label: 'Device ID',
+            // Meta rows
+            _MetaRow(
+              label: 'Device',
               value: wallet.deviceId.length > 20
-                  ? '${wallet.deviceId.substring(0, 12)}...'
+                  ? '${wallet.deviceId.substring(0, 14)}…'
                   : wallet.deviceId,
-              icon: Icons.smartphone,
             ),
-            _InfoRow(
+            _MetaRow(
               label: 'Created',
               value: wallet.createdAt.toLocal().toString().substring(0, 16),
-              icon: Icons.calendar_today,
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: SpotSpacing.xxl),
 
-            // ── Mnemonic section ──────────────────────────────────────────
-            _SectionCard(
-              title: 'Secret Recovery Words',
-              icon: Icons.vpn_key,
-              iconColor: const Color(0xFFFF4444),
+            // Recovery phrase section
+            _Section(
+              title: 'Recovery phrase',
               child: _mnemonicVisible
                   ? Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Never share these words with anyone.',
-                          style: TextStyle(
-                              color: Colors.white54, fontSize: 12),
+                          style: SpotType.caption.copyWith(color: SpotColors.danger),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: SpotSpacing.md),
                         Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children:
-                              wallet.mnemonic.asMap().entries.map((e) {
+                          spacing: SpotSpacing.xs,
+                          runSpacing: SpotSpacing.xs,
+                          children: wallet.mnemonic.asMap().entries.map((e) {
                             return Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 6),
+                                horizontal: SpotSpacing.sm,
+                                vertical: 5,
+                              ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0D0D0D),
-                                borderRadius: BorderRadius.circular(6),
+                                color: SpotColors.surfaceHigh,
+                                borderRadius: BorderRadius.circular(SpotRadius.xs),
                               ),
                               child: Text(
                                 '${e.key + 1}. ${e.value}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontFamily: 'monospace',
-                                  fontSize: 12,
+                                style: SpotType.mono.copyWith(
+                                  color: SpotColors.textPrimary,
                                 ),
                               ),
                             );
@@ -229,84 +199,72 @@ class _WalletScreenState extends State<WalletScreen> {
                       ],
                     )
                   : Center(
-                      child: TextButton.icon(
+                      child: TextButton(
                         onPressed: _revealMnemonic,
-                        icon: const Icon(Icons.visibility_off,
-                            color: Color(0xFFFF4444)),
-                        label: const Text('Reveal Recovery Words',
-                            style:
-                                TextStyle(color: Color(0xFFFF4444))),
+                        child: const Text('Show recovery words'),
                       ),
                     ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: SpotSpacing.lg),
 
-            // ── Migration section ─────────────────────────────────────────
-            _SectionCard(
-              title: 'Migrate to New Device',
-              icon: Icons.qr_code,
-              iconColor: Colors.white70,
+            // Migration section
+            _Section(
+              title: 'Move to new device',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    '1. Tap "Generate Migration QR" on this phone.\n'
-                    '2. On your new phone, open Spot and choose "Import".\n'
-                    '3. Scan the QR code. Your identity will transfer.\n'
-                    '4. This device will be revoked automatically.',
-                    style:
-                        TextStyle(color: Colors.white54, fontSize: 12, height: 1.6),
+                  Text(
+                    '1. Generate a migration code on this device.\n'
+                    '2. On the new device, choose "Import existing".\n'
+                    '3. Scan the QR. Your identity transfers automatically.\n'
+                    '4. This device revokes itself.',
+                    style: SpotType.bodySecondary.copyWith(height: 1.7),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: SpotSpacing.md),
                   if (!_migrationQrVisible)
-                    FilledButton.icon(
-                      onPressed:
-                          wallet.isRevoked || _isGeneratingQr
-                              ? null
-                              : _showMigrationQr,
-                      icon: _isGeneratingQr
+                    OutlinedButton(
+                      onPressed: wallet.isRevoked || _isGeneratingQr ? null : _showMigrationQr,
+                      child: _isGeneratingQr
                           ? const SizedBox(
-                              width: 16,
-                              height: 16,
+                              width: 14,
+                              height: 14,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
-                          : const Icon(Icons.qr_code),
-                      label: const Text('Generate Migration QR'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF2A2A2A),
-                      ),
+                                strokeWidth: 1,
+                                color: SpotColors.accent,
+                              ),
+                            )
+                          : const Text('Generate migration QR'),
                     )
                   else if (_migrationPayload != null) ...[
                     Center(
-                      child: QrImageView(
-                        data: _migrationPayload!,
-                        version: QrVersions.auto,
-                        size: 200,
-                        backgroundColor: Colors.white,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(SpotRadius.sm),
+                        child: QrImageView(
+                          data: _migrationPayload!,
+                          version: QrVersions.auto,
+                          size: 180,
+                          backgroundColor: Colors.white,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: SpotSpacing.sm),
                     const Text(
-                      'This QR contains your encrypted identity. '
-                      'Scan it with your new device.',
+                      'Scan with your new device',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                          color: Colors.white54, fontSize: 11),
+                      style: SpotType.caption,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: SpotSpacing.sm),
                     TextButton(
-                      onPressed: () =>
-                          setState(() => _migrationQrVisible = false),
-                      child: const Text('Hide QR',
-                          style: TextStyle(color: Colors.white38)),
+                      onPressed: () => setState(() => _migrationQrVisible = false),
+                      child: const Text('Hide'),
                     ),
                   ],
                 ],
               ),
             ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: SpotSpacing.xxxl),
           ],
         ),
       ),
@@ -314,38 +272,38 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 }
 
-// ── Subwidgets ────────────────────────────────────────────────────────────────
+// ── Sub-widgets ────────────────────────────────────────────────────────────────
 
-class _PubkeyAvatar extends StatelessWidget {
-  const _PubkeyAvatar({required this.pubkeyHex});
+class _Avatar extends StatelessWidget {
+  const _Avatar({required this.pubkeyHex});
 
   final String pubkeyHex;
 
   @override
   Widget build(BuildContext context) {
-    // Use a consistent accent colour from first byte
-    final accentHex = pubkeyHex.substring(0, 6);
-    final accentValue =
-        int.tryParse(accentHex, radix: 16) ?? 0xFF4444;
-    final accent = Color(0xFF000000 | accentValue);
+    final hex = pubkeyHex.length >= 6 ? pubkeyHex.substring(0, 6) : '888480';
+    final value = int.tryParse(hex, radix: 16) ?? 0x888480;
+    // Blend the derived colour toward the accent for visual consistency
+    final r = ((value >> 16) & 0xFF);
+    final g = ((value >>  8) & 0xFF);
+    final b = (value & 0xFF);
+    final accent = Color.fromARGB(255, r.clamp(80, 200), g.clamp(80, 180), b.clamp(60, 160));
 
     return Container(
-      width: 80,
-      height: 80,
+      width: 72,
+      height: 72,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: accent, width: 3),
-        gradient: RadialGradient(
-          colors: [accent.withOpacity(0.4), const Color(0xFF0D0D0D)],
-        ),
+        color: SpotColors.surface,
+        border: Border.all(color: accent.withAlpha(120), width: 1),
       ),
       child: Center(
         child: Text(
           pubkeyHex.substring(0, 2).toUpperCase(),
           style: TextStyle(
             color: accent,
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
+            fontSize: 26,
+            fontWeight: FontWeight.w300,
             fontFamily: 'monospace',
           ),
         ),
@@ -354,77 +312,45 @@ class _PubkeyAvatar extends StatelessWidget {
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow(
-      {required this.label, required this.value, required this.icon});
+class _MetaRow extends StatelessWidget {
+  const _MetaRow({required this.label, required this.value});
 
   final String label;
   final String value;
-  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
-          Icon(icon, color: Colors.white30, size: 16),
-          const SizedBox(width: 8),
-          Text('$label: ',
-              style:
-                  const TextStyle(color: Colors.white54, fontSize: 13)),
-          Expanded(
-            child: Text(value,
-                style:
-                    const TextStyle(color: Colors.white70, fontSize: 13),
-                overflow: TextOverflow.ellipsis),
+          SizedBox(
+            width: 64,
+            child: Text(label, style: SpotType.label),
           ),
+          Expanded(child: Text(value, style: SpotType.bodySecondary)),
         ],
       ),
     );
   }
 }
 
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({
-    required this.title,
-    required this.icon,
-    required this.iconColor,
-    required this.child,
-  });
+class _Section extends StatelessWidget {
+  const _Section({required this.title, required this.child});
 
   final String title;
-  final IconData icon;
-  final Color iconColor;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2A2A2A)),
-      ),
+      padding: const EdgeInsets.all(SpotSpacing.lg),
+      decoration: SpotDecoration.cardBordered(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(icon, color: iconColor, size: 16),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+          Text(title, style: SpotType.label),
+          const SizedBox(height: SpotSpacing.md),
           child,
         ],
       ),

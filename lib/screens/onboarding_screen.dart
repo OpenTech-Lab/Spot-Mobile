@@ -6,11 +6,9 @@ import 'package:mobile/core/wallet.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/home_screen.dart';
 import 'package:mobile/services/storage_service.dart';
+import 'package:mobile/theme/spot_theme.dart';
 
-/// Three-step onboarding flow:
-///   Step 0 — Welcome
-///   Step 1 — Create or import identity
-///   Step 2 — Success (shows npub + QR)
+/// Three-step onboarding:  Welcome → Identity → Success
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -21,16 +19,14 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   int _step = 0;
 
-  // Step 1 state
   bool _isImporting = false;
-  bool _isLoading = false;
+  bool _isLoading   = false;
   String _importError = '';
   final _importController = TextEditingController();
 
-  // Created/imported wallet
   WalletModel? _wallet;
+  bool _mnemonicRevealed  = false;
   bool _mnemonicConfirmed = false;
-  bool _mnemonicRevealed = false;
 
   @override
   void dispose() {
@@ -38,111 +34,65 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  // ── Actions ───────────────────────────────────────────────────────────────
-
   Future<void> _createWallet() async {
-    setState(() {
-      _isLoading = true;
-      _isImporting = false;
-      _importError = '';
-    });
-
+    setState(() { _isLoading = true; _importError = ''; });
     try {
       final wallet = await WalletService.createNewWallet();
       await StorageService.instance.saveWallet(wallet);
-      if (mounted) {
-        setState(() {
-          _wallet = wallet;
-          _step = 2;
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() { _wallet = wallet; _step = 2; _isLoading = false; });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _importError = 'Failed to create wallet: $e';
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() { _importError = 'Failed: $e'; _isLoading = false; });
     }
   }
 
   Future<void> _importWallet() async {
-    final text = _importController.text.trim();
-    final words = text.split(RegExp(r'\s+'));
-
+    final words = _importController.text.trim().split(RegExp(r'\s+'));
     if (words.length != 12) {
-      setState(() => _importError = 'Please enter exactly 12 mnemonic words.');
+      setState(() => _importError = 'Enter exactly 12 recovery words.');
       return;
     }
-
-    setState(() {
-      _isLoading = true;
-      _importError = '';
-    });
-
+    setState(() { _isLoading = true; _importError = ''; });
     try {
       final wallet = await WalletService.importFromMnemonic(words);
       await StorageService.instance.saveWallet(wallet);
-      if (mounted) {
-        setState(() {
-          _wallet = wallet;
-          _step = 2;
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() { _wallet = wallet; _step = 2; _isLoading = false; });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _importError = 'Invalid mnemonic: $e';
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() { _importError = 'Invalid phrase: $e'; _isLoading = false; });
     }
   }
 
-  void _goToHome() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => HomeScreen(wallet: _wallet!),
-      ),
-    );
-  }
-
-  // ── Build ─────────────────────────────────────────────────────────────────
+  void _goToHome() => Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => HomeScreen(wallet: _wallet!)),
+      );
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: SpotColors.bg,
       body: SafeArea(
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 260),
+          transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
           child: switch (_step) {
-            0 => _WelcomeStep(
-                key: const ValueKey(0),
-                onNext: () => setState(() => _step = 1),
-              ),
+            0 => _WelcomeStep(key: const ValueKey(0), onNext: () => setState(() => _step = 1)),
             1 => _IdentityStep(
                 key: const ValueKey(1),
-                isImporting: _isImporting,
-                isLoading: _isLoading,
-                importError: _importError,
+                isImporting:      _isImporting,
+                isLoading:        _isLoading,
+                importError:      _importError,
                 importController: _importController,
-                onCreateTap: _createWallet,
-                onImportToggle: () =>
-                    setState(() => _isImporting = !_isImporting),
-                onImportSubmit: _importWallet,
+                onCreateTap:      _createWallet,
+                onImportToggle:   () => setState(() => _isImporting = !_isImporting),
+                onImportSubmit:   _importWallet,
               ),
             _ => _SuccessStep(
                 key: const ValueKey(2),
-                wallet: _wallet!,
-                mnemonicRevealed: _mnemonicRevealed,
+                wallet:            _wallet!,
+                mnemonicRevealed:  _mnemonicRevealed,
                 mnemonicConfirmed: _mnemonicConfirmed,
-                onRevealMnemonic: () =>
-                    setState(() => _mnemonicRevealed = true),
-                onConfirm: () => setState(() => _mnemonicConfirmed = true),
-                onEnter: _goToHome,
+                onRevealMnemonic:  () => setState(() => _mnemonicRevealed = true),
+                onConfirm:         () => setState(() => _mnemonicConfirmed = true),
+                onEnter:           _goToHome,
               ),
           },
         ),
@@ -151,93 +101,77 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 }
 
-// ── Step 0: Welcome ───────────────────────────────────────────────────────────
+// ── Welcome ────────────────────────────────────────────────────────────────────
 
 class _WelcomeStep extends StatelessWidget {
   const _WelcomeStep({super.key, required this.onNext});
-
   final VoidCallback onNext;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.xxl),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.radio_button_checked,
-              color: Color(0xFFFF4444), size: 80),
-          const SizedBox(height: 24),
-          const Text(
-            'SPOT',
-            style: TextStyle(
-              color: Color(0xFFFF4444),
-              fontSize: 42,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 8,
-              fontFamily: 'monospace',
+          const Spacer(flex: 3),
+
+          const Text('Spot', style: SpotType.wordmark),
+          const SizedBox(height: SpotSpacing.sm),
+          Container(width: 28, height: 0.5, color: SpotColors.accent),
+          const SizedBox(height: SpotSpacing.lg),
+          Text(
+            'Decentralised media.\nVerified at capture.',
+            style: SpotType.bodySecondary.copyWith(
+              fontSize: 15,
+              fontWeight: FontWeight.w300,
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Citizen Swarm',
-            style: TextStyle(color: Colors.white54, fontSize: 16),
-          ),
-          const SizedBox(height: 32),
-          const Text(
-            'A decentralized, geo-tagged media platform.\n'
-            'Record, publish, and protect — with zero central servers.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70, height: 1.5),
-          ),
-          const SizedBox(height: 16),
-          const _FeatureBullet(icon: Icons.lock, text: 'Device-bound identity (Nostr wallet)'),
-          const _FeatureBullet(icon: Icons.gps_fixed, text: 'GPS-locked media at capture time'),
-          const _FeatureBullet(icon: Icons.shield, text: 'Danger Mode: face blur + GPS strip'),
-          const _FeatureBullet(icon: Icons.share, text: 'P2P media swarm — no central servers'),
-          const SizedBox(height: 48),
-          FilledButton(
-            onPressed: onNext,
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFFF4444),
-              minimumSize: const Size(double.infinity, 52),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Get Started',
-                style:
-                    TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          ),
+
+          const Spacer(flex: 2),
+
+          const _Bullet('Device-bound cryptographic identity'),
+          const _Bullet('GPS-locked at the moment of capture'),
+          const _Bullet('Danger mode — blur faces, hide location'),
+          const _Bullet('Peer-to-peer, no central servers'),
+
+          const Spacer(flex: 3),
+
+          _PrimaryBtn(label: 'Get started', onPressed: onNext),
+          const SizedBox(height: SpotSpacing.xxl),
         ],
       ),
     );
   }
 }
 
-class _FeatureBullet extends StatelessWidget {
-  const _FeatureBullet({required this.icon, required this.text});
-
-  final IconData icon;
+class _Bullet extends StatelessWidget {
+  const _Bullet(this.text);
   final String text;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
-          Icon(icon, color: const Color(0xFFFF4444), size: 18),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Text(text,
-                  style: const TextStyle(color: Colors.white70))),
+          Container(
+            width: 3,
+            height: 3,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: SpotColors.accent,
+            ),
+          ),
+          const SizedBox(width: SpotSpacing.md),
+          Text(text, style: SpotType.bodySecondary),
         ],
       ),
     );
   }
 }
 
-// ── Step 1: Identity ──────────────────────────────────────────────────────────
+// ── Identity ───────────────────────────────────────────────────────────────────
 
 class _IdentityStep extends StatelessWidget {
   const _IdentityStep({
@@ -262,113 +196,78 @@ class _IdentityStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.xxl),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Your Identity',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-            ),
+          const Spacer(flex: 2),
+
+          Text(
+            isImporting ? 'Import identity' : 'Create identity',
+            style: SpotType.heading,
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Your identity is a cryptographic wallet bound to this device. '
-            'You can migrate it to a new phone anytime using your mnemonic.',
-            style: TextStyle(color: Colors.white54, height: 1.5),
+          const SizedBox(height: SpotSpacing.sm),
+          Text(
+            isImporting
+                ? 'Enter your 12-word recovery phrase.'
+                : 'A keypair will be generated and stored securely on this device.',
+            style: SpotType.bodySecondary,
           ),
-          const SizedBox(height: 40),
+
+          const Spacer(flex: 1),
 
           if (!isImporting) ...[
-            FilledButton.icon(
+            _PrimaryBtn(
+              label: 'Generate new identity',
               onPressed: isLoading ? null : onCreateTap,
-              icon: isLoading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2))
-                  : const Icon(Icons.add),
-              label: const Text('Create New Identity'),
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFFF4444),
-                minimumSize: const Size(double.infinity, 52),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
+              loading: isLoading,
             ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: onImportToggle,
-              icon: const Icon(Icons.file_download_outlined),
-              label: const Text('Import Existing Identity'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white70,
-                side: const BorderSide(color: Colors.white24),
-                minimumSize: const Size(double.infinity, 52),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
+            const SizedBox(height: SpotSpacing.md),
+            _OutlineBtn(label: 'Import existing', onPressed: onImportToggle),
           ] else ...[
-            const Text(
-              'Enter your 12-word mnemonic:',
-              style: TextStyle(color: Colors.white70),
-            ),
-            const SizedBox(height: 8),
             TextField(
               controller: importController,
               maxLines: 4,
-              style: const TextStyle(
-                  color: Colors.white, fontFamily: 'monospace'),
+              style: SpotType.body,
               decoration: InputDecoration(
-                hintText: 'word1 word2 word3 ...',
-                hintStyle: const TextStyle(color: Colors.white24),
+                hintText: 'word1 word2 word3 …',
+                hintStyle: SpotType.bodySecondary.copyWith(color: SpotColors.textTertiary),
                 filled: true,
-                fillColor: const Color(0xFF1A1A1A),
+                fillColor: SpotColors.surface,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(SpotRadius.sm),
                   borderSide: BorderSide.none,
                 ),
               ),
             ),
             if (importError.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(importError,
-                  style: const TextStyle(
-                      color: Color(0xFFFF4444), fontSize: 13)),
-            ],
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: isLoading ? null : onImportSubmit,
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFFF4444),
-                minimumSize: const Size(double.infinity, 52),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: SpotSpacing.sm),
+              Text(
+                importError,
+                style: SpotType.caption.copyWith(color: SpotColors.danger),
               ),
-              child: isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Import Identity'),
+            ],
+            const SizedBox(height: SpotSpacing.lg),
+            _PrimaryBtn(
+              label: 'Import identity',
+              onPressed: isLoading ? null : onImportSubmit,
+              loading: isLoading,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: SpotSpacing.sm),
             TextButton(
               onPressed: onImportToggle,
-              child: const Text('Back',
-                  style: TextStyle(color: Colors.white54)),
+              child: Text('Back', style: SpotType.bodySecondary),
             ),
           ],
+
+          const Spacer(flex: 2),
         ],
       ),
     );
   }
 }
 
-// ── Step 2: Success ───────────────────────────────────────────────────────────
+// ── Success ────────────────────────────────────────────────────────────────────
 
 class _SuccessStep extends StatelessWidget {
   const _SuccessStep({
@@ -391,164 +290,170 @@ class _SuccessStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.fromLTRB(
+        SpotSpacing.xxl, SpotSpacing.xxxl,
+        SpotSpacing.xxl, SpotSpacing.xxl,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 24),
-          const Icon(Icons.check_circle,
-              color: Colors.greenAccent, size: 64),
-          const SizedBox(height: 16),
-          const Text(
-            'Identity Created!',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Your Nostr public key (npub):',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white54),
-          ),
-          const SizedBox(height: 8),
+          const Text('Identity ready', style: SpotType.heading),
+          const SizedBox(height: SpotSpacing.xs),
+          const Text('Your public key', style: SpotType.bodySecondary),
+          const SizedBox(height: SpotSpacing.md),
+
+          // npub row
           GestureDetector(
             onTap: () {
               Clipboard.setData(ClipboardData(text: wallet.npub));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('npub copied')),
-              );
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(const SnackBar(content: Text('Copied')));
             },
             child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                wallet.npub,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFFFF4444),
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                ),
+              padding: const EdgeInsets.all(SpotSpacing.md),
+              decoration: SpotDecoration.card(),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(wallet.npub, style: SpotType.mono, overflow: TextOverflow.fade),
+                  ),
+                  const SizedBox(width: SpotSpacing.sm),
+                  const Icon(Icons.copy_outlined, color: SpotColors.textTertiary, size: 13),
+                ],
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          // QR code of npub
-          Center(
-            child: QrImageView(
-              data: wallet.npub,
-              version: QrVersions.auto,
-              size: 160,
-              backgroundColor: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 24),
 
-          // Mnemonic backup section
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1A1A),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFF4444), width: 1),
+          const SizedBox(height: SpotSpacing.xl),
+          Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(SpotRadius.sm),
+              child: QrImageView(
+                data: wallet.npub,
+                version: QrVersions.auto,
+                size: 130,
+                backgroundColor: Colors.white,
+              ),
             ),
+          ),
+
+          const SizedBox(height: SpotSpacing.xxl),
+
+          // Recovery phrase
+          Container(
+            padding: const EdgeInsets.all(SpotSpacing.lg),
+            decoration: SpotDecoration.cardBordered(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
-                  children: [
-                    Icon(Icons.warning, color: Color(0xFFFF4444), size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      'BACK UP YOUR MNEMONIC',
-                      style: TextStyle(
-                          color: Color(0xFFFF4444),
-                          fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
+                const Text('Recovery phrase', style: SpotType.body),
+                const SizedBox(height: SpotSpacing.xs),
                 const Text(
-                  'These 12 words are the ONLY way to recover your identity '
-                  'if you lose your phone. Write them down on paper and store '
-                  'them safely.',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                  'The only way to restore your identity if you lose this device. '
+                  'Write these down and keep them safe.',
+                  style: SpotType.bodySecondary,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: SpotSpacing.lg),
                 if (!mnemonicRevealed)
                   Center(
                     child: TextButton(
                       onPressed: onRevealMnemonic,
-                      child: const Text('Reveal Mnemonic',
-                          style:
-                              TextStyle(color: Color(0xFFFF4444))),
+                      child: const Text('Show recovery phrase'),
                     ),
                   )
                 else ...[
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: SpotSpacing.xs,
+                    runSpacing: SpotSpacing.xs,
                     children: wallet.mnemonic.asMap().entries.map((e) {
                       return Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
+                          horizontal: SpotSpacing.sm,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0D0D0D),
-                          borderRadius: BorderRadius.circular(6),
+                          color: SpotColors.surfaceHigh,
+                          borderRadius: BorderRadius.circular(SpotRadius.xs),
                         ),
                         child: Text(
                           '${e.key + 1}. ${e.value}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontFamily: 'monospace',
-                            fontSize: 13,
-                          ),
+                          style: SpotType.mono.copyWith(color: SpotColors.textPrimary),
                         ),
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 12),
-                  if (!mnemonicConfirmed)
-                    FilledButton(
+                  if (!mnemonicConfirmed) ...[
+                    const SizedBox(height: SpotSpacing.lg),
+                    _OutlineBtn(
+                      label: 'I have saved these words',
                       onPressed: onConfirm,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.green.shade700,
-                        minimumSize: const Size(double.infinity, 44),
-                      ),
-                      child: const Text("I've written it down"),
                     ),
+                  ],
                 ],
               ],
             ),
           ),
 
-          const SizedBox(height: 24),
-          FilledButton(
+          const SizedBox(height: SpotSpacing.xl),
+          _PrimaryBtn(
+            label: mnemonicRevealed && !mnemonicConfirmed
+                ? 'Confirm backup first'
+                : 'Continue',
             onPressed: mnemonicConfirmed || !mnemonicRevealed ? onEnter : null,
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFFF4444),
-              minimumSize: const Size(double.infinity, 52),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              disabledBackgroundColor: Colors.grey.shade800,
-            ),
-            child: Text(
-              mnemonicRevealed && !mnemonicConfirmed
-                  ? 'Confirm backup first'
-                  : 'Enter Spot',
-              style: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.bold),
-            ),
           ),
-          const SizedBox(height: 16),
         ],
+      ),
+    );
+  }
+}
+
+// ── Shared button components ───────────────────────────────────────────────────
+
+class _PrimaryBtn extends StatelessWidget {
+  const _PrimaryBtn({required this.label, required this.onPressed, this.loading = false});
+  final String label;
+  final VoidCallback? onPressed;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: SpotSpacing.md),
+        ),
+        child: loading
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  color: SpotColors.onAccent,
+                  strokeWidth: 1.5,
+                ),
+              )
+            : Text(label),
+      ),
+    );
+  }
+}
+
+class _OutlineBtn extends StatelessWidget {
+  const _OutlineBtn({required this.label, required this.onPressed});
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: SpotSpacing.md),
+        ),
+        child: Text(label),
       ),
     );
   }

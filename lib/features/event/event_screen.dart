@@ -3,15 +3,9 @@ import 'package:intl/intl.dart';
 
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
+import 'package:mobile/theme/spot_theme.dart';
 
-/// Event detail screen — shows a [CivicEvent] as a wiki-like live timeline.
-///
-/// Navigated to with a [CivicEvent] argument:
-/// ```dart
-/// Navigator.of(context).push(MaterialPageRoute(
-///   builder: (_) => EventScreen(event: myEvent),
-/// ));
-/// ```
+/// Event detail — wiki-like timeline for a [CivicEvent].
 class EventScreen extends StatelessWidget {
   const EventScreen({super.key, required this.event});
 
@@ -22,67 +16,40 @@ class EventScreen extends StatelessWidget {
     final posts = event.postsByNewest;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: SpotColors.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D0D0D),
-        foregroundColor: Colors.white,
-        title: Text(
-          '#${event.hashtag}',
-          style: const TextStyle(
-            fontFamily: 'monospace',
-            color: Color(0xFFFF4444),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        backgroundColor: SpotColors.bg,
+        title: Text('#${event.hashtag}', style: SpotType.subheading),
         actions: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(
+              horizontal: SpotSpacing.lg,
+              vertical: SpotSpacing.sm,
+            ),
             child: Chip(
-              backgroundColor: const Color(0xFF1A1A1A),
-              label: Text(
-                '${event.participantCount} contributors',
-                style: const TextStyle(
-                    color: Colors.white70, fontSize: 11),
-              ),
+              label: Text('${event.participantCount} contributors'),
             ),
           ),
         ],
       ),
       body: CustomScrollView(
         slivers: [
-          // ── Event header ──────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: _EventHeader(event: event),
-          ),
+          SliverToBoxAdapter(child: _EventHeader(event: event)),
 
-          // ── Post count separator ──────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.photo_library,
-                      color: Color(0xFFFF4444), size: 16),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${posts.length} posts',
-                    style: const TextStyle(
-                        color: Colors.white70, fontSize: 13),
-                  ),
-                ],
+              padding: const EdgeInsets.fromLTRB(
+                SpotSpacing.lg, SpotSpacing.sm,
+                SpotSpacing.lg, SpotSpacing.xs,
               ),
+              child: Text('${posts.length} posts', style: SpotType.label),
             ),
           ),
 
-          // ── Timeline list ─────────────────────────────────────────────────
           posts.isEmpty
               ? const SliverFillRemaining(
                   child: Center(
-                    child: Text(
-                      'No posts yet.',
-                      style: TextStyle(color: Colors.white54),
-                    ),
+                    child: Text('No posts yet', style: SpotType.bodySecondary),
                   ),
                 )
               : SliverList(
@@ -97,91 +64,68 @@ class EventScreen extends StatelessWidget {
   }
 }
 
-// ── Event header ──────────────────────────────────────────────────────────────
+// ── Event header ───────────────────────────────────────────────────────────────
 
 class _EventHeader extends StatelessWidget {
   const _EventHeader({required this.event});
-
   final CivicEvent event;
 
   @override
   Widget build(BuildContext context) {
-    final df = DateFormat('MMM d, yyyy HH:mm');
+    final df = DateFormat('MMM d, yyyy  HH:mm');
 
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2A2A2A)),
-      ),
+      margin: const EdgeInsets.all(SpotSpacing.lg),
+      padding: const EdgeInsets.all(SpotSpacing.lg),
+      decoration: SpotDecoration.cardBordered(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            event.title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          _StatRow(
-              icon: Icons.access_time,
-              label: 'First seen',
-              value: df.format(event.firstSeen.toLocal())),
-          const SizedBox(height: 4),
-          _StatRow(
-              icon: Icons.people,
-              label: 'Participants',
-              value: event.participantCount.toString()),
-          if (event.centerLat != null && event.centerLon != null) ...[
-            const SizedBox(height: 4),
+          Text(event.title, style: SpotType.subheading),
+          const SizedBox(height: SpotSpacing.lg),
+
+          _StatRow(label: 'First seen',     value: df.format(event.firstSeen.toLocal())),
+          const SizedBox(height: SpotSpacing.xs),
+          _StatRow(label: 'Participants',   value: event.participantCount.toString()),
+
+          if (event.centerLat != null) ...[
+            const SizedBox(height: SpotSpacing.xs),
             _StatRow(
-              icon: Icons.location_on,
-              label: 'Centre',
-              value:
-                  '${event.centerLat!.toStringAsFixed(4)}, ${event.centerLon!.toStringAsFixed(4)}',
+              label: 'Location',
+              value: '${event.centerLat!.toStringAsFixed(4)}, '
+                  '${event.centerLon!.toStringAsFixed(4)}',
             ),
+          ] else ...[
+            const SizedBox(height: SpotSpacing.xs),
+            const _StatRow(label: 'Location', value: 'Hidden'),
           ],
-          if (event.centerLat == null) ...[
-            const SizedBox(height: 4),
-            const _StatRow(
-                icon: Icons.location_off,
-                label: 'Location',
-                value: 'GPS hidden (Danger Mode)'),
-          ],
-          const SizedBox(height: 12),
-          // Map placeholder
+
+          const SizedBox(height: SpotSpacing.lg),
+
+          // Location card (placeholder for flutter_map integration)
           Container(
-            height: 120,
+            height: 100,
             decoration: BoxDecoration(
-              color: const Color(0xFF0D0D0D),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF3A3A3A)),
+              color: SpotColors.bg,
+              borderRadius: BorderRadius.circular(SpotRadius.sm),
+              border: Border.all(color: SpotColors.border, width: 0.5),
             ),
             child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.map, color: Color(0xFFFF4444), size: 32),
-                  const SizedBox(height: 4),
-                  Text(
-                    event.centerLat != null
-                        ? '${event.centerLat!.toStringAsFixed(4)}, ${event.centerLon!.toStringAsFixed(4)}'
-                        : 'Location hidden',
-                    style: const TextStyle(
-                        color: Colors.white54, fontSize: 11),
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    'Map — TODO: integrate Leaflet/flutter_map',
-                    style: TextStyle(color: Colors.white30, fontSize: 10),
-                  ),
-                ],
-              ),
+              child: event.centerLat != null
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.location_on_outlined,
+                            color: SpotColors.textTertiary, size: 20),
+                        const SizedBox(height: SpotSpacing.xs),
+                        Text(
+                          '${event.centerLat!.toStringAsFixed(4)}, '
+                          '${event.centerLon!.toStringAsFixed(4)}',
+                          style: SpotType.caption,
+                        ),
+                      ],
+                    )
+                  : const Text('Location hidden', style: SpotType.caption),
             ),
           ),
         ],
@@ -191,10 +135,7 @@ class _EventHeader extends StatelessWidget {
 }
 
 class _StatRow extends StatelessWidget {
-  const _StatRow(
-      {required this.icon, required this.label, required this.value});
-
-  final IconData icon;
+  const _StatRow({required this.label, required this.value});
   final String label;
   final String value;
 
@@ -202,125 +143,105 @@ class _StatRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: Colors.white38, size: 14),
-        const SizedBox(width: 6),
-        Text('$label: ',
-            style:
-                const TextStyle(color: Colors.white54, fontSize: 12)),
+        SizedBox(
+          width: 90,
+          child: Text(label, style: SpotType.label),
+        ),
         Expanded(
-          child: Text(value,
-              style: const TextStyle(
-                  color: Colors.white70, fontSize: 12),
-              overflow: TextOverflow.ellipsis),
+          child: Text(value, style: SpotType.bodySecondary, overflow: TextOverflow.ellipsis),
         ),
       ],
     );
   }
 }
 
-// ── Post card ─────────────────────────────────────────────────────────────────
+// ── Post card ──────────────────────────────────────────────────────────────────
 
 class _PostCard extends StatelessWidget {
   const _PostCard({required this.post});
-
   final MediaPost post;
 
   @override
   Widget build(BuildContext context) {
-    final df = DateFormat('MMM d HH:mm');
-    final shortPubkey =
-        post.pubkey.length > 16 ? '${post.pubkey.substring(0, 8)}...' : post.pubkey;
+    final df = DateFormat('MMM d  HH:mm');
+    final shortKey = post.pubkey.length > 12
+        ? '${post.pubkey.substring(0, 8)}…'
+        : post.pubkey;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: post.isDangerMode
-              ? const Color(0xFFFF4444).withOpacity(0.5)
-              : const Color(0xFF2A2A2A),
-        ),
+      margin: const EdgeInsets.symmetric(
+        horizontal: SpotSpacing.lg,
+        vertical: 4,
       ),
+      decoration: SpotDecoration.card(),
       child: Row(
         children: [
-          // Thumbnail placeholder
+          // Thumbnail area
           Container(
-            width: 80,
-            height: 80,
+            width: 72,
+            height: 72,
             decoration: BoxDecoration(
-              color: const Color(0xFF0D0D0D),
+              color: SpotColors.bg,
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(10),
-                bottomLeft: Radius.circular(10),
+                topLeft:    Radius.circular(SpotRadius.sm),
+                bottomLeft: Radius.circular(SpotRadius.sm),
               ),
             ),
-            child: Icon(
-              post.isDangerMode ? Icons.shield : Icons.image,
-              color: post.isDangerMode
-                  ? const Color(0xFFFF4444)
-                  : Colors.white30,
-              size: 32,
+            child: Center(
+              child: Icon(
+                post.isDangerMode
+                    ? Icons.shield_outlined
+                    : Icons.image_outlined,
+                color: post.isDangerMode
+                    ? SpotColors.danger.withAlpha(160)
+                    : SpotColors.overlay,
+                size: 22,
+              ),
             ),
           ),
-          const SizedBox(width: 12),
+
+          const SizedBox(width: SpotSpacing.md),
+
+          // Details
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.symmetric(vertical: SpotSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Danger badge
                   if (post.isDangerMode)
                     Container(
                       margin: const EdgeInsets.only(bottom: 4),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFF4444),
-                        borderRadius: BorderRadius.circular(4),
+                        color: SpotColors.dangerSubtle,
+                        borderRadius: BorderRadius.circular(SpotRadius.xs),
                       ),
-                      child: const Text(
-                        'DANGER MODE',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold),
+                      child: Text(
+                        'Protected',
+                        style: SpotType.label.copyWith(color: SpotColors.danger),
                       ),
                     ),
-                  // Author
-                  Text(
-                    shortPubkey,
-                    style: const TextStyle(
-                        color: Color(0xFFFF4444),
-                        fontSize: 11,
-                        fontFamily: 'monospace'),
-                  ),
-                  const SizedBox(height: 2),
-                  // Time
-                  Text(
-                    df.format(post.capturedAt.toLocal()),
-                    style: const TextStyle(
-                        color: Colors.white54, fontSize: 11),
-                  ),
-                  const SizedBox(height: 4),
-                  // GPS badge
+                  Text(shortKey, style: SpotType.mono),
+                  const SizedBox(height: 3),
+                  Text(df.format(post.capturedAt.toLocal()), style: SpotType.caption),
+                  const SizedBox(height: SpotSpacing.xs),
                   Row(
                     children: [
                       Icon(
                         post.hasGps ? Icons.gps_fixed : Icons.gps_off,
                         color: post.hasGps
-                            ? Colors.greenAccent
-                            : Colors.white30,
-                        size: 12,
+                            ? SpotColors.success.withAlpha(160)
+                            : SpotColors.textTertiary,
+                        size: 11,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         post.hasGps
-                            ? '${post.latitude!.toStringAsFixed(3)}, ${post.longitude!.toStringAsFixed(3)}'
-                            : 'GPS hidden',
-                        style: const TextStyle(
-                            color: Colors.white38, fontSize: 11),
+                            ? '${post.latitude!.toStringAsFixed(3)}, '
+                              '${post.longitude!.toStringAsFixed(3)}'
+                            : 'Hidden',
+                        style: SpotType.caption,
                       ),
                     ],
                   ),
@@ -328,8 +249,9 @@ class _PostCard extends StatelessWidget {
               ),
             ),
           ),
-          const Icon(Icons.chevron_right, color: Colors.white30),
-          const SizedBox(width: 8),
+
+          const Icon(Icons.chevron_right, color: SpotColors.overlay, size: 16),
+          const SizedBox(width: SpotSpacing.sm),
         ],
       ),
     );
