@@ -289,6 +289,135 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
         .showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  // ── Tag section ──────────────────────────────────────────────────────────
+
+  void _onTagFieldChanged(String v) {
+    if (v.endsWith(' ') || v.endsWith(',')) {
+      _addTag(v.replaceAll(',', ''));
+    }
+  }
+
+  Widget _buildTagSection() {
+    final hasCategory = _tags.isNotEmpty;
+    final categoryTag = hasCategory ? _tags[0] : null;
+    final extraTags = hasCategory ? _tags.sublist(1) : <String>[];
+    final isReply = widget.replyToPost != null;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
+      decoration: BoxDecoration(
+        color: SpotColors.surfaceHigh,
+        borderRadius: BorderRadius.circular(SpotRadius.md),
+        border: Border.all(color: SpotColors.border, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Category row ──────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: SpotSpacing.md,
+              vertical: SpotSpacing.sm,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  hasCategory
+                      ? CupertinoIcons.tag_fill
+                      : CupertinoIcons.tag,
+                  size: 14,
+                  color: hasCategory
+                      ? SpotColors.accent
+                      : SpotColors.textTertiary,
+                ),
+                const SizedBox(width: SpotSpacing.sm),
+                Expanded(
+                  child: hasCategory
+                      ? Row(
+                          children: [
+                            _TagChip(
+                              tag: categoryTag!,
+                              isCategory: true,
+                              canRemove: !isReply,
+                              onRemove: () => _removeTag(categoryTag),
+                            ),
+                          ],
+                        )
+                      : TextField(
+                          controller: _tagInputCtrl,
+                          focusNode: _tagFocus,
+                          style: SpotType.body
+                              .copyWith(color: SpotColors.textPrimary),
+                          decoration: InputDecoration(
+                            hintText:
+                                'Category tag (e.g. AWSSummitTokyo2026)',
+                            hintStyle: SpotType.body
+                                .copyWith(color: SpotColors.textTertiary),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            isDense: true,
+                          ),
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: _addTag,
+                          onChanged: _onTagFieldChanged,
+                        ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Extra tags row (appears once category is set) ─────────────
+          if (hasCategory) ...[
+            const Divider(
+                height: 1, thickness: 0.5, color: SpotColors.border),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: SpotSpacing.md,
+                vertical: SpotSpacing.xs,
+              ),
+              child: Wrap(
+                spacing: SpotSpacing.xs,
+                runSpacing: SpotSpacing.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Icon(CupertinoIcons.number,
+                      size: 11, color: SpotColors.textTertiary),
+                  for (int i = 0; i < extraTags.length; i++)
+                    _TagChip(
+                      tag: extraTags[i],
+                      isCategory: false,
+                      canRemove: true,
+                      onRemove: () => _removeTag(extraTags[i]),
+                    ),
+                  IntrinsicWidth(
+                    child: TextField(
+                      controller: _tagInputCtrl,
+                      focusNode: _tagFocus,
+                      style: SpotType.caption
+                          .copyWith(color: SpotColors.textSecondary),
+                      decoration: InputDecoration(
+                        hintText: 'Add more tags…',
+                        hintStyle: SpotType.caption
+                            .copyWith(color: SpotColors.textTertiary),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                        isDense: true,
+                      ),
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: _addTag,
+                      onChanged: _onTagFieldChanged,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
@@ -334,6 +463,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                         TextField(
                           controller: _captionCtrl,
                           focusNode: _captionFocus,
+                          minLines: 4,
                           maxLines: null,
                           style: SpotType.body,
                           decoration: InputDecoration(
@@ -364,52 +494,17 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
           const SizedBox(height: SpotSpacing.sm),
 
-          // ── Tag chips + input ───────────────────────────────────────────────
+          // ── Tag card ────────────────────────────────────────────────────
+          _buildTagSection(),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
-            child: Wrap(
-              spacing: SpotSpacing.xs,
-              runSpacing: SpotSpacing.xs,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                const Icon(CupertinoIcons.number,
-                    size: 13, color: SpotColors.textTertiary),
-                // Existing tag chips — first tag is the category
-                for (int i = 0; i < _tags.length; i++)
-                  _TagChip(
-                    tag: _tags[i],
-                    isCategory: i == 0,
-                    canRemove: !(i == 0 && widget.replyToPost != null),
-                    onRemove: () => _removeTag(_tags[i]),
-                  ),
-                // Input for new tag
-                IntrinsicWidth(
-                  child: TextField(
-                    controller: _tagInputCtrl,
-                    focusNode: _tagFocus,
-                    style: SpotType.caption
-                        .copyWith(color: SpotColors.textSecondary),
-                    decoration: InputDecoration(
-                      hintText: _tags.isEmpty
-                          ? 'Category tag (e.g. AWSSummitTokyo2026)'
-                          : 'Add more tags…',
-                      hintStyle: SpotType.caption
-                          .copyWith(color: SpotColors.textTertiary),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
-                      isDense: true,
-                    ),
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: _addTag,
-                    // Also add on comma or space
-                    onChanged: (v) {
-                      if (v.endsWith(' ') || v.endsWith(',')) {
-                        _addTag(v.replaceAll(',', ''));
-                      }
-                    },
-                  ),
-                ),
-              ],
+            padding: const EdgeInsets.fromLTRB(
+                SpotSpacing.lg + SpotSpacing.md + 14 + SpotSpacing.sm,
+                3,
+                SpotSpacing.lg,
+                0),
+            child: Text(
+              'First tag is the event category · press Space or , to add more',
+              style: SpotType.caption.copyWith(color: SpotColors.textTertiary),
             ),
           ),
 
