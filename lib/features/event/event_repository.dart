@@ -426,8 +426,10 @@ class EventRepository {
 
   /// Public static helper used by [FeedScreen] to convert raw Nostr events
   /// received via ad-hoc subscriptions into [MediaPost] objects.
-  static MediaPost nostrEventToPost(NostrEvent event) =>
-      _nostrEventToMediaPost(event, _visibleSpotTags(event.getAllTagValues('t')));
+  static MediaPost nostrEventToPost(NostrEvent event) => _nostrEventToMediaPost(
+    event,
+    _visibleSpotTags(event.getAllTagValues('t')),
+  );
 
   static List<String> _visibleSpotTags(Iterable<String> tags) =>
       tags.where((tag) => tag != spotDiscoveryHashtag).toList(growable: false);
@@ -436,6 +438,8 @@ class EventRepository {
     NostrEvent event,
     List<String> eventTags,
   ) {
+    final preview = _previewFromEvent(event);
+
     // geo tag format: ["geo", "lat", "lon"]
     double? latitude, longitude;
     for (final tag in event.tags) {
@@ -490,6 +494,8 @@ class EventRepository {
       isVirtual: event.getTagValue('virtual') == '1',
       isAiGenerated: event.getTagValue('ai_content') == '1',
       isTextOnly: event.getTagValue('text_only') == '1',
+      previewBase64: preview?.base64,
+      previewMimeType: preview?.mimeType,
       sourceType: event.getTagValue('source') == 'secondhand'
           ? PostSourceType.secondhand
           : PostSourceType.firsthand,
@@ -501,5 +507,23 @@ class EventRepository {
           .toList(),
       nostrEventId: event.id,
     );
+  }
+
+  static ({String mimeType, String base64})? _previewFromEvent(
+    NostrEvent event,
+  ) {
+    for (final tag in event.tags) {
+      if (tag.isEmpty || tag[0] != 'preview' || tag.length < 3) continue;
+
+      final mimeType = tag[1];
+      final base64 = tag[2];
+      if (!mimeType.startsWith('image/') || base64.isEmpty) {
+        return null;
+      }
+
+      return (mimeType: mimeType, base64: base64);
+    }
+
+    return null;
   }
 }

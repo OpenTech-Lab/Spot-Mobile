@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:image/image.dart' as img;
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -19,6 +21,7 @@ const _defaultRelays = [
 
 const _relayConnectTimeout = Duration(seconds: 5);
 const _publishAckTimeout = Duration(seconds: 4);
+const _maxInlinePreviewBytes = 24 * 1024;
 
 /// Relay-indexable single-letter marker used to discover Spot events.
 const spotRelayMarkerTag = 'd';
@@ -147,10 +150,7 @@ class NostrService {
     }
 
     final relayUrls = _channels.keys.toList(growable: false);
-    final pending = _PendingPublish(
-      eventId: event.id,
-      relayUrls: relayUrls,
-    );
+    final pending = _PendingPublish(eventId: event.id, relayUrls: relayUrls);
     _pendingPublishes[event.id] = pending;
 
     final msg = jsonEncode(['EVENT', event.toJson()]);
@@ -180,6 +180,7 @@ class NostrService {
       contentParts.add('#$t');
     }
     final content = contentParts.join('\n');
+    final previewTag = await _buildPreviewTag(post);
 
     final tags = <List<String>>[
       ..._spotOriginTags(),
@@ -197,6 +198,7 @@ class NostrService {
       if (post.isTextOnly) ['text_only', '1'],
       ['source', post.sourceType.name],
     ];
+    if (previewTag != null) tags.add(previewTag);
 
     // Build a placeholder event to compute its ID
     final placeholder = NostrEvent(
@@ -533,6 +535,56 @@ class NostrService {
       publish.record(relayUrl, accepted: false, message: reason);
     }
   }
+
+  Future<List<String>?> _buildPreviewTag(MediaPost post) async {
+    if (post.isTextOnly || post.mediaPaths.isEmpty) return null;
+
+    final path = post.mediaPaths.first;
+    if (_isVideoPath(path)) return null;
+
+    final file = File(path);
+    if (!file.existsSync()) return null;
+
+    try {
+      final bytes = await file.readAsBytes();
+      final decoded = img.decodeImage(bytes);
+      if (decoded == null) return null;
+
+      for (final maxDimension in const [320, 240, 160]) {
+        final resized = _resizeToFit(decoded, maxDimension);
+        for (final quality in const [55, 45, 35]) {
+          final encoded = img.encodeJpg(resized, quality: quality);
+          if (encoded.length <= _maxInlinePreviewBytes) {
+            return ['preview', 'image/jpeg', base64Encode(encoded)];
+          }
+        }
+      }
+    } catch (_) {
+      return null;
+    }
+
+    return null;
+  }
+
+  img.Image _resizeToFit(img.Image image, int maxDimension) {
+    final width = image.width;
+    final height = image.height;
+    final longest = width > height ? width : height;
+    if (longest <= maxDimension) return image;
+
+    if (width >= height) {
+      return img.copyResize(image, width: maxDimension);
+    }
+    return img.copyResize(image, height: maxDimension);
+  }
+
+  bool _isVideoPath(String path) {
+    final lower = path.toLowerCase();
+    return lower.endsWith('.mp4') ||
+        lower.endsWith('.mov') ||
+        lower.endsWith('.avi') ||
+        lower.endsWith('.mkv');
+  }
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────
@@ -557,10 +609,8 @@ class _RelayMessage {
 }
 
 class _PendingPublish {
-  _PendingPublish({
-    required this.eventId,
-    required List<String> relayUrls,
-  }) : _expectedRelays = relayUrls.toSet();
+  _PendingPublish({required this.eventId, required List<String> relayUrls})
+    : _expectedRelays = relayUrls.toSet();
 
   final String eventId;
   final Set<String> _expectedRelays;
@@ -572,7 +622,8 @@ class _PendingPublish {
     required bool accepted,
     required String message,
   }) {
-    if (!_expectedRelays.contains(relayUrl) || _responses.containsKey(relayUrl)) {
+    if (!_expectedRelays.contains(relayUrl) ||
+        _responses.containsKey(relayUrl)) {
       return;
     }
 
@@ -585,7 +636,8 @@ class _PendingPublish {
       return;
     }
 
-    if (_responses.length == _expectedRelays.length && !_completer.isCompleted) {
+    if (_responses.length == _expectedRelays.length &&
+        !_completer.isCompleted) {
       _completer.completeError(StateError(_failureSummary()));
     }
   }
@@ -602,7 +654,9 @@ class _PendingPublish {
     final rejected = _responses.entries
         .where((entry) => !entry.value.accepted)
         .map((entry) {
-          final suffix = entry.value.message.isEmpty ? '' : ' (${entry.value.message})';
+          final suffix = entry.value.message.isEmpty
+              ? ''
+              : ' (${entry.value.message})';
           return '${entry.key}$suffix';
         })
         .toList(growable: false);

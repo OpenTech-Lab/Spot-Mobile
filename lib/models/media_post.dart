@@ -47,6 +47,11 @@ class MediaPost {
   /// Whether this post is text-only and carries no downloadable media.
   final bool isTextOnly;
 
+  /// Optional inline preview image for remote rendering when raw media has not
+  /// been synced yet.
+  final String? previewBase64;
+  final String? previewMimeType;
+
   /// Whether this is the author's own account or a secondhand report.
   final PostSourceType sourceType;
 
@@ -81,6 +86,8 @@ class MediaPost {
     this.isVirtual = false,
     this.isAiGenerated = false,
     this.isTextOnly = false,
+    this.previewBase64,
+    this.previewMimeType,
     this.sourceType = PostSourceType.firsthand,
     this.caption,
     this.replyToId,
@@ -117,6 +124,8 @@ class MediaPost {
         'isVirtual': isVirtual,
         'isAiGenerated': isAiGenerated,
         'isTextOnly': isTextOnly,
+        'previewBase64': previewBase64,
+        'previewMimeType': previewMimeType,
         'sourceType': sourceType.name,
         'caption': caption,
         'replyToId': replyToId,
@@ -146,6 +155,8 @@ class MediaPost {
         isVirtual: json['isVirtual'] as bool? ?? false,
         isAiGenerated: json['isAiGenerated'] as bool? ?? false,
         isTextOnly: json['isTextOnly'] as bool? ?? false,
+        previewBase64: json['previewBase64'] as String?,
+        previewMimeType: json['previewMimeType'] as String?,
         sourceType: _parseSourceType(json['sourceType'] as String?),
         caption: json['caption'] as String?,
         replyToId: json['replyToId'] as String?,
@@ -171,6 +182,8 @@ class MediaPost {
     bool? isVirtual,
     bool? isAiGenerated,
     bool? isTextOnly,
+    String? previewBase64,
+    String? previewMimeType,
     PostSourceType? sourceType,
   }) =>
       MediaPost(
@@ -187,6 +200,8 @@ class MediaPost {
         isVirtual: isVirtual ?? this.isVirtual,
         isAiGenerated: isAiGenerated ?? this.isAiGenerated,
         isTextOnly: isTextOnly ?? this.isTextOnly,
+        previewBase64: previewBase64 ?? this.previewBase64,
+        previewMimeType: previewMimeType ?? this.previewMimeType,
         sourceType: sourceType ?? this.sourceType,
         caption: caption ?? this.caption,
         replyToId: replyToId ?? this.replyToId,

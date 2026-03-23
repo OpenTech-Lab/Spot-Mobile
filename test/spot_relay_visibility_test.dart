@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
@@ -31,28 +32,64 @@ void main() {
 
       expect(event.getTagValue(spotRelayMarkerTag), spotEventOrigin);
       expect(event.getTagValue(legacySpotAppTag), spotEventOrigin);
-      expect(event.getAllTagValues('t'), containsAll([spotDiscoveryHashtag, 'tokyo']));
+      expect(
+        event.getAllTagValues('t'),
+        containsAll([spotDiscoveryHashtag, 'tokyo']),
+      );
       expect(event.content, contains('Test post'));
       await service.disconnect();
     });
 
-    test('publishMediaPost marks text-only posts without media_hash tags', () async {
-      acceptedRelay = await _TestRelay.start(name: 'accepted');
-      final service = NostrService(relayUrls: [acceptedRelay!.url]);
+    test(
+      'publishMediaPost marks text-only posts without media_hash tags',
+      () async {
+        acceptedRelay = await _TestRelay.start(name: 'accepted');
+        final service = NostrService(relayUrls: [acceptedRelay!.url]);
 
-      final event = await service.publishMediaPost(
-        _post().copyWith(
-          contentHashes: const ['temp-hash'],
-          mediaPaths: const [],
-          isTextOnly: true,
-        ),
-        _wallet(),
-      );
+        final event = await service.publishMediaPost(
+          _post().copyWith(
+            contentHashes: const ['temp-hash'],
+            mediaPaths: const [],
+            isTextOnly: true,
+          ),
+          _wallet(),
+        );
 
-      expect(event.getTagValue('text_only'), '1');
-      expect(event.getAllTagValues('media_hash'), isEmpty);
-      await service.disconnect();
-    });
+        expect(event.getTagValue('text_only'), '1');
+        expect(event.getAllTagValues('media_hash'), isEmpty);
+        await service.disconnect();
+      },
+    );
+
+    test(
+      'publishMediaPost includes an inline preview for image posts',
+      () async {
+        acceptedRelay = await _TestRelay.start(name: 'accepted');
+        final service = NostrService(relayUrls: [acceptedRelay!.url]);
+        final tempDir = await Directory.systemTemp.createTemp(
+          'spot-preview-test-',
+        );
+        addTearDown(() => tempDir.delete(recursive: true));
+
+        final imageFile = File('${tempDir.path}/preview.jpg');
+        final image = img.Image(width: 32, height: 32);
+        await imageFile.writeAsBytes(img.encodeJpg(image, quality: 80));
+
+        final event = await service.publishMediaPost(
+          _post().copyWith(mediaPaths: [imageFile.path]),
+          _wallet(),
+        );
+
+        final previewTag = event.tags.firstWhere(
+          (tag) => tag.isNotEmpty && tag.first == 'preview',
+        );
+
+        expect(previewTag, hasLength(3));
+        expect(previewTag[1], 'image/jpeg');
+        expect(previewTag[2], isNotEmpty);
+        await service.disconnect();
+      },
+    );
 
     test(
       'buildSpotPostFilters uses only indexed discovery tag plus fallback',
@@ -132,6 +169,21 @@ void main() {
       expect(post.eventTags, ['tokyo', 'news']);
     });
 
+    test('nostrEventToPost keeps the inline preview for remote rendering', () {
+      final event = _eventWithTags([
+        [spotRelayMarkerTag, spotEventOrigin],
+        ['t', spotDiscoveryHashtag],
+        ['t', 'tokyo'],
+        ['preview', 'image/jpeg', 'YWJj'],
+      ]);
+
+      final post = EventRepository.nostrEventToPost(event);
+
+      expect(post.eventTags, ['tokyo']);
+      expect(post.previewMimeType, 'image/jpeg');
+      expect(post.previewBase64, 'YWJj');
+    });
+
     test('connect only reports relays after websocket readiness', () async {
       acceptedRelay = await _TestRelay.start(name: 'accepted');
       rejectedRelay = await _TestRelay.start(name: 'rejected');
@@ -145,15 +197,18 @@ void main() {
 
       await connectFuture;
 
-      expect(
-        service.connectedRelays.toSet(),
-        {acceptedRelay!.url, rejectedRelay!.url},
-      );
+      expect(service.connectedRelays.toSet(), {
+        acceptedRelay!.url,
+        rejectedRelay!.url,
+      });
       await service.disconnect();
     });
 
     test('publishMediaPost succeeds when at least one relay accepts', () async {
-      acceptedRelay = await _TestRelay.start(name: 'accepted', acceptEvents: true);
+      acceptedRelay = await _TestRelay.start(
+        name: 'accepted',
+        acceptEvents: true,
+      );
       rejectedRelay = await _TestRelay.start(
         name: 'rejected',
         acceptEvents: false,

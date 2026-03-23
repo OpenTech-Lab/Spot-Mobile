@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -34,7 +36,9 @@ class PostThreadRow extends StatelessWidget {
       context: context,
       backgroundColor: SpotColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(SpotRadius.lg)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(SpotRadius.lg),
+        ),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
@@ -98,8 +102,10 @@ class PostThreadRow extends StatelessWidget {
                   color: SpotColors.textSecondary,
                   size: 20,
                 ),
-                title: const Text('Cancel',
-                    style: TextStyle(color: SpotColors.textSecondary)),
+                title: const Text(
+                  'Cancel',
+                  style: TextStyle(color: SpotColors.textSecondary),
+                ),
                 contentPadding: EdgeInsets.zero,
                 onTap: () => Navigator.of(ctx).pop(),
               ),
@@ -114,7 +120,10 @@ class PostThreadRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        SpotSpacing.lg, SpotSpacing.sm, SpotSpacing.lg, 0,
+        SpotSpacing.lg,
+        SpotSpacing.sm,
+        SpotSpacing.lg,
+        0,
       ),
       child: IntrinsicHeight(
         child: Row(
@@ -222,8 +231,9 @@ class PostThreadRow extends StatelessWidget {
                           const SizedBox(width: 4),
                           Text(
                             _shortKey(post.replyToId!),
-                            style: SpotType.caption
-                                .copyWith(color: SpotColors.textTertiary),
+                            style: SpotType.caption.copyWith(
+                              color: SpotColors.textTertiary,
+                            ),
                           ),
                         ],
                       ),
@@ -237,8 +247,9 @@ class PostThreadRow extends StatelessWidget {
                           for (final t in post.eventTags)
                             Text(
                               '#$t',
-                              style: SpotType.body
-                                  .copyWith(color: SpotColors.accent),
+                              style: SpotType.body.copyWith(
+                                color: SpotColors.accent,
+                              ),
                             ),
                         ],
                       ),
@@ -273,8 +284,9 @@ class PostThreadRow extends StatelessWidget {
                               const SizedBox(width: 4),
                               Text(
                                 'Reply',
-                                style: SpotType.caption
-                                    .copyWith(color: SpotColors.textTertiary),
+                                style: SpotType.caption.copyWith(
+                                  color: SpotColors.textTertiary,
+                                ),
                               ),
                             ],
                           ),
@@ -327,13 +339,18 @@ class _PostMedia extends StatelessWidget {
                 borderRadius: BorderRadius.circular(SpotRadius.sm),
                 child: _isVideo(path)
                     ? _VideoThumb(path: path, compact: true)
-                    : Image.file(File(path),
+                    : Image.file(
+                        File(path),
                         fit: BoxFit.cover,
                         errorBuilder: (ctx, err, stack) => Container(
                           color: SpotColors.surface,
-                          child: const Icon(CupertinoIcons.photo,
-                              color: SpotColors.overlay, size: 22),
-                        )),
+                          child: const Icon(
+                            CupertinoIcons.photo,
+                            color: SpotColors.overlay,
+                            size: 22,
+                          ),
+                        ),
+                      ),
               ),
             );
           },
@@ -356,9 +373,60 @@ class _PostMedia extends StatelessWidget {
             width: double.infinity,
             fit: BoxFit.cover,
             errorBuilder: (ctx, err, stack) => _mediaShell(
-              child: const Icon(CupertinoIcons.photo,
-                  color: SpotColors.overlay, size: 26),
+              child: const Icon(
+                CupertinoIcons.photo,
+                color: SpotColors.overlay,
+                size: 26,
+              ),
             ),
+          ),
+        ),
+      );
+    }
+
+    final previewBytes = _decodePreviewBytes();
+    if (previewBytes != null) {
+      return ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: _maxImageHeight),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(SpotRadius.md),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.memory(
+                previewBytes,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (ctx, err, stack) => _mediaShell(
+                  child: const Icon(
+                    CupertinoIcons.photo,
+                    color: SpotColors.overlay,
+                    size: 26,
+                  ),
+                ),
+              ),
+              Positioned(
+                right: SpotSpacing.sm,
+                bottom: SpotSpacing.sm,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: SpotSpacing.sm,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xB3000000),
+                    borderRadius: BorderRadius.circular(SpotRadius.full),
+                  ),
+                  child: Text(
+                    'Preview',
+                    style: SpotType.caption.copyWith(
+                      color: Colors.white,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -369,27 +437,41 @@ class _PostMedia extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(CupertinoIcons.photo,
-              color: SpotColors.overlay, size: 26),
+          const Icon(CupertinoIcons.photo, color: SpotColors.overlay, size: 26),
           const SizedBox(height: SpotSpacing.xs),
-          Text('Media not synced yet',
-              style:
-                  SpotType.caption.copyWith(color: SpotColors.textTertiary)),
+          Text(
+            'Media not synced yet',
+            style: SpotType.caption.copyWith(color: SpotColors.textTertiary),
+          ),
         ],
       ),
     );
   }
 
   Widget _mediaShell({required Widget child}) => Container(
-        height: _maxImageHeight,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: SpotColors.surface,
-          borderRadius: BorderRadius.circular(SpotRadius.md),
-          border: Border.all(color: SpotColors.border, width: 0.5),
-        ),
-        child: Center(child: child),
-      );
+    height: _maxImageHeight,
+    width: double.infinity,
+    decoration: BoxDecoration(
+      color: SpotColors.surface,
+      borderRadius: BorderRadius.circular(SpotRadius.md),
+      border: Border.all(color: SpotColors.border, width: 0.5),
+    ),
+    child: Center(child: child),
+  );
+
+  Uint8List? _decodePreviewBytes() {
+    final previewBase64 = post.previewBase64;
+    if (previewBase64 == null || previewBase64.isEmpty) return null;
+
+    final mimeType = post.previewMimeType;
+    if (mimeType != null && !mimeType.startsWith('image/')) return null;
+
+    try {
+      return base64Decode(previewBase64);
+    } catch (_) {
+      return null;
+    }
+  }
 
   static bool _isVideo(String path) {
     final p = path.toLowerCase();
@@ -437,17 +519,15 @@ class _VideoThumb extends StatelessWidget {
               bottom: SpotSpacing.sm,
               left: SpotSpacing.sm,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: Colors.black54,
-                  borderRadius:
-                      BorderRadius.circular(SpotRadius.xs),
+                  borderRadius: BorderRadius.circular(SpotRadius.xs),
                 ),
-                child: const Text('Video',
-                    style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 11)),
+                child: const Text(
+                  'Video',
+                  style: TextStyle(color: Colors.white70, fontSize: 11),
+                ),
               ),
             ),
           ],
@@ -531,8 +611,11 @@ class _GpsRow extends StatelessWidget {
     if (post.isVirtual) {
       return Row(
         children: [
-          const Icon(CupertinoIcons.gamecontroller,
-              size: 11, color: SpotColors.textTertiary),
+          const Icon(
+            CupertinoIcons.gamecontroller,
+            size: 11,
+            color: SpotColors.textTertiary,
+          ),
           const SizedBox(width: 4),
           Text('Virtual', style: SpotType.caption),
         ],
@@ -542,8 +625,11 @@ class _GpsRow extends StatelessWidget {
     if (!post.hasGps) {
       return Row(
         children: [
-          const Icon(CupertinoIcons.location_slash,
-              size: 11, color: SpotColors.textTertiary),
+          const Icon(
+            CupertinoIcons.location_slash,
+            size: 11,
+            color: SpotColors.textTertiary,
+          ),
           const SizedBox(width: 4),
           Text('Location hidden', style: SpotType.caption),
         ],
@@ -561,7 +647,8 @@ class _GpsRow extends StatelessWidget {
         label = '${geo.country}/${geo.city}';
       } else {
         // Normal mode: country/city(lat,lon)
-        label = '${geo.country}/${geo.city}'
+        label =
+            '${geo.country}/${geo.city}'
             '(${lat.toStringAsFixed(3)},${lon.toStringAsFixed(3)})';
       }
     } else {
@@ -584,8 +671,12 @@ class _GpsRow extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         Expanded(
-          child: Text(label, style: SpotType.caption, maxLines: 1,
-              overflow: TextOverflow.ellipsis),
+          child: Text(
+            label,
+            style: SpotType.caption,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );
