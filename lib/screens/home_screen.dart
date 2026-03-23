@@ -106,7 +106,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       decoration: const BoxDecoration(
         color: SpotColors.bg,
-        border: Border(top: BorderSide(color: SpotColors.border, width: 0.5)),
       ),
       child: SafeArea(
         child: Padding(

@@ -370,27 +370,20 @@ class _FeedScreenState extends State<FeedScreen>
   }
 
   Widget _buildTabBar() {
-    return Container(
-      decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: SpotColors.border, width: 0.5),
-        ),
-      ),
-      child: TabBar(
-        controller: _tabController,
-        labelColor: SpotColors.accent,
-        unselectedLabelColor: SpotColors.textTertiary,
-        indicatorColor: SpotColors.accent,
-        indicatorWeight: 1.5,
-        labelStyle:
-            SpotType.caption.copyWith(letterSpacing: 0.8, fontSize: 11),
-        tabs: const [
-          Tab(text: 'LATEST'),
-          Tab(text: 'FOR YOU'),
-          Tab(text: 'TRENDING'),
-          Tab(text: 'NEARBY'),
-        ],
-      ),
+    return TabBar(
+      controller: _tabController,
+      labelColor: SpotColors.accent,
+      unselectedLabelColor: SpotColors.textTertiary,
+      indicatorColor: SpotColors.accent,
+      indicatorWeight: 1.5,
+      labelStyle:
+          SpotType.caption.copyWith(letterSpacing: 0.8, fontSize: 11),
+      tabs: const [
+        Tab(text: 'LATEST'),
+        Tab(text: 'FOR YOU'),
+        Tab(text: 'TRENDING'),
+        Tab(text: 'NEARBY'),
+      ],
     );
   }
 }
