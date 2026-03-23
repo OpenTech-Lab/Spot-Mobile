@@ -228,6 +228,40 @@ void main() {
       await service.disconnect();
     });
 
+    test(
+      'publishMediaPost retries without preview when relays reject preview payloads',
+      () async {
+        acceptedRelay = await _TestRelay.start(
+          name: 'accepted',
+          rejectPreviewEvents: true,
+          okMessage: 'invalid: event too large',
+        );
+        final service = NostrService(relayUrls: [acceptedRelay!.url]);
+        final tempDir = await Directory.systemTemp.createTemp(
+          'spot-preview-retry-test-',
+        );
+        addTearDown(() => tempDir.delete(recursive: true));
+
+        final imageFile = File('${tempDir.path}/preview.jpg');
+        final image = img.Image(width: 512, height: 512);
+        await imageFile.writeAsBytes(img.encodeJpg(image, quality: 95));
+
+        final event = await service.publishMediaPost(
+          _post().copyWith(mediaPaths: [imageFile.path]),
+          _wallet(),
+        );
+
+        expect(
+          event.tags.where((tag) => tag.isNotEmpty && tag.first == 'preview'),
+          isEmpty,
+        );
+        expect(acceptedRelay!.receivedEventIds, hasLength(2));
+        expect(acceptedRelay!.receivedPreviewFlags, [true, false]);
+        expect(acceptedRelay!.receivedEventIds.last, event.id);
+        await service.disconnect();
+      },
+    );
+
     test('publishMediaPost throws when all relays reject the event', () async {
       acceptedRelay = await _TestRelay.start(
         name: 'reject-a',
@@ -299,14 +333,17 @@ class _TestRelay {
     required this.server,
     required this.acceptEvents,
     required this.okMessage,
+    required this.rejectPreviewEvents,
   });
 
   final String name;
   final HttpServer server;
   final bool acceptEvents;
   final String okMessage;
+  final bool rejectPreviewEvents;
   final List<WebSocket> _sockets = [];
   final List<String> receivedEventIds = [];
+  final List<bool> receivedPreviewFlags = [];
 
   String get url => 'ws://${server.address.host}:${server.port}';
 
@@ -314,6 +351,7 @@ class _TestRelay {
     required String name,
     bool acceptEvents = true,
     String okMessage = 'saved',
+    bool rejectPreviewEvents = false,
   }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final relay = _TestRelay._(
@@ -321,6 +359,7 @@ class _TestRelay {
       server: server,
       acceptEvents: acceptEvents,
       okMessage: okMessage,
+      rejectPreviewEvents: rejectPreviewEvents,
     );
     relay._listen();
     return relay;
@@ -337,8 +376,22 @@ class _TestRelay {
           if (data.first == 'EVENT' && data.length >= 2) {
             final eventJson = Map<String, dynamic>.from(data[1] as Map);
             final eventId = eventJson['id'] as String;
+            final tags = (eventJson['tags'] as List<dynamic>? ?? const [])
+                .whereType<List<dynamic>>()
+                .map((tag) => tag.map((value) => value.toString()).toList())
+                .toList();
+            final hasPreview = tags.any(
+              (tag) => tag.isNotEmpty && tag.first == 'preview',
+            );
             receivedEventIds.add(eventId);
-            socket.add(jsonEncode(['OK', eventId, acceptEvents, okMessage]));
+            receivedPreviewFlags.add(hasPreview);
+
+            final accepted =
+                acceptEvents && !(rejectPreviewEvents && hasPreview);
+            final message = rejectPreviewEvents && hasPreview
+                ? 'invalid: event too large'
+                : okMessage;
+            socket.add(jsonEncode(['OK', eventId, accepted, message]));
           }
         },
         onDone: () {

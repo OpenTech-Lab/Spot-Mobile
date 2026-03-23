@@ -21,7 +21,7 @@ const _defaultRelays = [
 
 const _relayConnectTimeout = Duration(seconds: 5);
 const _publishAckTimeout = Duration(seconds: 4);
-const _maxInlinePreviewBytes = 24 * 1024;
+const _maxInlinePreviewBytes = 4 * 1024;
 
 /// Relay-indexable single-letter marker used to discover Spot events.
 const spotRelayMarkerTag = 'd';
@@ -184,7 +184,41 @@ class NostrService {
     }
     final content = contentParts.join('\n');
     final previewTag = await _buildPreviewTag(post);
+    var signed = _signMediaPostEvent(
+      post,
+      wallet,
+      now: now,
+      content: content,
+      previewTag: previewTag,
+    );
 
+    try {
+      await publishEvent(signed);
+    } on StateError {
+      if (previewTag == null) rethrow;
+
+      // Some relays reject larger events. Retry once without the inline
+      // preview so image replies still publish instead of failing outright.
+      signed = _signMediaPostEvent(post, wallet, now: now, content: content);
+      await publishEvent(signed);
+    }
+
+    // Self-deliver immediately so the post appears in the feed without
+    // waiting for a relay echo (many relays delay or filter kind-1 events).
+    for (final sub in _subscriptions.values) {
+      sub.onEvent(signed);
+    }
+
+    return signed;
+  }
+
+  NostrEvent _signMediaPostEvent(
+    MediaPost post,
+    WalletModel wallet, {
+    required int now,
+    required String content,
+    List<String>? previewTag,
+  }) {
     final tags = <List<String>>[
       ..._spotOriginTags(),
       if (post.replyToId != null) ['e', post.replyToId!, '', 'reply'],
@@ -217,7 +251,6 @@ class NostrService {
     ];
     if (previewTag != null) tags.add(previewTag);
 
-    // Build a placeholder event to compute its ID
     final placeholder = NostrEvent(
       id: '',
       pubkey: wallet.publicKeyHex,
@@ -229,7 +262,6 @@ class NostrService {
     );
 
     final id = WalletService.computeEventId(placeholder);
-
     final withId = NostrEvent(
       id: id,
       pubkey: placeholder.pubkey,
@@ -241,8 +273,7 @@ class NostrService {
     );
 
     final sig = WalletService.signNostrEvent(withId, wallet.privateKeyHex);
-
-    final signed = NostrEvent(
+    return NostrEvent(
       id: withId.id,
       pubkey: withId.pubkey,
       createdAt: withId.createdAt,
@@ -251,16 +282,6 @@ class NostrService {
       content: withId.content,
       sig: sig,
     );
-
-    await publishEvent(signed);
-
-    // Self-deliver immediately so the post appears in the feed without
-    // waiting for a relay echo (many relays delay or filter kind-1 events).
-    for (final sub in _subscriptions.values) {
-      sub.onEvent(signed);
-    }
-
-    return signed;
   }
 
   /// Publishes a witness signal (seen / confirm / deny) for an event hashtag.
