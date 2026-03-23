@@ -14,6 +14,7 @@ class FollowService {
   Set<String> _following = {};
   Set<String> _muted = {};
   Set<String> _blocked = {};
+  Set<String> _followedTags = {};
   bool _loaded = false;
 
   // ── Init ──────────────────────────────────────────────────────────────────
@@ -25,9 +26,10 @@ class FollowService {
       if (await file.exists()) {
         final raw = await file.readAsString();
         final data = jsonDecode(raw) as Map<String, dynamic>;
-        _following = Set<String>.from(data['following'] as List? ?? []);
-        _muted     = Set<String>.from(data['muted']     as List? ?? []);
-        _blocked   = Set<String>.from(data['blocked']   as List? ?? []);
+        _following    = Set<String>.from(data['following']    as List? ?? []);
+        _muted        = Set<String>.from(data['muted']        as List? ?? []);
+        _blocked      = Set<String>.from(data['blocked']      as List? ?? []);
+        _followedTags = Set<String>.from(data['followedTags'] as List? ?? []);
       }
     } catch (_) {}
     _loaded = true;
@@ -35,11 +37,25 @@ class FollowService {
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
-  bool isFollowing(String pubkey) => _following.contains(pubkey);
-  bool isMuted(String pubkey)     => _muted.contains(pubkey);
-  bool isBlocked(String pubkey)   => _blocked.contains(pubkey);
+  bool isFollowing(String pubkey)    => _following.contains(pubkey);
+  bool isMuted(String pubkey)        => _muted.contains(pubkey);
+  bool isBlocked(String pubkey)      => _blocked.contains(pubkey);
+  bool isFollowingTag(String tag)    => _followedTags.contains(tag);
 
-  List<String> get following => _following.toList();
+  List<String> get following    => _following.toList();
+  List<String> get followedTags => _followedTags.toList();
+
+  // ── Follow tag ────────────────────────────────────────────────────────────
+
+  Future<void> followTag(String tag) async {
+    _followedTags.add(tag);
+    await _save();
+  }
+
+  Future<void> unfollowTag(String tag) async {
+    _followedTags.remove(tag);
+    await _save();
+  }
 
   // ── Follow ────────────────────────────────────────────────────────────────
 
@@ -87,9 +103,10 @@ class FollowService {
     try {
       final file = await _file();
       await file.writeAsString(jsonEncode({
-        'following': _following.toList(),
-        'muted':     _muted.toList(),
-        'blocked':   _blocked.toList(),
+        'following':    _following.toList(),
+        'muted':        _muted.toList(),
+        'blocked':      _blocked.toList(),
+        'followedTags': _followedTags.toList(),
       }));
     } catch (_) {}
   }

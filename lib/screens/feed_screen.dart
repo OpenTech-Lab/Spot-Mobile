@@ -234,9 +234,14 @@ class FeedScreenState extends State<FeedScreen>
 
   // ── Following filter ──────────────────────────────────────────────────────
 
-  List<MediaPost> get _followingPosts => _posts
-      .where((p) => FollowService.instance.isFollowing(p.pubkey))
-      .toList();
+  List<MediaPost> get _followingPosts {
+    final tags = FollowService.instance.followedTags.toSet();
+    return _posts
+        .where((p) =>
+            FollowService.instance.isFollowing(p.pubkey) ||
+            p.eventTags.any(tags.contains))
+        .toList();
+  }
 
   // ── Build ─────────────────────────────────────────────────────────────────
 

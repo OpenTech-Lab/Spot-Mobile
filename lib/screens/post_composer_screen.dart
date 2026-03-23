@@ -374,9 +374,14 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
               children: [
                 const Icon(CupertinoIcons.number,
                     size: 13, color: SpotColors.textTertiary),
-                // Existing tag chips
-                for (final tag in _tags)
-                  _TagChip(tag: tag, onRemove: () => _removeTag(tag)),
+                // Existing tag chips — first tag is the category
+                for (int i = 0; i < _tags.length; i++)
+                  _TagChip(
+                    tag: _tags[i],
+                    isCategory: i == 0,
+                    canRemove: !(i == 0 && widget.replyToPost != null),
+                    onRemove: () => _removeTag(_tags[i]),
+                  ),
                 // Input for new tag
                 IntrinsicWidth(
                   child: TextField(
@@ -386,8 +391,8 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                         .copyWith(color: SpotColors.textSecondary),
                     decoration: InputDecoration(
                       hintText: _tags.isEmpty
-                          ? 'Add tags (e.g. protest2024)'
-                          : 'Add another tag…',
+                          ? 'Category tag (e.g. AWSSummitTokyo2026)'
+                          : 'Add more tags…',
                       hintStyle: SpotType.caption
                           .copyWith(color: SpotColors.textTertiary),
                       border: InputBorder.none,
@@ -1028,9 +1033,16 @@ class _LegalCheckbox extends StatelessWidget {
 // ── Tag chip ──────────────────────────────────────────────────────────────────
 
 class _TagChip extends StatelessWidget {
-  const _TagChip({required this.tag, required this.onRemove});
+  const _TagChip({
+    required this.tag,
+    required this.onRemove,
+    this.isCategory = false,
+    this.canRemove = true,
+  });
   final String tag;
   final VoidCallback onRemove;
+  final bool isCategory;
+  final bool canRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -1038,23 +1050,41 @@ class _TagChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(
           horizontal: SpotSpacing.sm, vertical: 2),
       decoration: BoxDecoration(
-        color: SpotColors.accentSubtle,
+        color: isCategory
+            ? SpotColors.accent.withValues(alpha: 0.18)
+            : SpotColors.accentSubtle,
         borderRadius: BorderRadius.circular(SpotRadius.full),
         border: Border.all(
-            color: SpotColors.accent.withAlpha(60), width: 0.5),
+          color: isCategory
+              ? SpotColors.accent.withValues(alpha: 0.7)
+              : SpotColors.accent.withAlpha(60),
+          width: isCategory ? 1.0 : 0.5,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('#$tag',
-              style: SpotType.label
-                  .copyWith(color: SpotColors.accent)),
-          const SizedBox(width: 4),
-          GestureDetector(
-            onTap: onRemove,
-            child: const Icon(CupertinoIcons.xmark,
-                size: 10, color: SpotColors.accent),
+          if (isCategory) ...[
+            const Icon(CupertinoIcons.tag_fill,
+                size: 9, color: SpotColors.accent),
+            const SizedBox(width: 3),
+          ],
+          Text(
+            '#$tag',
+            style: SpotType.label.copyWith(
+              color: SpotColors.accent,
+              fontWeight:
+                  isCategory ? FontWeight.w600 : FontWeight.normal,
+            ),
           ),
+          if (canRemove) ...[
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: onRemove,
+              child: const Icon(CupertinoIcons.xmark,
+                  size: 10, color: SpotColors.accent),
+            ),
+          ],
         ],
       ),
     );

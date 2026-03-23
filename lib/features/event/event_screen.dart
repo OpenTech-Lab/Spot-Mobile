@@ -6,6 +6,7 @@ import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
 /// Event detail — wiki-like timeline for a [CivicEvent] with EBES trust data.
@@ -27,11 +28,32 @@ class EventScreen extends StatefulWidget {
 
 class _EventScreenState extends State<EventScreen> {
   late CivicEvent _event;
+  bool _isFollowingTag = false;
 
   @override
   void initState() {
     super.initState();
     _event = widget.event;
+    _loadFollowState();
+  }
+
+  Future<void> _loadFollowState() async {
+    await FollowService.instance.init();
+    if (mounted) {
+      setState(() {
+        _isFollowingTag =
+            FollowService.instance.isFollowingTag(_event.hashtag);
+      });
+    }
+  }
+
+  Future<void> _toggleFollowTag() async {
+    if (_isFollowingTag) {
+      await FollowService.instance.unfollowTag(_event.hashtag);
+    } else {
+      await FollowService.instance.followTag(_event.hashtag);
+    }
+    if (mounted) setState(() => _isFollowingTag = !_isFollowingTag);
   }
 
   Future<void> _submitWitness(String type) async {
@@ -60,13 +82,36 @@ class _EventScreenState extends State<EventScreen> {
         backgroundColor: SpotColors.bg,
         title: Text('#${_event.hashtag}', style: SpotType.subheading),
         actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: SpotSpacing.lg,
-              vertical: SpotSpacing.sm,
-            ),
-            child: Chip(
-              label: Text('${_event.participantCount} contributors'),
+          GestureDetector(
+            onTap: _toggleFollowTag,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              margin: const EdgeInsets.only(right: SpotSpacing.lg),
+              padding: const EdgeInsets.symmetric(
+                horizontal: SpotSpacing.md,
+                vertical: SpotSpacing.xs,
+              ),
+              decoration: BoxDecoration(
+                color: _isFollowingTag
+                    ? SpotColors.accent.withValues(alpha: 0.15)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(SpotRadius.full),
+                border: Border.all(
+                  color: _isFollowingTag
+                      ? SpotColors.accent
+                      : SpotColors.border,
+                  width: 0.5,
+                ),
+              ),
+              child: Text(
+                _isFollowingTag ? 'Following' : 'Follow',
+                style: SpotType.label.copyWith(
+                  color: _isFollowingTag
+                      ? SpotColors.accent
+                      : SpotColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ),
         ],
@@ -100,12 +145,7 @@ class _EventScreenState extends State<EventScreen> {
                         Text('No posts yet', style: SpotType.bodySecondary),
                   ),
                 )
-              : SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (ctx, i) => _PostCard(post: posts[i]),
-                    childCount: posts.length,
-                  ),
-                ),
+              : _ThreadSliver(posts: posts),
         ],
       ),
     );
@@ -213,11 +253,61 @@ class _StatRow extends StatelessWidget {
   }
 }
 
-// ── Post card ──────────────────────────────────────────────────────────────────
+// ── Thread sliver ──────────────────────────────────────────────────────────────
 
-class _PostCard extends StatelessWidget {
-  const _PostCard({required this.post});
+/// Renders [posts] as a depth-first thread tree (roots + nested replies).
+class _ThreadSliver extends StatelessWidget {
+  const _ThreadSliver({required this.posts});
+  final List<MediaPost> posts;
+
+  /// Returns posts in depth-first order with their nesting depth.
+  static List<({MediaPost post, int depth})> _flatten(
+      List<MediaPost> all) {
+    final ids = {for (final p in all) p.nostrEventId};
+    final roots = all
+        .where((p) => p.replyToId == null || !ids.contains(p.replyToId))
+        .toList()
+      ..sort((a, b) => a.capturedAt.compareTo(b.capturedAt));
+
+    final out = <({MediaPost post, int depth})>[];
+    void visit(MediaPost p, int depth) {
+      out.add((post: p, depth: depth));
+      final replies = all
+          .where((r) => r.replyToId == p.nostrEventId)
+          .toList()
+        ..sort((a, b) => a.capturedAt.compareTo(b.capturedAt));
+      for (final r in replies) {
+        visit(r, depth + 1);
+      }
+    }
+
+    for (final root in roots) {
+      visit(root, 0);
+    }
+    return out;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _flatten(posts);
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (ctx, i) {
+          final (:post, :depth) = items[i];
+          return _ThreadPostCard(post: post, depth: depth);
+        },
+        childCount: items.length,
+      ),
+    );
+  }
+}
+
+// ── Thread post card ────────────────────────────────────────────────────────────
+
+class _ThreadPostCard extends StatelessWidget {
+  const _ThreadPostCard({required this.post, required this.depth});
   final MediaPost post;
+  final int depth;
 
   @override
   Widget build(BuildContext context) {
@@ -225,25 +315,42 @@ class _PostCard extends StatelessWidget {
     final shortKey = post.pubkey.length > 12
         ? '${post.pubkey.substring(0, 8)}…'
         : post.pubkey;
+    // Cap visible indent at 4 levels
+    final indent = depth.clamp(0, 4) * 18.0;
 
     return Container(
-      margin: const EdgeInsets.symmetric(
-        horizontal: SpotSpacing.lg,
-        vertical: 4,
+      margin: EdgeInsets.fromLTRB(
+        SpotSpacing.lg + indent,
+        0,
+        SpotSpacing.lg,
+        4,
       ),
-      decoration: SpotDecoration.card(),
+      decoration: depth == 0
+          ? SpotDecoration.card()
+          : BoxDecoration(
+              color: SpotColors.surface,
+              borderRadius: BorderRadius.circular(SpotRadius.sm),
+              border: Border(
+                left: BorderSide(
+                  color: SpotColors.accent.withValues(alpha: 0.35),
+                  width: 2,
+                ),
+              ),
+            ),
       child: Row(
         children: [
           // Thumbnail area
           Container(
-            width: 72,
-            height: 72,
+            width: 64,
+            height: 64,
             decoration: BoxDecoration(
               color: SpotColors.bg,
-              borderRadius: const BorderRadius.only(
-                topLeft:    Radius.circular(SpotRadius.sm),
-                bottomLeft: Radius.circular(SpotRadius.sm),
-              ),
+              borderRadius: depth == 0
+                  ? const BorderRadius.only(
+                      topLeft: Radius.circular(SpotRadius.sm),
+                      bottomLeft: Radius.circular(SpotRadius.sm),
+                    )
+                  : null,
             ),
             child: Center(
               child: Icon(
@@ -253,63 +360,61 @@ class _PostCard extends StatelessWidget {
                 color: post.isDangerMode
                     ? SpotColors.danger.withAlpha(160)
                     : SpotColors.overlay,
-                size: 22,
+                size: 20,
               ),
             ),
           ),
-
-          const SizedBox(width: SpotSpacing.md),
-
-          // Details
+          const SizedBox(width: SpotSpacing.sm),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: SpotSpacing.md),
+              padding: const EdgeInsets.symmetric(vertical: SpotSpacing.sm),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (depth > 0)
+                    Row(
+                      children: [
+                        const Icon(CupertinoIcons.arrow_turn_up_left,
+                            size: 10, color: SpotColors.textTertiary),
+                        const SizedBox(width: 3),
+                        Text('reply', style: SpotType.caption),
+                      ],
+                    ),
                   if (post.isDangerMode)
                     Container(
-                      margin: const EdgeInsets.only(bottom: 4),
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      margin: const EdgeInsets.only(bottom: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 2),
                       decoration: BoxDecoration(
                         color: SpotColors.dangerSubtle,
                         borderRadius: BorderRadius.circular(SpotRadius.xs),
                       ),
                       child: Text(
                         'Protected',
-                        style: SpotType.label.copyWith(color: SpotColors.danger),
+                        style:
+                            SpotType.label.copyWith(color: SpotColors.danger),
                       ),
                     ),
                   Text(shortKey, style: SpotType.mono),
-                  const SizedBox(height: 3),
-                  Text(df.format(post.capturedAt.toLocal()), style: SpotType.caption),
-                  const SizedBox(height: SpotSpacing.xs),
-                  Row(
-                    children: [
-                      Icon(
-                        post.hasGps ? CupertinoIcons.location_fill : CupertinoIcons.location_slash,
-                        color: post.hasGps
-                            ? SpotColors.success.withAlpha(160)
-                            : SpotColors.textTertiary,
-                        size: 11,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        post.hasGps
-                            ? '${post.latitude!.toStringAsFixed(3)}, '
-                              '${post.longitude!.toStringAsFixed(3)}'
-                            : 'Hidden',
-                        style: SpotType.caption,
-                      ),
-                    ],
-                  ),
+                  const SizedBox(height: 2),
+                  Text(df.format(post.capturedAt.toLocal()),
+                      style: SpotType.caption),
+                  if (post.caption != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      post.caption!,
+                      style: SpotType.bodySecondary,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
-
-          const Icon(CupertinoIcons.chevron_right, color: SpotColors.overlay, size: 16),
-          const SizedBox(width: SpotSpacing.sm),
+          const Icon(CupertinoIcons.chevron_right,
+              color: SpotColors.overlay, size: 14),
+          const SizedBox(width: SpotSpacing.xs),
         ],
       ),
     );
