@@ -17,6 +17,9 @@ const _defaultRelays = [
   'wss://relay.nostr.band',
 ];
 
+const _relayConnectTimeout = Duration(seconds: 5);
+const _publishAckTimeout = Duration(seconds: 4);
+
 /// Relay-indexable single-letter marker used to discover Spot events.
 const spotRelayMarkerTag = 'd';
 
@@ -56,8 +59,14 @@ class NostrService {
   /// Active WebSocket channels keyed by relay URL.
   final Map<String, WebSocketChannel> _channels = {};
 
+  /// In-flight connection attempts keyed by relay URL.
+  final Map<String, Future<void>> _connecting = {};
+
   /// Active subscriptions keyed by subscription ID.
   final Map<String, _SubscriptionState> _subscriptions = {};
+
+  /// Pending publish acknowledgements keyed by event ID.
+  final Map<String, _PendingPublish> _pendingPublishes = {};
 
   /// Broadcast stream controller for all inbound relay messages.
   final _inbound = StreamController<_RelayMessage>.broadcast();
@@ -67,22 +76,39 @@ class NostrService {
   /// Connects to all configured relays.
   Future<void> connect([List<String>? relayUrls]) async {
     final urls = relayUrls ?? _relayUrls;
-    for (final url in urls) {
-      _connectRelay(url);
-    }
+    await Future.wait(urls.map(_connectRelay));
   }
 
-  void _connectRelay(String url) {
-    if (_channels.containsKey(url)) return;
+  Future<void> _connectRelay(String url) {
+    if (_channels.containsKey(url)) return Future.value();
+    final existing = _connecting[url];
+    if (existing != null) return existing;
+
+    final attempt = _openRelay(url).whenComplete(() {
+      _connecting.remove(url);
+    });
+    _connecting[url] = attempt;
+    return attempt;
+  }
+
+  Future<void> _openRelay(String url) async {
     try {
       final channel = WebSocketChannel.connect(Uri.parse(url));
-      _channels[url] = channel;
 
       channel.stream.listen(
         (raw) => _handleIncoming(url, raw),
-        onError: (_) => _channels.remove(url),
-        onDone: () => _channels.remove(url),
+        onError: (error) {
+          _channels.remove(url);
+          _markRelayPublishFailure(url, 'socket error: $error');
+        },
+        onDone: () {
+          _channels.remove(url);
+          _markRelayPublishFailure(url, 'connection closed');
+        },
       );
+
+      await channel.ready.timeout(_relayConnectTimeout);
+      _channels[url] = channel;
 
       // Re-subscribe on reconnect
       for (final sub in _subscriptions.values) {
@@ -95,7 +121,8 @@ class NostrService {
 
   /// Disconnects from all relays and cancels all subscriptions.
   Future<void> disconnect() async {
-    for (final channel in _channels.values) {
+    final channels = _channels.values.toList(growable: false);
+    for (final channel in channels) {
       await channel.sink.close();
     }
     _channels.clear();
@@ -106,10 +133,28 @@ class NostrService {
   // ── Publishing ────────────────────────────────────────────────────────────
 
   /// Broadcasts [event] to all connected relays.
-  void publishEvent(NostrEvent event) {
+  Future<void> publishEvent(NostrEvent event) async {
+    await connect();
+    if (_channels.isEmpty) {
+      throw StateError('No connected relays available');
+    }
+
+    final relayUrls = _channels.keys.toList(growable: false);
+    final pending = _PendingPublish(
+      eventId: event.id,
+      relayUrls: relayUrls,
+    );
+    _pendingPublishes[event.id] = pending;
+
     final msg = jsonEncode(['EVENT', event.toJson()]);
-    for (final channel in _channels.values) {
+    for (final channel in _channels.values.toList(growable: false)) {
       channel.sink.add(msg);
+    }
+
+    try {
+      await pending.waitForAcceptance(_publishAckTimeout);
+    } finally {
+      _pendingPublishes.remove(event.id);
     }
   }
 
@@ -179,7 +224,7 @@ class NostrService {
       sig: sig,
     );
 
-    publishEvent(signed);
+    await publishEvent(signed);
 
     // Self-deliver immediately so the post appears in the feed without
     // waiting for a relay echo (many relays delay or filter kind-1 events).
@@ -242,7 +287,7 @@ class NostrService {
       sig: sig,
     );
 
-    publishEvent(signed);
+    await publishEvent(signed);
 
     // Self-deliver
     for (final sub in _subscriptions.values) {
@@ -301,7 +346,7 @@ class NostrService {
       sig: sig,
     );
 
-    publishEvent(signed);
+    await publishEvent(signed);
   }
 
   /// Publishes a NIP-56 kind-1984 report event.
@@ -354,7 +399,7 @@ class NostrService {
       sig: sig,
     );
 
-    publishEvent(signed);
+    await publishEvent(signed);
   }
 
   // ── Subscriptions ─────────────────────────────────────────────────────────
@@ -441,6 +486,17 @@ class NostrService {
           _subscriptions[subId]?.onEvent(event);
           _inbound.add(_RelayMessage(relayUrl: relayUrl, event: event));
 
+        case 'OK':
+          if (data.length < 4) return;
+          final eventId = data[1] as String;
+          final accepted = data[2] == true;
+          final message = data[3]?.toString() ?? '';
+          _pendingPublishes[eventId]?.record(
+            relayUrl,
+            accepted: accepted,
+            message: message,
+          );
+
         case 'NOTICE':
           // Relay notice — log but do not surface to app layer.
           break;
@@ -462,6 +518,12 @@ class NostrService {
 
   /// List of currently connected relay URLs.
   List<String> get connectedRelays => List.unmodifiable(_channels.keys);
+
+  void _markRelayPublishFailure(String relayUrl, String reason) {
+    for (final publish in _pendingPublishes.values) {
+      publish.record(relayUrl, accepted: false, message: reason);
+    }
+  }
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────
@@ -483,4 +545,72 @@ class _RelayMessage {
   final NostrEvent event;
 
   const _RelayMessage({required this.relayUrl, required this.event});
+}
+
+class _PendingPublish {
+  _PendingPublish({
+    required this.eventId,
+    required List<String> relayUrls,
+  }) : _expectedRelays = relayUrls.toSet();
+
+  final String eventId;
+  final Set<String> _expectedRelays;
+  final Map<String, ({bool accepted, String message})> _responses = {};
+  final Completer<void> _completer = Completer<void>();
+
+  void record(
+    String relayUrl, {
+    required bool accepted,
+    required String message,
+  }) {
+    if (!_expectedRelays.contains(relayUrl) || _responses.containsKey(relayUrl)) {
+      return;
+    }
+
+    _responses[relayUrl] = (accepted: accepted, message: message);
+
+    if (accepted) {
+      if (!_completer.isCompleted) {
+        _completer.complete();
+      }
+      return;
+    }
+
+    if (_responses.length == _expectedRelays.length && !_completer.isCompleted) {
+      _completer.completeError(StateError(_failureSummary()));
+    }
+  }
+
+  Future<void> waitForAcceptance(Duration timeout) async {
+    try {
+      await _completer.future.timeout(timeout);
+    } on TimeoutException {
+      throw StateError(_failureSummary(timedOut: true));
+    }
+  }
+
+  String _failureSummary({bool timedOut = false}) {
+    final rejected = _responses.entries
+        .where((entry) => !entry.value.accepted)
+        .map((entry) {
+          final suffix = entry.value.message.isEmpty ? '' : ' (${entry.value.message})';
+          return '${entry.key}$suffix';
+        })
+        .toList(growable: false);
+    final missing = _expectedRelays.difference(_responses.keys.toSet()).toList()
+      ..sort();
+
+    final parts = <String>['No relay accepted Nostr event $eventId'];
+    if (rejected.isNotEmpty) {
+      parts.add('rejected by ${rejected.join(', ')}');
+    }
+    if (missing.isNotEmpty) {
+      parts.add(
+        timedOut
+            ? 'timed out waiting for ${missing.join(', ')}'
+            : 'no response from ${missing.join(', ')}',
+      );
+    }
+    return parts.join('; ');
+  }
 }
