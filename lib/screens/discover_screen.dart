@@ -3,12 +3,12 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import 'package:mobile/features/camera/camera_screen.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/feed_scoring_service.dart';
 import 'package:mobile/services/location_service.dart';
@@ -85,7 +85,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       await _loadPersistedPosts();
       await widget.nostrService.connect();
       _sub = _repo.subscribeToEvents().listen(_onEvent);
-    } catch (_) {} finally {
+    } catch (_) {
+    } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -169,18 +170,22 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   List<MediaPost> get _trendingPosts {
     final events = _repo.getAllEvents();
-    final scored = events
-        .where((e) => DateTime.now().difference(e.firstSeen).inHours <= 48)
-        .toList()
-      ..sort((a, b) =>
-          _scoring.trendingScore(b).compareTo(_scoring.trendingScore(a)));
+    final scored =
+        events
+            .where((e) => DateTime.now().difference(e.firstSeen).inHours <= 48)
+            .toList()
+          ..sort(
+            (a, b) =>
+                _scoring.trendingScore(b).compareTo(_scoring.trendingScore(a)),
+          );
 
     final result = <MediaPost>[];
     for (final event in scored) {
       result.addAll(event.postsByNewest);
     }
-    final untagged =
-        _posts.where((p) => p.eventTag == null || p.eventTag == '_unsorted');
+    final untagged = _posts.where(
+      (p) => p.eventTag == null || p.eventTag == '_unsorted',
+    );
     result.addAll(untagged);
 
     final seen = <String>{};
@@ -189,35 +194,33 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   List<MediaPost> get _forYouPosts {
     final interests = UserPrefsService.instance.interests;
-    final viewed    = UserPrefsService.instance.viewedHashtags;
-    return List<MediaPost>.from(_posts)
-      ..sort((a, b) {
-        final sa = _scoring.recommendationScore(
-          post: a,
-          userInterests: interests,
-          viewedHashtags: viewed,
-          userLat: _userLat,
-          userLon: _userLon,
-        );
-        final sb = _scoring.recommendationScore(
-          post: b,
-          userInterests: interests,
-          viewedHashtags: viewed,
-          userLat: _userLat,
-          userLon: _userLon,
-        );
-        return sb.compareTo(sa);
-      });
+    final viewed = UserPrefsService.instance.viewedHashtags;
+    return List<MediaPost>.from(_posts)..sort((a, b) {
+      final sa = _scoring.recommendationScore(
+        post: a,
+        userInterests: interests,
+        viewedHashtags: viewed,
+        userLat: _userLat,
+        userLon: _userLon,
+      );
+      final sb = _scoring.recommendationScore(
+        post: b,
+        userInterests: interests,
+        viewedHashtags: viewed,
+        userLat: _userLat,
+        userLon: _userLon,
+      );
+      return sb.compareTo(sa);
+    });
   }
 
   List<MediaPost> get _nearbyPosts {
     if (_userLat == null || _userLon == null) return [];
-    return List<MediaPost>.from(_posts.where((p) => p.hasGps))
-      ..sort((a, b) {
-        final sa = _scoring.nearbyScore(a, _userLat!, _userLon!);
-        final sb = _scoring.nearbyScore(b, _userLat!, _userLon!);
-        return sb.compareTo(sa);
-      });
+    return List<MediaPost>.from(_posts.where((p) => p.hasGps))..sort((a, b) {
+      final sa = _scoring.nearbyScore(a, _userLat!, _userLon!);
+      final sb = _scoring.nearbyScore(b, _userLat!, _userLon!);
+      return sb.compareTo(sa);
+    });
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -257,8 +260,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       indicatorColor: SpotColors.accent,
       indicatorWeight: 1.5,
       dividerColor: Colors.transparent,
-      labelStyle:
-          SpotType.caption.copyWith(letterSpacing: 0.8, fontSize: 11),
+      labelStyle: SpotType.caption.copyWith(letterSpacing: 0.8, fontSize: 11),
       tabs: const [
         Tab(text: 'TRENDING'),
         Tab(text: 'FOR YOU'),
@@ -286,7 +288,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               width: 16,
               height: 16,
               child: CircularProgressIndicator(
-                  color: SpotColors.accent, strokeWidth: 1),
+                color: SpotColors.accent,
+                strokeWidth: 1,
+              ),
             ),
           ],
         ),
@@ -296,8 +300,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(SpotSpacing.xxxl),
-          child: Text(emptyLabel,
-              style: SpotType.bodySecondary, textAlign: TextAlign.center),
+          child: Text(
+            emptyLabel,
+            style: SpotType.bodySecondary,
+            textAlign: TextAlign.center,
+          ),
         ),
       );
     }
@@ -309,7 +316,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       onRefresh: _refresh,
       child: ListView.builder(
         padding: const EdgeInsets.only(
-            top: SpotSpacing.sm, bottom: SpotSpacing.xl),
+          top: SpotSpacing.sm,
+          bottom: SpotSpacing.xl,
+        ),
         itemCount: posts.length,
         itemBuilder: (ctx, i) {
           final post = posts[i];
@@ -318,14 +327,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
             isLast: i == posts.length - 1,
             onAvatarTap: () => _openUserProfile(ctx, post.pubkey),
             onReport: () => _reportPost(post),
-            onReply: () => Navigator.of(ctx).push(
-              MaterialPageRoute(
-                builder: (_) => CameraScreen(
-                  wallet: widget.wallet,
-                  nostrService: widget.nostrService,
-                  replyToPost: post,
-                ),
-              ),
+            onReply: () => showPostComposer(
+              ctx,
+              wallet: widget.wallet,
+              nostrService: widget.nostrService,
+              eventRepo: _repo,
+              replyToPost: post,
             ),
           );
         },
@@ -341,8 +348,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(CupertinoIcons.location_slash,
-                  color: SpotColors.textTertiary, size: 32),
+              const Icon(
+                CupertinoIcons.location_slash,
+                color: SpotColors.textTertiary,
+                size: 32,
+              ),
               const SizedBox(height: SpotSpacing.xl),
               const Text(
                 'Enable location to see nearby events',
@@ -358,13 +368,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                     vertical: SpotSpacing.sm,
                   ),
                   decoration: BoxDecoration(
-                    border:
-                        Border.all(color: SpotColors.border, width: 0.5),
-                    borderRadius:
-                        BorderRadius.circular(SpotRadius.sm),
+                    border: Border.all(color: SpotColors.border, width: 0.5),
+                    borderRadius: BorderRadius.circular(SpotRadius.sm),
                   ),
-                  child: const Text('Allow Location',
-                      style: SpotType.bodySecondary),
+                  child: const Text(
+                    'Allow Location',
+                    style: SpotType.bodySecondary,
+                  ),
                 ),
               ),
             ],

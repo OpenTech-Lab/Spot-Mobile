@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import 'package:mobile/features/camera/camera_screen.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/interests_screen.dart';
+import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/follow_service.dart';
@@ -137,9 +137,7 @@ class FeedScreenState extends State<FeedScreen>
         ),
         (event) {
           if (!EventRepository.isSpotEvent(event)) return;
-          _repo.addPost(
-            EventRepository.nostrEventToPost(event),
-          );
+          _repo.addPost(EventRepository.nostrEventToPost(event));
         },
       );
 
@@ -260,6 +258,7 @@ class FeedScreenState extends State<FeedScreen>
                 onAvatarTap: _openUserProfile,
                 wallet: widget.wallet,
                 nostrService: widget.nostrService,
+                eventRepo: _repo,
               ),
               _FollowingTab(
                 posts: _followingPosts,
@@ -269,6 +268,7 @@ class FeedScreenState extends State<FeedScreen>
                 onAvatarTap: _openUserProfile,
                 wallet: widget.wallet,
                 nostrService: widget.nostrService,
+                eventRepo: _repo,
               ),
             ],
           ),
@@ -308,6 +308,7 @@ class _LatestTab extends StatefulWidget {
     required this.onAvatarTap,
     required this.wallet,
     required this.nostrService,
+    required this.eventRepo,
   });
 
   final List<MediaPost> posts;
@@ -320,6 +321,7 @@ class _LatestTab extends StatefulWidget {
   final void Function(BuildContext, String) onAvatarTap;
   final WalletModel wallet;
   final NostrService nostrService;
+  final EventRepository eventRepo;
 
   @override
   State<_LatestTab> createState() => _LatestTabState();
@@ -396,14 +398,12 @@ class _LatestTabState extends State<_LatestTab> {
             isLast: i == widget.posts.length - 1,
             onAvatarTap: () => widget.onAvatarTap(ctx, post.pubkey),
             onReport: () => widget.onReport(post),
-            onReply: () => Navigator.of(ctx).push(
-              MaterialPageRoute(
-                builder: (_) => CameraScreen(
-                  wallet: widget.wallet,
-                  nostrService: widget.nostrService,
-                  replyToPost: post,
-                ),
-              ),
+            onReply: () => showPostComposer(
+              ctx,
+              wallet: widget.wallet,
+              nostrService: widget.nostrService,
+              eventRepo: widget.eventRepo,
+              replyToPost: post,
             ),
           );
         },
@@ -534,6 +534,7 @@ class _FollowingTab extends StatelessWidget {
     required this.onAvatarTap,
     required this.wallet,
     required this.nostrService,
+    required this.eventRepo,
   });
 
   final List<MediaPost> posts;
@@ -543,6 +544,7 @@ class _FollowingTab extends StatelessWidget {
   final void Function(BuildContext, String) onAvatarTap;
   final WalletModel wallet;
   final NostrService nostrService;
+  final EventRepository eventRepo;
 
   @override
   Widget build(BuildContext context) {
@@ -630,14 +632,12 @@ class _FollowingTab extends StatelessWidget {
             isLast: i == posts.length - 1,
             onAvatarTap: () => onAvatarTap(ctx, post.pubkey),
             onReport: () => onReport(post),
-            onReply: () => Navigator.of(ctx).push(
-              MaterialPageRoute(
-                builder: (_) => CameraScreen(
-                  wallet: wallet,
-                  nostrService: nostrService,
-                  replyToPost: post,
-                ),
-              ),
+            onReply: () => showPostComposer(
+              ctx,
+              wallet: wallet,
+              nostrService: nostrService,
+              eventRepo: eventRepo,
+              replyToPost: post,
             ),
           );
         },

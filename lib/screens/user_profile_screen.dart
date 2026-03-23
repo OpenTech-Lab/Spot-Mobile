@@ -3,12 +3,12 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import 'package:mobile/features/camera/camera_screen.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
@@ -61,18 +61,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     setState(() => _isLoading = true);
     try {
       await widget.nostrService.connect();
-      _sub = _repo
-          .subscribeToAuthorPosts(widget.pubkey)
-          .listen(_onEvent);
-    } catch (_) {} finally {
+      _sub = _repo.subscribeToAuthorPosts(widget.pubkey).listen(_onEvent);
+    } catch (_) {
+    } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _onEvent(CivicEvent event) {
     if (!mounted) return;
-    final posts =
-        event.posts.where((p) => p.pubkey == widget.pubkey).toList();
+    final posts = event.posts.where((p) => p.pubkey == widget.pubkey).toList();
     if (posts.isEmpty) return;
     final merged = _mergePosts(_posts, posts);
     if (merged.length == _posts.length) return;
@@ -131,15 +129,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   // ── User settings menu ────────────────────────────────────────────────────
 
   void _showUserMenu() {
-    final isMuted   = FollowService.instance.isMuted(widget.pubkey);
+    final isMuted = FollowService.instance.isMuted(widget.pubkey);
     final isBlocked = FollowService.instance.isBlocked(widget.pubkey);
 
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: SpotColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(SpotRadius.lg)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(SpotRadius.lg),
+        ),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
@@ -171,8 +170,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ),
                 title: Text(
                   isMuted ? 'Unmute user' : 'Mute user',
-                  style:
-                      const TextStyle(color: SpotColors.textSecondary),
+                  style: const TextStyle(color: SpotColors.textSecondary),
                 ),
                 contentPadding: EdgeInsets.zero,
                 onTap: () async {
@@ -286,9 +284,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 onFollowTap: _toggleFollow,
               ),
             ),
-            const SliverToBoxAdapter(
-              child: Divider(height: 1, thickness: 0.5),
-            ),
+            const SliverToBoxAdapter(child: Divider(height: 1, thickness: 0.5)),
             if (_isLoading && _posts.isEmpty)
               const SliverFillRemaining(
                 child: Center(
@@ -308,8 +304,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(CupertinoIcons.camera,
-                          color: SpotColors.overlay, size: 32),
+                      Icon(
+                        CupertinoIcons.camera,
+                        color: SpotColors.overlay,
+                        size: 32,
+                      ),
                       SizedBox(height: SpotSpacing.lg),
                       Text('No posts yet', style: SpotType.bodySecondary),
                     ],
@@ -318,26 +317,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               )
             else
               SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (ctx, i) {
-                    final post = _posts[i];
-                    return PostThreadRow(
-                      post: post,
-                      isLast: i == _posts.length - 1,
-                      onReport: () => _reportPost(post),
-                      onReply: () => Navigator.of(ctx).push(
-                        MaterialPageRoute(
-                          builder: (_) => CameraScreen(
-                            wallet: widget.wallet,
-                            nostrService: widget.nostrService,
-                            replyToPost: post,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                  childCount: _posts.length,
-                ),
+                delegate: SliverChildBuilderDelegate((ctx, i) {
+                  final post = _posts[i];
+                  return PostThreadRow(
+                    post: post,
+                    isLast: i == _posts.length - 1,
+                    onReport: () => _reportPost(post),
+                    onReply: () => showPostComposer(
+                      ctx,
+                      wallet: widget.wallet,
+                      nostrService: widget.nostrService,
+                      replyToPost: post,
+                    ),
+                  );
+                }, childCount: _posts.length),
               ),
           ],
         ),

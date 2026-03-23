@@ -4,12 +4,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:mobile/features/camera/camera_screen.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/settings_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/local_post_store.dart';
@@ -271,14 +271,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   return PostThreadRow(
                     post: post,
                     isLast: i == _posts.length - 1,
-                    onReply: () => Navigator.of(ctx).push(
-                      MaterialPageRoute(
-                        builder: (_) => CameraScreen(
-                          wallet: widget.wallet,
-                          nostrService: widget.nostrService,
-                          replyToPost: post,
-                        ),
-                      ),
+                    onReply: () => showPostComposer(
+                      ctx,
+                      wallet: widget.wallet,
+                      nostrService: widget.nostrService,
+                      eventRepo: _repo,
+                      replyToPost: post,
                     ),
                     onDelete: () => _deletePost(post),
                     onReport: () => _reportPost(post),

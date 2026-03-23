@@ -25,6 +25,7 @@ Future<void> showPostComposer(
   required NostrService nostrService,
   EventRepository? eventRepo,
   MediaPost? replyToPost,
+  Future<GpsLock?> Function()? gpsLoader,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -38,6 +39,7 @@ Future<void> showPostComposer(
       nostrService: nostrService,
       eventRepo: eventRepo,
       replyToPost: replyToPost,
+      gpsLoader: gpsLoader,
     ),
   );
 }
@@ -50,12 +52,14 @@ class PostComposerSheet extends StatefulWidget {
     required this.nostrService,
     this.eventRepo,
     this.replyToPost,
+    this.gpsLoader,
   });
 
   final WalletModel wallet;
   final NostrService nostrService;
   final EventRepository? eventRepo;
   final MediaPost? replyToPost;
+  final Future<GpsLock?> Function()? gpsLoader;
 
   @override
   State<PostComposerSheet> createState() => _PostComposerSheetState();
@@ -119,7 +123,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
   void _removeTag(String tag) => setState(() => _tags.remove(tag));
 
   Future<void> _fetchGps() async {
-    final lock = await CameraService.instance.lockGPS();
+    final lock = await (widget.gpsLoader ?? CameraService.instance.lockGPS)();
     if (mounted) setState(() => _gpsLock = lock);
   }
 
