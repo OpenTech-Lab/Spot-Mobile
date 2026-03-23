@@ -86,7 +86,9 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
     if (widget.replyToPost?.eventTag != null) {
       _tags.add(widget.replyToPost!.eventTag!);
     }
-    _captionFocus.addListener(() { if (mounted) setState(() {}); });
+    _captionFocus.addListener(() {
+      if (mounted) setState(() {});
+    });
     _fetchGps();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _captionFocus.requestFocus();
@@ -186,8 +188,9 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
           context: context,
           backgroundColor: SpotColors.surface,
           shape: const RoundedRectangleBorder(
-            borderRadius:
-                BorderRadius.vertical(top: Radius.circular(SpotRadius.xl)),
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(SpotRadius.xl),
+            ),
           ),
           isScrollControlled: true,
           builder: (_) => const _LegalCheckSheet(),
@@ -210,8 +213,11 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
       // Text-only post: derive a deterministic temp ID from caption + timestamp
       if (hashes.isEmpty) {
         final caption = _captionCtrl.text.trim();
-        hashes.add(EncryptionUtils.sha256Hex(
-            '${widget.wallet.publicKeyHex}:$caption:${DateTime.now().millisecondsSinceEpoch}'));
+        hashes.add(
+          EncryptionUtils.sha256Hex(
+            '${widget.wallet.publicKeyHex}:$caption:${DateTime.now().millisecondsSinceEpoch}',
+          ),
+        );
       }
 
       // Commit any tag that's still in the input field
@@ -252,14 +258,17 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
         }
       }
 
-      final signed =
-          await widget.nostrService.publishMediaPost(post, widget.wallet);
+      final signed = await widget.nostrService.publishMediaPost(
+        post,
+        widget.wallet,
+      );
 
       final savedPost = post.copyWith(
         id: signed.id,
         nostrEventId: signed.id,
-        capturedAt:
-            DateTime.fromMillisecondsSinceEpoch(signed.createdAt * 1000),
+        capturedAt: DateTime.fromMillisecondsSinceEpoch(
+          signed.createdAt * 1000,
+        ),
       );
 
       await LocalPostStore.instance.savePost(savedPost);
@@ -286,8 +295,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
   void _showSnack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   // ── Tag section ──────────────────────────────────────────────────────────
@@ -324,9 +332,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
             child: Row(
               children: [
                 Icon(
-                  hasCategory
-                      ? CupertinoIcons.tag_fill
-                      : CupertinoIcons.tag,
+                  hasCategory ? CupertinoIcons.tag_fill : CupertinoIcons.tag,
                   size: 18,
                   color: hasCategory
                       ? SpotColors.accent
@@ -348,15 +354,19 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                       : TextField(
                           controller: _tagInputCtrl,
                           focusNode: _tagFocus,
-                          style: SpotType.body
-                              .copyWith(color: SpotColors.textPrimary),
+                          style: SpotType.body.copyWith(
+                            color: SpotColors.textPrimary,
+                          ),
                           decoration: InputDecoration(
-                            hintText:
-                                'Category tag (e.g. AWSSummitTokyo2026)',
-                            hintStyle: SpotType.body
-                                .copyWith(color: SpotColors.textTertiary),
+                            hintText: 'Category tag (e.g. AWSSummitTokyo2026)',
+                            hintStyle: SpotType.body.copyWith(
+                              color: SpotColors.textTertiary,
+                            ),
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.zero,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: SpotSpacing.sm,
+                              vertical: SpotSpacing.sm,
+                            ),
                             isDense: true,
                           ),
                           textInputAction: TextInputAction.done,
@@ -370,8 +380,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
           // ── Extra tags row (appears once category is set) ─────────────
           if (hasCategory) ...[
-            const Divider(
-                height: 1, thickness: 0.5, color: SpotColors.border),
+            const Divider(height: 1, thickness: 0.5, color: SpotColors.border),
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: SpotSpacing.md,
@@ -382,8 +391,11 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                 runSpacing: SpotSpacing.sm,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  const Icon(CupertinoIcons.number,
-                      size: 14, color: SpotColors.textTertiary),
+                  const Icon(
+                    CupertinoIcons.number,
+                    size: 14,
+                    color: SpotColors.textTertiary,
+                  ),
                   for (int i = 0; i < extraTags.length; i++)
                     _TagChip(
                       tag: extraTags[i],
@@ -395,14 +407,19 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                     child: TextField(
                       controller: _tagInputCtrl,
                       focusNode: _tagFocus,
-                      style: SpotType.bodySecondary
-                          .copyWith(color: SpotColors.textSecondary),
+                      style: SpotType.bodySecondary.copyWith(
+                        color: SpotColors.textSecondary,
+                      ),
                       decoration: InputDecoration(
                         hintText: 'Add more tags…',
-                        hintStyle: SpotType.bodySecondary
-                            .copyWith(color: SpotColors.textTertiary),
+                        hintStyle: SpotType.bodySecondary.copyWith(
+                          color: SpotColors.textTertiary,
+                        ),
                         border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: SpotSpacing.sm,
+                          vertical: SpotSpacing.sm,
+                        ),
                         isDense: true,
                       ),
                       textInputAction: TextInputAction.done,
@@ -433,22 +450,10 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
           // ── Caption + avatar (fills remaining space) ─────────────────────
           Expanded(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              margin: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(SpotRadius.md),
-                border: Border.all(
-                  color: _captionFocus.hasFocus
-                      ? SpotColors.accent.withValues(alpha: 0.45)
-                      : SpotColors.border,
-                  width: 0.5,
-                ),
-              ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(SpotSpacing.md),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   PubkeyAvatar(pubkey: widget.wallet.publicKeyHex),
                   const SizedBox(width: SpotSpacing.sm),
@@ -461,35 +466,59 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                             padding: const EdgeInsets.only(bottom: 4),
                             child: Row(
                               children: [
-                                const Icon(CupertinoIcons.arrow_turn_up_left,
-                                    size: 11,
-                                    color: SpotColors.textTertiary),
+                                const Icon(
+                                  CupertinoIcons.arrow_turn_up_left,
+                                  size: 11,
+                                  color: SpotColors.textTertiary,
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Reply to ${_shortKey(widget.replyToPost!.nostrEventId)}',
                                   style: SpotType.caption.copyWith(
-                                      color: SpotColors.textTertiary),
+                                    color: SpotColors.textTertiary,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                        TextField(
-                          controller: _captionCtrl,
-                          focusNode: _captionFocus,
-                          minLines: 4,
-                          maxLines: null,
-                          style: SpotType.body,
-                          decoration: InputDecoration(
-                            hintText: widget.replyToPost != null
-                                ? 'Write a reply…'
-                                : 'What\'s happening?',
-                            hintStyle: SpotType.body.copyWith(
-                                color: SpotColors.textTertiary),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.zero,
-                            isDense: true,
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.all(SpotSpacing.sm),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(SpotRadius.sm),
+                            border: Border.all(
+                              color: _captionFocus.hasFocus
+                                  ? SpotColors.accent.withValues(alpha: 0.45)
+                                  : SpotColors.border,
+                              width: 0.5,
+                            ),
                           ),
-                          onChanged: (_) => setState(() {}),
+                          child: TextField(
+                            controller: _captionCtrl,
+                            focusNode: _captionFocus,
+                            minLines: 4,
+                            maxLines: null,
+                            style: SpotType.body,
+                            decoration: InputDecoration(
+                              filled: false,
+                              fillColor: Colors.transparent,
+                              hintText: widget.replyToPost != null
+                                  ? 'Write a reply…'
+                                  : 'What\'s happening?',
+                              hintStyle: SpotType.body.copyWith(
+                                color: SpotColors.textTertiary,
+                              ),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              disabledBorder: InputBorder.none,
+                              errorBorder: InputBorder.none,
+                              focusedErrorBorder: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                              isDense: true,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
                         ),
                       ],
                     ),
@@ -497,7 +526,6 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                 ],
               ),
             ),
-          ),
           ),
 
           // ── Media strip ─────────────────────────────────────────────────────
@@ -512,10 +540,11 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
           _buildTagSection(),
           Padding(
             padding: const EdgeInsets.fromLTRB(
-                SpotSpacing.lg + SpotSpacing.md + 14 + SpotSpacing.sm,
-                3,
-                SpotSpacing.lg,
-                0),
+              SpotSpacing.lg + SpotSpacing.md + 14 + SpotSpacing.sm,
+              3,
+              SpotSpacing.lg,
+              0,
+            ),
             child: Text(
               'First tag is the event category · press Space or , to add more',
               style: SpotType.caption.copyWith(color: SpotColors.textTertiary),
@@ -533,8 +562,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
           ),
 
           const SizedBox(height: SpotSpacing.sm),
-          const Divider(
-              color: SpotColors.border, height: 1, thickness: 0.5),
+          const Divider(color: SpotColors.border, height: 1, thickness: 0.5),
           const SizedBox(height: SpotSpacing.sm),
 
           // ── Expandable options ──────────────────────────────────────────────
@@ -556,8 +584,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
               onSourceChanged: (v) => setState(() => _sourceType = v),
             ),
             const SizedBox(height: SpotSpacing.sm),
-            const Divider(
-                color: SpotColors.border, height: 1, thickness: 0.5),
+            const Divider(color: SpotColors.border, height: 1, thickness: 0.5),
             const SizedBox(height: SpotSpacing.sm),
           ],
 
@@ -581,9 +608,9 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                 // More options toggle
                 _ToolButton(
                   icon: CupertinoIcons.slider_horizontal_3,
-                  onTap: () =>
-                      setState(() => _showOptions = !_showOptions),
-                  active: _showOptions ||
+                  onTap: () => setState(() => _showOptions = !_showOptions),
+                  active:
+                      _showOptions ||
                       _isDangerMode ||
                       _isVirtual ||
                       _isAiGenerated ||
@@ -596,13 +623,14 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: SpotSpacing.lg, vertical: SpotSpacing.sm),
+                      horizontal: SpotSpacing.lg,
+                      vertical: SpotSpacing.sm,
+                    ),
                     decoration: BoxDecoration(
                       color: _canPost
                           ? SpotColors.accent
                           : SpotColors.surfaceHigh,
-                      borderRadius:
-                          BorderRadius.circular(SpotRadius.full),
+                      borderRadius: BorderRadius.circular(SpotRadius.full),
                     ),
                     child: _isPublishing
                         ? const SizedBox(
@@ -631,9 +659,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
           // always stays visible above it.
           AnimatedContainer(
             duration: const Duration(milliseconds: 80),
-            height: bottomInset > 0
-                ? bottomInset
-                : SpotSpacing.md,
+            height: bottomInset > 0 ? bottomInset : SpotSpacing.md,
           ),
         ],
       ),
@@ -724,7 +750,8 @@ class _ComposerOptions extends StatelessWidget {
             subtitle: 'You are sharing a secondhand account',
             value: sourceType == PostSourceType.secondhand,
             onChanged: (v) => onSourceChanged(
-                v ? PostSourceType.secondhand : PostSourceType.firsthand),
+              v ? PostSourceType.secondhand : PostSourceType.firsthand,
+            ),
             activeColor: SpotColors.accent,
           ),
         ],
@@ -761,7 +788,9 @@ class _ModePill extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(
-            horizontal: SpotSpacing.md, vertical: SpotSpacing.xs),
+          horizontal: SpotSpacing.md,
+          vertical: SpotSpacing.xs,
+        ),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(SpotRadius.full),
@@ -772,9 +801,13 @@ class _ModePill extends StatelessWidget {
           children: [
             Icon(icon, size: 12, color: fg),
             const SizedBox(width: 5),
-            Text(label,
-                style: SpotType.label.copyWith(
-                    color: fg, fontWeight: FontWeight.w500)),
+            Text(
+              label,
+              style: SpotType.label.copyWith(
+                color: fg,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ],
         ),
       ),
@@ -808,19 +841,24 @@ class _OptionRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Row(
         children: [
-          Icon(icon,
-              size: 16,
-              color: value ? activeColor : SpotColors.textTertiary),
+          Icon(
+            icon,
+            size: 16,
+            color: value ? activeColor : SpotColors.textTertiary,
+          ),
           const SizedBox(width: SpotSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label,
-                    style: SpotType.bodySecondary.copyWith(
-                        color: value
-                            ? SpotColors.textPrimary
-                            : SpotColors.textSecondary)),
+                Text(
+                  label,
+                  style: SpotType.bodySecondary.copyWith(
+                    color: value
+                        ? SpotColors.textPrimary
+                        : SpotColors.textSecondary,
+                  ),
+                ),
                 Text(subtitle, style: SpotType.caption),
               ],
             ),
@@ -859,11 +897,9 @@ class _MediaStrip extends StatelessWidget {
       height: 90,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding:
-            const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
+        padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
         itemCount: files.length,
-        separatorBuilder: (_, _) =>
-            const SizedBox(width: SpotSpacing.sm),
+        separatorBuilder: (_, _) => const SizedBox(width: SpotSpacing.sm),
         itemBuilder: (ctx, i) {
           final path = files[i].path;
           return Stack(
@@ -877,9 +913,10 @@ class _MediaStrip extends StatelessWidget {
                         color: SpotColors.overlay,
                         child: const Center(
                           child: Icon(
-                              CupertinoIcons.play_circle_fill,
-                              color: Colors.white54,
-                              size: 32),
+                            CupertinoIcons.play_circle_fill,
+                            color: Colors.white54,
+                            size: 32,
+                          ),
                         ),
                       )
                     : Image.file(
@@ -891,8 +928,10 @@ class _MediaStrip extends StatelessWidget {
                           width: 90,
                           height: 90,
                           color: SpotColors.overlay,
-                          child: const Icon(CupertinoIcons.photo,
-                              color: SpotColors.textTertiary),
+                          child: const Icon(
+                            CupertinoIcons.photo,
+                            color: SpotColors.textTertiary,
+                          ),
                         ),
                       ),
               ),
@@ -907,11 +946,13 @@ class _MediaStrip extends StatelessWidget {
                     height: 20,
                     decoration: BoxDecoration(
                       color: Colors.black54,
-                      borderRadius:
-                          BorderRadius.circular(SpotRadius.full),
+                      borderRadius: BorderRadius.circular(SpotRadius.full),
                     ),
-                    child: const Icon(CupertinoIcons.xmark,
-                        size: 11, color: Colors.white),
+                    child: const Icon(
+                      CupertinoIcons.xmark,
+                      size: 11,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -1014,7 +1055,8 @@ class _LegalCheckSheetState extends State<_LegalCheckSheet> {
             const SizedBox(height: SpotSpacing.xl),
             _LegalCheckbox(
               value: _accuracy,
-              label: 'The information I\'m sharing is accurate to the best of my knowledge',
+              label:
+                  'The information I\'m sharing is accurate to the best of my knowledge',
               onChanged: (v) => setState(() => _accuracy = v),
             ),
             _LegalCheckbox(
@@ -1029,7 +1071,8 @@ class _LegalCheckSheetState extends State<_LegalCheckSheet> {
             ),
             _LegalCheckbox(
               value: _legalCompliance,
-              label: 'I confirm this complies with applicable laws in my jurisdiction',
+              label:
+                  'I confirm this complies with applicable laws in my jurisdiction',
               onChanged: (v) => setState(() => _legalCompliance = v),
             ),
             const SizedBox(height: SpotSpacing.xl),
@@ -1041,14 +1084,12 @@ class _LegalCheckSheetState extends State<_LegalCheckSheet> {
                     : null,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
-                  padding:
-                      const EdgeInsets.symmetric(vertical: SpotSpacing.md),
+                  padding: const EdgeInsets.symmetric(vertical: SpotSpacing.md),
                   decoration: BoxDecoration(
                     color: _allChecked
                         ? SpotColors.accent
                         : SpotColors.surfaceHigh,
-                    borderRadius:
-                        BorderRadius.circular(SpotRadius.md),
+                    borderRadius: BorderRadius.circular(SpotRadius.md),
                   ),
                   child: Center(
                     child: Text(
@@ -1072,11 +1113,13 @@ class _LegalCheckSheetState extends State<_LegalCheckSheet> {
                 child: Center(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        vertical: SpotSpacing.sm),
+                      vertical: SpotSpacing.sm,
+                    ),
                     child: Text(
                       'Cancel',
-                      style: SpotType.body
-                          .copyWith(color: SpotColors.textSecondary),
+                      style: SpotType.body.copyWith(
+                        color: SpotColors.textSecondary,
+                      ),
                     ),
                   ),
                 ),
@@ -1124,14 +1167,15 @@ class _LegalCheckbox extends StatelessWidget {
                 borderRadius: BorderRadius.circular(SpotRadius.xs),
               ),
               child: value
-                  ? const Icon(CupertinoIcons.checkmark,
-                      size: 13, color: SpotColors.onAccent)
+                  ? const Icon(
+                      CupertinoIcons.checkmark,
+                      size: 13,
+                      color: SpotColors.onAccent,
+                    )
                   : null,
             ),
             const SizedBox(width: SpotSpacing.sm),
-            Expanded(
-              child: Text(label, style: SpotType.body),
-            ),
+            Expanded(child: Text(label, style: SpotType.body)),
           ],
         ),
       ),
@@ -1157,7 +1201,9 @@ class _TagChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(
-          horizontal: SpotSpacing.md, vertical: SpotSpacing.xs),
+        horizontal: SpotSpacing.md,
+        vertical: SpotSpacing.xs,
+      ),
       decoration: BoxDecoration(
         color: isCategory
             ? SpotColors.accent.withValues(alpha: 0.18)
@@ -1174,24 +1220,29 @@ class _TagChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (isCategory) ...[
-            const Icon(CupertinoIcons.tag_fill,
-                size: 11, color: SpotColors.accent),
+            const Icon(
+              CupertinoIcons.tag_fill,
+              size: 11,
+              color: SpotColors.accent,
+            ),
             const SizedBox(width: 4),
           ],
           Text(
             '#$tag',
             style: SpotType.bodySecondary.copyWith(
               color: SpotColors.accent,
-              fontWeight:
-                  isCategory ? FontWeight.w600 : FontWeight.w400,
+              fontWeight: isCategory ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
           if (canRemove) ...[
             const SizedBox(width: 6),
             GestureDetector(
               onTap: onRemove,
-              child: const Icon(CupertinoIcons.xmark_circle_fill,
-                  size: 14, color: SpotColors.accent),
+              child: const Icon(
+                CupertinoIcons.xmark_circle_fill,
+                size: 14,
+                color: SpotColors.accent,
+              ),
             ),
           ],
         ],
@@ -1219,11 +1270,16 @@ class _LocationRow extends StatelessWidget {
     if (isVirtual) {
       return Row(
         children: [
-          const Icon(CupertinoIcons.gamecontroller,
-              size: 12, color: SpotColors.accent),
+          const Icon(
+            CupertinoIcons.gamecontroller,
+            size: 12,
+            color: SpotColors.accent,
+          ),
           const SizedBox(width: 5),
-          Text('Virtual — location not published',
-              style: SpotType.caption.copyWith(color: SpotColors.accent)),
+          Text(
+            'Virtual — location not published',
+            style: SpotType.caption.copyWith(color: SpotColors.accent),
+          ),
         ],
       );
     }
@@ -1273,8 +1329,12 @@ class _LocationRow extends StatelessWidget {
         Icon(icon, size: 12, color: iconColor),
         const SizedBox(width: 5),
         Expanded(
-          child: Text(label,
-              style: SpotType.caption, maxLines: 1, overflow: TextOverflow.ellipsis),
+          child: Text(
+            label,
+            style: SpotType.caption,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );
