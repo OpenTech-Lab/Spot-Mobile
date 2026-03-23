@@ -51,6 +51,7 @@ class _CameraScreenState extends State<CameraScreen>
 
   GpsLock? _gpsLock;
   String _eventTag = '';
+  String? _spotName;
   // Accumulated media files — up to 4 items per post
   final List<XFile> _capturedFiles = [];
   final List<bool> _capturedIsVideos = [];
@@ -185,20 +186,22 @@ class _CameraScreenState extends State<CameraScreen>
     final primaryHash = hashes.first;
     final paths = processedFiles.map((f) => f.path).toList();
 
+    final effectiveSpotName =
+        _spotName?.trim().isNotEmpty == true ? _spotName!.trim() : null;
+
     final post = MediaPost(
       id: primaryHash,
       pubkey: widget.wallet.publicKeyHex,
       contentHashes: hashes,
       mediaPaths: paths,
-      // Danger mode: coarsen to ~0.5° (≈55 km) instead of stripping entirely.
-      // Virtual mode: GPS is stored locally (for internal use) but the
-      // NostrService will NOT include geo tags in the published event.
-      latitude: _isDangerMode
-          ? _coarseCoord(_gpsLock?.latitude)
-          : _gpsLock?.latitude,
-      longitude: _isDangerMode
-          ? _coarseCoord(_gpsLock?.longitude)
-          : _gpsLock?.longitude,
+      // Exact GPS only for Spot check-ins; coarsen by default.
+      // Virtual mode: GPS is stored locally but NOT published.
+      latitude: effectiveSpotName != null
+          ? _gpsLock?.latitude
+          : _coarseCoord(_gpsLock?.latitude),
+      longitude: effectiveSpotName != null
+          ? _gpsLock?.longitude
+          : _coarseCoord(_gpsLock?.longitude),
       capturedAt: _gpsLock?.timestamp ?? DateTime.now().toUtc(),
       eventTags: effectiveTag != null ? [effectiveTag] : const [],
       isDangerMode: _isDangerMode,
@@ -206,6 +209,7 @@ class _CameraScreenState extends State<CameraScreen>
       caption: caption.isEmpty ? null : caption,
       replyToId: widget.replyToPost?.nostrEventId,
       nostrEventId: primaryHash,
+      spotName: effectiveSpotName,
     );
 
     try {
@@ -300,6 +304,8 @@ class _CameraScreenState extends State<CameraScreen>
             ? _eventTag
             : widget.replyToPost?.eventTag,
         replyToPost: widget.replyToPost,
+        spotName: _spotName,
+        onSpotNameChanged: (v) => setState(() => _spotName = v),
         onConfirm: _publishPost,
         onDiscard: _discardCapture,
         onAddMore: _capturedFiles.length < 4 ? _pickFromGallery : null,
@@ -354,7 +360,7 @@ class _CameraScreenState extends State<CameraScreen>
                     borderRadius: BorderRadius.circular(SpotRadius.xs),
                   ),
                   child: Text(
-                    _isVirtualMode ? 'Virtual · no location published' : 'Protected mode',
+                    _isVirtualMode ? 'Virtual · no location published' : 'Faces blurred',
                     style: SpotType.label.copyWith(
                       color: _isVirtualMode
                           ? SpotColors.onAccent
@@ -526,13 +532,13 @@ class _ControlsPanel extends StatelessWidget {
           ),
           const SizedBox(height: SpotSpacing.md),
 
-          // Mode selector pill — Real / Virtual
+          // Mode selector pill — Standard / Virtual
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _ModePill(
-                label: 'REAL',
-                icon: CupertinoIcons.location_fill,
+                label: 'STANDARD',
+                icon: CupertinoIcons.location,
                 active: !isVirtualMode,
                 activeColor: SpotColors.success,
                 onTap: isVirtualMode ? onVirtualToggle : null,
@@ -645,6 +651,8 @@ class _PreviewScreen extends StatefulWidget {
     this.gpsLock,
     this.eventTag,
     this.replyToPost,
+    this.spotName,
+    this.onSpotNameChanged,
     required this.onConfirm,
     required this.onDiscard,
     this.onAddMore,
@@ -657,6 +665,8 @@ class _PreviewScreen extends StatefulWidget {
   final GpsLock? gpsLock;
   final String? eventTag;
   final MediaPost? replyToPost;
+  final String? spotName;
+  final ValueChanged<String?>? onSpotNameChanged;
   final void Function(String caption) onConfirm;
   final VoidCallback onDiscard;
 
@@ -675,6 +685,51 @@ class _PreviewScreenState extends State<_PreviewScreen> {
   void dispose() {
     _captionController.dispose();
     super.dispose();
+  }
+
+  void _showSpotNameDialog(BuildContext context) {
+    final ctrl = TextEditingController();
+    showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SpotColors.surface,
+        title: Text('Check in at a spot', style: SpotType.heading),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          maxLength: 100,
+          style: SpotType.body,
+          decoration: InputDecoration(
+            hintText: 'e.g. Eiffel Tower, Central Park…',
+            hintStyle: SpotType.body.copyWith(color: SpotColors.textTertiary),
+            counterText: '',
+          ),
+          onSubmitted: (v) {
+            final trimmed = v.trim();
+            if (trimmed.isNotEmpty) {
+              widget.onSpotNameChanged?.call(trimmed);
+            }
+            Navigator.of(ctx).pop();
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancel', style: TextStyle(color: SpotColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () {
+              final trimmed = ctrl.text.trim();
+              if (trimmed.isNotEmpty) {
+                widget.onSpotNameChanged?.call(trimmed);
+              }
+              Navigator.of(ctx).pop();
+            },
+            child: Text('Set', style: TextStyle(color: SpotColors.accent)),
+          ),
+        ],
+      ),
+    ).then((_) => ctrl.dispose());
   }
 
   @override
@@ -881,16 +936,45 @@ class _PreviewScreenState extends State<_PreviewScreen> {
                     label: 'Virtual · location not published',
                     color: SpotColors.accent,
                   )
-                else
+                else ...[
                   _PreviewMetaRow(
-                    icon: widget.isDangerMode
-                        ? CupertinoIcons.shield
-                        : CupertinoIcons.location_fill,
-                    label: _buildGpsLabel(widget.isDangerMode, widget.gpsLock),
-                    color: widget.isDangerMode
-                        ? SpotColors.danger
+                    icon: widget.spotName?.trim().isNotEmpty == true
+                        ? CupertinoIcons.map_pin_ellipse
+                        : CupertinoIcons.location,
+                    label: _buildGpsLabel(
+                      widget.isDangerMode,
+                      widget.gpsLock,
+                      spotName: widget.spotName,
+                    ),
+                    color: widget.spotName?.trim().isNotEmpty == true
+                        ? SpotColors.accent
                         : SpotColors.success,
                   ),
+                  // Spot check-in input
+                  if (!widget.isVirtualMode) ...[
+                    const SizedBox(height: SpotSpacing.xs),
+                    GestureDetector(
+                      onTap: () {
+                        final hasSpot =
+                            widget.spotName?.trim().isNotEmpty == true;
+                        if (hasSpot) {
+                          widget.onSpotNameChanged?.call(null);
+                        } else {
+                          _showSpotNameDialog(context);
+                        }
+                      },
+                      child: _PreviewMetaRow(
+                        icon: CupertinoIcons.map_pin,
+                        label: widget.spotName?.trim().isNotEmpty == true
+                            ? 'Spot: ${widget.spotName!.trim()}  ✕'
+                            : 'Check in at a spot…',
+                        color: widget.spotName?.trim().isNotEmpty == true
+                            ? SpotColors.accent
+                            : SpotColors.textTertiary,
+                      ),
+                    ),
+                  ],
+                ],
                 if (widget.eventTag?.isNotEmpty == true)
                   _PreviewMetaRow(
                     icon: CupertinoIcons.tag,
@@ -1010,26 +1094,30 @@ double? _coarseCoord(double? v) =>
     v == null ? null : (v * 2).roundToDouble() / 2.0;
 
 /// Builds the GPS label shown in the preview screen metadata row.
-/// Normal:    "Japan/Tokyo(35.6897,139.6922)"
-/// Protected: "Japan/Tokyo  (±55 km, faces blurred)" — no exact coords
-String _buildGpsLabel(bool isDangerMode, GpsLock? gpsLock) {
-  if (isDangerMode) {
-    final lat = _coarseCoord(gpsLock?.latitude);
-    final lon = _coarseCoord(gpsLock?.longitude);
-    if (lat == null) return 'Faces blurred · no location';
-    final geo = GeoLookup.instance.nearest(lat, lon!);
-    final place = geo != null ? '${geo.country}/${geo.city}' : '${lat.toStringAsFixed(1)}, ${lon.toStringAsFixed(1)}';
-    return '$place  (±55 km, faces blurred)';
-  }
+/// Default:   "Japan/Tokyo" — city-level only (coarsened)
+/// Spot:      "SpotName · Japan/Tokyo" — exact GPS
+/// Danger:    "Japan/Tokyo  (faces blurred)"
+String _buildGpsLabel(bool isDangerMode, GpsLock? gpsLock, {String? spotName}) {
   if (gpsLock == null) return 'No location';
   final lat = gpsLock.latitude;
   final lon = gpsLock.longitude;
   final geo = GeoLookup.instance.nearest(lat, lon);
-  if (geo != null) {
-    return '${geo.country}/${geo.city}'
-        '(${lat.toStringAsFixed(4)},${lon.toStringAsFixed(4)})';
+  final place = geo != null
+      ? '${geo.country}/${geo.city}'
+      : '${lat.toStringAsFixed(1)}, ${lon.toStringAsFixed(1)}';
+
+  // Spot check-in: show spot name + place
+  if (spotName?.trim().isNotEmpty == true) {
+    return '${spotName!.trim()}  ·  $place';
   }
-  return '${lat.toStringAsFixed(4)}, ${lon.toStringAsFixed(4)}';
+
+  // Danger mode: city-level + face blur note
+  if (isDangerMode) {
+    return '$place  (faces blurred)';
+  }
+
+  // Default: city-level only
+  return place;
 }
 
 class _PreviewMetaRow extends StatelessWidget {

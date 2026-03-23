@@ -639,36 +639,29 @@ class _GpsRow extends StatelessWidget {
     final lat = post.latitude!;
     final lon = post.longitude!;
     final geo = GeoLookup.instance.nearest(lat, lon);
+    final place = geo != null
+        ? '${geo.country}/${geo.city}'
+        : '${lat.toStringAsFixed(1)}, ${lon.toStringAsFixed(1)}';
 
+    final IconData icon;
+    final Color iconColor;
     final String label;
-    if (geo != null) {
-      if (post.isDangerMode) {
-        // Protected mode: country/city only, no coordinates
-        label = '${geo.country}/${geo.city}';
-      } else {
-        // Normal mode: country/city(lat,lon)
-        label =
-            '${geo.country}/${geo.city}'
-            '(${lat.toStringAsFixed(3)},${lon.toStringAsFixed(3)})';
-      }
+
+    if (post.isSpotCheckIn) {
+      // Spot check-in: show spot name + location
+      icon = CupertinoIcons.map_pin_ellipse;
+      iconColor = SpotColors.accent;
+      label = '${post.spotName}  ·  $place';
     } else {
-      // GeoLookup not ready yet — fall back to raw coordinates
-      label = post.isDangerMode
-          ? '${lat.toStringAsFixed(1)}, ${lon.toStringAsFixed(1)}'
-          : '${lat.toStringAsFixed(3)}, ${lon.toStringAsFixed(3)}';
+      // Default: city-level only (all posts are coarsened)
+      icon = CupertinoIcons.location;
+      iconColor = SpotColors.success.withAlpha(160);
+      label = place;
     }
 
     return Row(
       children: [
-        Icon(
-          post.isDangerMode
-              ? CupertinoIcons.location
-              : CupertinoIcons.location_fill,
-          size: 11,
-          color: post.isDangerMode
-              ? SpotColors.warning.withAlpha(160)
-              : SpotColors.success.withAlpha(160),
-        ),
+        Icon(icon, size: 11, color: iconColor),
         const SizedBox(width: 4),
         Expanded(
           child: Text(

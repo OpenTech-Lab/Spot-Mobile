@@ -47,6 +47,9 @@ List<List<String>> _spotOriginTags() => const [
   ['t', spotDiscoveryHashtag],
 ];
 
+/// Coarsen a coordinate to the nearest 0.5° (~55 km) for privacy.
+double _coarseCoord(double v) => (v / 0.5).round() * 0.5;
+
 /// Nostr relay WebSocket client.
 ///
 /// Manages connections to one or more relays and exposes methods to
@@ -187,8 +190,22 @@ class NostrService {
       if (post.replyToId != null) ['e', post.replyToId!, '', 'reply'],
       for (final t in post.eventTags) ['t', t],
       // Virtual posts: GPS is recorded locally but NOT published to Nostr.
-      if (!post.isVirtual && post.latitude != null && post.longitude != null)
-        ['geo', post.latitude.toString(), post.longitude.toString()],
+      // Spot check-in: publish exact GPS + spot tag.
+      // Default: always coarsen GPS to ~0.5° (~55 km).
+      if (!post.isVirtual &&
+          post.latitude != null &&
+          post.longitude != null) ...[
+        if (post.isSpotCheckIn) ...[
+          ['geo', post.latitude.toString(), post.longitude.toString()],
+          ['spot', post.spotName!],
+        ] else ...[
+          [
+            'geo',
+            _coarseCoord(post.latitude!).toString(),
+            _coarseCoord(post.longitude!).toString(),
+          ],
+        ],
+      ],
       if (!post.isTextOnly)
         for (final hash in post.contentHashes) ['media_hash', hash],
       if (post.ipfsCid != null) ['ipfs', post.ipfsCid!],

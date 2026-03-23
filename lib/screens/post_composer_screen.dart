@@ -82,6 +82,8 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
   PostSourceType _sourceType = PostSourceType.firsthand;
   bool _isPublishing = false;
   bool _showOptions = false;
+  String? _spotName;
+  final _spotNameCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -103,6 +105,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
   void dispose() {
     _captionCtrl.dispose();
     _tagInputCtrl.dispose();
+    _spotNameCtrl.dispose();
     _captionFocus.dispose();
     _tagFocus.dispose();
     super.dispose();
@@ -235,17 +238,21 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
       final caption = _captionCtrl.text.trim();
 
+      final effectiveSpotName =
+          _spotName?.trim().isNotEmpty == true ? _spotName!.trim() : null;
+
       final post = MediaPost(
         id: hashes.first,
         pubkey: widget.wallet.publicKeyHex,
         contentHashes: hashes,
         mediaPaths: paths,
-        latitude: _isDangerMode
-            ? _coarseCoord(_gpsLock?.latitude)
-            : _gpsLock?.latitude,
-        longitude: _isDangerMode
-            ? _coarseCoord(_gpsLock?.longitude)
-            : _gpsLock?.longitude,
+        // Exact GPS only for Spot check-ins; coarsen by default.
+        latitude: effectiveSpotName != null
+            ? _gpsLock?.latitude
+            : _coarseCoord(_gpsLock?.latitude),
+        longitude: effectiveSpotName != null
+            ? _gpsLock?.longitude
+            : _coarseCoord(_gpsLock?.longitude),
         capturedAt: _gpsLock?.timestamp ?? DateTime.now().toUtc(),
         eventTags: effectiveTags,
         isDangerMode: _isDangerMode,
@@ -256,6 +263,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
         caption: caption.isEmpty ? null : caption,
         replyToId: widget.replyToPost?.nostrEventId,
         nostrEventId: hashes.first,
+        spotName: effectiveSpotName,
       );
 
       // Register all media files in cache before publishing
@@ -566,6 +574,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
               gpsLock: _gpsLock,
               isVirtual: _isVirtual,
               isDangerMode: _isDangerMode,
+              spotName: _spotName,
             ),
           ),
 
@@ -580,16 +589,23 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
               isVirtual: _isVirtual,
               isAiGenerated: _isAiGenerated,
               sourceType: _sourceType,
+              spotName: _spotName,
+              spotNameCtrl: _spotNameCtrl,
               onDangerChanged: (v) => setState(() {
                 _isDangerMode = v;
                 if (v) _isVirtual = false;
               }),
               onVirtualChanged: (v) => setState(() {
                 _isVirtual = v;
-                if (v) _isDangerMode = false;
+                if (v) {
+                  _isDangerMode = false;
+                  _spotName = null;
+                  _spotNameCtrl.clear();
+                }
               }),
               onAiChanged: (v) => setState(() => _isAiGenerated = v),
               onSourceChanged: (v) => setState(() => _sourceType = v),
+              onSpotNameChanged: (v) => setState(() => _spotName = v),
             ),
             const SizedBox(height: SpotSpacing.sm),
             const Divider(color: SpotColors.border, height: 1, thickness: 0.5),
@@ -622,6 +638,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                       _isDangerMode ||
                       _isVirtual ||
                       _isAiGenerated ||
+                      _spotName?.isNotEmpty == true ||
                       _sourceType == PostSourceType.secondhand,
                 ),
                 const Spacer(),
@@ -683,23 +700,31 @@ class _ComposerOptions extends StatelessWidget {
     required this.isVirtual,
     required this.isAiGenerated,
     required this.sourceType,
+    required this.spotName,
+    required this.spotNameCtrl,
     required this.onDangerChanged,
     required this.onVirtualChanged,
     required this.onAiChanged,
     required this.onSourceChanged,
+    required this.onSpotNameChanged,
   });
 
   final bool isDangerMode;
   final bool isVirtual;
   final bool isAiGenerated;
   final PostSourceType sourceType;
+  final String? spotName;
+  final TextEditingController spotNameCtrl;
   final ValueChanged<bool> onDangerChanged;
   final ValueChanged<bool> onVirtualChanged;
   final ValueChanged<bool> onAiChanged;
   final ValueChanged<PostSourceType> onSourceChanged;
+  final ValueChanged<String?> onSpotNameChanged;
 
   @override
   Widget build(BuildContext context) {
+    final hasSpot = spotName?.isNotEmpty == true;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
       child: Column(
@@ -711,22 +736,11 @@ class _ComposerOptions extends StatelessWidget {
           Row(
             children: [
               _ModePill(
-                icon: CupertinoIcons.location_fill,
-                label: 'Real',
-                active: !isDangerMode && !isVirtual,
+                icon: CupertinoIcons.location,
+                label: 'Standard',
+                active: !isVirtual,
                 activeColor: SpotColors.success,
-                onTap: () {
-                  onDangerChanged(false);
-                  onVirtualChanged(false);
-                },
-              ),
-              const SizedBox(width: SpotSpacing.sm),
-              _ModePill(
-                icon: CupertinoIcons.shield_lefthalf_fill,
-                label: 'Protected',
-                active: isDangerMode,
-                activeColor: SpotColors.danger,
-                onTap: () => onDangerChanged(!isDangerMode),
+                onTap: () => onVirtualChanged(false),
               ),
               const SizedBox(width: SpotSpacing.sm),
               _ModePill(
@@ -739,6 +753,73 @@ class _ComposerOptions extends StatelessWidget {
             ],
           ),
           const SizedBox(height: SpotSpacing.md),
+
+          // ── Spot check-in ─────────────────────────────────────────────────
+          if (!isVirtual) ...[
+            _OptionRow(
+              icon: CupertinoIcons.map_pin_ellipse,
+              label: 'Check in at a spot',
+              subtitle: 'Publish exact location with a place name',
+              value: hasSpot,
+              onChanged: (v) {
+                if (v) {
+                  onSpotNameChanged(spotNameCtrl.text.trim().isEmpty
+                      ? ' '
+                      : spotNameCtrl.text.trim());
+                } else {
+                  spotNameCtrl.clear();
+                  onSpotNameChanged(null);
+                }
+              },
+              activeColor: SpotColors.accent,
+            ),
+            if (hasSpot) ...[
+              const SizedBox(height: SpotSpacing.sm),
+              TextField(
+                controller: spotNameCtrl,
+                style: SpotType.body,
+                maxLength: 100,
+                decoration: InputDecoration(
+                  hintText: 'e.g. Eiffel Tower, Central Park…',
+                  hintStyle: SpotType.body.copyWith(
+                    color: SpotColors.textTertiary,
+                  ),
+                  counterText: '',
+                  filled: true,
+                  fillColor: SpotColors.surfaceHigh,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: SpotSpacing.md,
+                    vertical: SpotSpacing.sm,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(SpotRadius.sm),
+                    borderSide: BorderSide.none,
+                  ),
+                  prefixIcon: const Icon(
+                    CupertinoIcons.map_pin,
+                    size: 16,
+                    color: SpotColors.textTertiary,
+                  ),
+                ),
+                onChanged: (v) {
+                  final trimmed = v.trim();
+                  onSpotNameChanged(trimmed.isEmpty ? ' ' : trimmed);
+                },
+              ),
+            ],
+            const SizedBox(height: SpotSpacing.sm),
+          ],
+
+          // ── Blur faces toggle (danger mode) ────────────────────────────────
+          _OptionRow(
+            icon: CupertinoIcons.shield_lefthalf_fill,
+            label: 'Blur faces',
+            subtitle: 'Automatically blur detected faces',
+            value: isDangerMode,
+            onChanged: onDangerChanged,
+            activeColor: SpotColors.danger,
+          ),
+          const SizedBox(height: SpotSpacing.sm),
 
           // ── AI-generated toggle ────────────────────────────────────────────
           _OptionRow(
@@ -1266,11 +1347,13 @@ class _LocationRow extends StatelessWidget {
     required this.gpsLock,
     required this.isVirtual,
     required this.isDangerMode,
+    this.spotName,
   });
 
   final GpsLock? gpsLock;
   final bool isVirtual;
   final bool isDangerMode;
+  final String? spotName;
 
   @override
   Widget build(BuildContext context) {
@@ -1313,23 +1396,26 @@ class _LocationRow extends StatelessWidget {
     final lat = gpsLock!.latitude;
     final lon = gpsLock!.longitude;
     final geo = GeoLookup.instance.nearest(lat, lon);
+    final hasSpot = spotName != null && spotName!.trim().isNotEmpty;
 
     final IconData icon;
     final Color iconColor;
     final String label;
 
-    if (isDangerMode) {
-      icon = CupertinoIcons.location;
-      iconColor = SpotColors.warning.withAlpha(160);
+    if (hasSpot) {
+      // Spot check-in: show spot name + exact location
+      icon = CupertinoIcons.map_pin_ellipse;
+      iconColor = SpotColors.accent;
       label = geo != null
-          ? '${geo.country} / ${geo.city}  ·  Protected'
-          : '${lat.toStringAsFixed(1)}, ${lon.toStringAsFixed(1)}  ·  Protected';
+          ? '${spotName!.trim()}  ·  ${geo.country} / ${geo.city}'
+          : '${spotName!.trim()}  ·  Exact location';
     } else {
-      icon = CupertinoIcons.location_fill;
+      // Default: city-level only (coarsened)
+      icon = CupertinoIcons.location;
       iconColor = SpotColors.success.withAlpha(160);
       label = geo != null
           ? '${geo.country} / ${geo.city}'
-          : '${lat.toStringAsFixed(3)}, ${lon.toStringAsFixed(3)}';
+          : '${lat.toStringAsFixed(1)}, ${lon.toStringAsFixed(1)}';
     }
 
     return Row(

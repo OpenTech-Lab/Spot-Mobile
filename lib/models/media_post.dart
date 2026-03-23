@@ -60,6 +60,10 @@ class MediaPost {
   /// Nostr and NOT shown to other users in the feed.
   final bool isVirtual;
 
+  /// User-provided place name for a Spot check-in (e.g. "Eiffel Tower").
+  /// When non-null and non-empty, exact GPS is published instead of coarsened.
+  final String? spotName;
+
   /// Optional text caption added by the author at publish time.
   final String? caption;
 
@@ -93,6 +97,7 @@ class MediaPost {
     this.replyToId,
     this.tags = const [],
     required this.nostrEventId,
+    this.spotName,
   });
 
   // ── Convenience getters ────────────────────────────────────────────────────
@@ -107,6 +112,9 @@ class MediaPost {
   String? get mediaPath => mediaPaths.isEmpty ? null : mediaPaths.first;
 
   bool get hasGps => latitude != null && longitude != null;
+
+  /// Whether this post is a Spot check-in with a named place.
+  bool get isSpotCheckIn => spotName != null && spotName!.isNotEmpty;
 
   // ── Serialisation ──────────────────────────────────────────────────────────
 
@@ -131,6 +139,7 @@ class MediaPost {
         'replyToId': replyToId,
         'tags': tags,
         'nostrEventId': nostrEventId,
+        'spotName': spotName,
       };
 
   factory MediaPost.fromJson(Map<String, dynamic> json) => MediaPost(
@@ -162,6 +171,7 @@ class MediaPost {
         replyToId: json['replyToId'] as String?,
         tags: List<String>.from(json['tags'] as List? ?? []),
         nostrEventId: json['nostrEventId'] as String,
+        spotName: json['spotName'] as String?,
       );
 
   MediaPost copyWith({
@@ -185,6 +195,7 @@ class MediaPost {
     String? previewBase64,
     String? previewMimeType,
     PostSourceType? sourceType,
+    String? spotName,
   }) =>
       MediaPost(
         id: id ?? this.id,
@@ -207,6 +218,7 @@ class MediaPost {
         replyToId: replyToId ?? this.replyToId,
         tags: tags ?? this.tags,
         nostrEventId: nostrEventId ?? this.nostrEventId,
+        spotName: spotName ?? this.spotName,
       );
 
   static PostSourceType _parseSourceType(String? value) =>

@@ -450,6 +450,15 @@ class EventRepository {
       }
     }
 
+    // spot tag format: ["spot", "place name"]
+    String? spotName;
+    for (final tag in event.tags) {
+      if (tag.isNotEmpty && tag[0] == 'spot' && tag.length >= 2) {
+        spotName = tag[1];
+        break;
+      }
+    }
+
     // Collect all media hashes (supports multi-file posts)
     final allHashes = event.getAllTagValues('media_hash');
     if (allHashes.isEmpty) allHashes.add(event.id);
@@ -506,6 +515,7 @@ class EventRepository {
           .map((t) => t.join(':'))
           .toList(),
       nostrEventId: event.id,
+      spotName: spotName,
     );
   }
 
