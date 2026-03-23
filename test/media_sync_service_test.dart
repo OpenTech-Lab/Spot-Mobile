@@ -16,7 +16,7 @@ void main() {
       await fetchedFile.writeAsBytes(const [1, 2, 3]);
 
       final service = MediaSyncService(
-        fetchMedia: (contentHash) async {
+        fetchMedia: (contentHash, {authorPubkey}) async {
           if (contentHash == 'hash-a') return fetchedFile;
           return null;
         },
@@ -34,7 +34,9 @@ void main() {
   test(
     'hydratePosts leaves posts unchanged when fetch returns nothing',
     () async {
-      final service = MediaSyncService(fetchMedia: (_) async => null);
+      final service = MediaSyncService(
+        fetchMedia: (_, {authorPubkey}) async => null,
+      );
 
       final updated = await service.hydratePosts([
         _post(contentHashes: const ['hash-a']),

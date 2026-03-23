@@ -2,7 +2,8 @@ import 'dart:io';
 
 import 'package:mobile/models/media_post.dart';
 
-typedef MediaFetcher = Future<File?> Function(String contentHash);
+typedef MediaFetcher =
+    Future<File?> Function(String contentHash, {String? authorPubkey});
 
 class MediaSyncService {
   const MediaSyncService({required this.fetchMedia});
@@ -37,7 +38,10 @@ class MediaSyncService {
         continue;
       }
 
-      final fetched = await fetchMedia(post.contentHashes[i]);
+      final fetched = await fetchMedia(
+        post.contentHashes[i],
+        authorPubkey: post.pubkey,
+      );
       if (fetched != null && fetched.existsSync()) {
         resolvedPaths.add(fetched.path);
         fetchedAny = true;

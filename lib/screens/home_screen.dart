@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/event/event_screen.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
+import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/discover_screen.dart';
 import 'package:mobile/screens/feed_screen.dart';
@@ -32,19 +33,29 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _nostrService = NostrService();
     _eventRepo = EventRepository(nostrService: _nostrService);
+    P2PService.instance.configure(
+      nostrService: _nostrService,
+      wallet: widget.wallet,
+    );
     _nostrService.connect();
+    P2PService.instance.startSwarm();
   }
 
   @override
   void dispose() {
     _eventRepo.dispose();
+    P2PService.instance.stopSwarm();
     _nostrService.disconnect();
     super.dispose();
   }
 
   // Tabs built once and preserved via IndexedStack
   late final List<Widget> _tabs = [
-    FeedScreen(key: _feedKey, nostrService: _nostrService, wallet: widget.wallet),
+    FeedScreen(
+      key: _feedKey,
+      nostrService: _nostrService,
+      wallet: widget.wallet,
+    ),
     DiscoverScreen(nostrService: _nostrService, wallet: widget.wallet),
     _EventsListTab(
       eventRepo: _eventRepo,
@@ -70,24 +81,24 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: _selectedTab == 3
           ? null // ProfileScreen provides its own AppBar with settings button
           : _selectedTab == 0
-              ? AppBar(
-                  backgroundColor: SpotColors.bg,
-                  centerTitle: true,
-                  title: Image.asset(
-                    'assets/logo_transparent.png',
-                    height: 28,
-                    fit: BoxFit.contain,
-                  ),
-                )
-              : _selectedTab == 1
-                  ? AppBar(
-                      backgroundColor: SpotColors.bg,
-                      title: const Text('Discover', style: SpotType.subheading),
-                    )
-                  : AppBar(
-                      backgroundColor: SpotColors.bg,
-                      title: const Text('Events', style: SpotType.subheading),
-                    ),
+          ? AppBar(
+              backgroundColor: SpotColors.bg,
+              centerTitle: true,
+              title: Image.asset(
+                'assets/logo_transparent.png',
+                height: 28,
+                fit: BoxFit.contain,
+              ),
+            )
+          : _selectedTab == 1
+          ? AppBar(
+              backgroundColor: SpotColors.bg,
+              title: const Text('Discover', style: SpotType.subheading),
+            )
+          : AppBar(
+              backgroundColor: SpotColors.bg,
+              title: const Text('Events', style: SpotType.subheading),
+            ),
       body: Stack(
         children: [
           for (int i = 0; i < _tabs.length; i++)
@@ -103,31 +114,33 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
-      floatingActionButton: _selectedTab != 0 && _selectedTab != 1 ? null : GestureDetector(
-        onTap: _openComposer,
-        child: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: SpotColors.bg,
-          ),
-          child: const Icon(
-            CupertinoIcons.plus,
-            color: SpotColors.textSecondary,
-            size: 22,
-          ),
-        ),
-      ),
-      floatingActionButtonLocation: _selectedTab != 0 && _selectedTab != 1 ? null : FloatingActionButtonLocation.endFloat,
+      floatingActionButton: _selectedTab != 0 && _selectedTab != 1
+          ? null
+          : GestureDetector(
+              onTap: _openComposer,
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: SpotColors.bg,
+                ),
+                child: const Icon(
+                  CupertinoIcons.plus,
+                  color: SpotColors.textSecondary,
+                  size: 22,
+                ),
+              ),
+            ),
+      floatingActionButtonLocation: _selectedTab != 0 && _selectedTab != 1
+          ? null
+          : FloatingActionButtonLocation.endFloat,
     );
   }
 
   Widget _buildBottomNav() {
     return Container(
-      decoration: const BoxDecoration(
-        color: SpotColors.bg,
-      ),
+      decoration: const BoxDecoration(color: SpotColors.bg),
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: SpotSpacing.sm),
@@ -335,11 +348,17 @@ class _EventsListTab extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(CupertinoIcons.folder, color: SpotColors.overlay, size: 40),
+            const Icon(
+              CupertinoIcons.folder,
+              color: SpotColors.overlay,
+              size: 40,
+            ),
             const SizedBox(height: SpotSpacing.lg),
             Text(
               'No events yet',
-              style: SpotType.bodySecondary.copyWith(fontWeight: FontWeight.w300),
+              style: SpotType.bodySecondary.copyWith(
+                fontWeight: FontWeight.w300,
+              ),
             ),
           ],
         ),
@@ -387,7 +406,11 @@ class _EventsListTab extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(CupertinoIcons.chevron_right, color: SpotColors.overlay, size: 16),
+                const Icon(
+                  CupertinoIcons.chevron_right,
+                  color: SpotColors.overlay,
+                  size: 16,
+                ),
               ],
             ),
           ),

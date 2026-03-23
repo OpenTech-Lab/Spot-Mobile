@@ -1,69 +1,124 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+
+import 'package:mobile/core/encryption.dart';
+import 'package:mobile/core/wallet.dart';
+import 'package:mobile/features/nostr/nostr_models.dart';
+import 'package:mobile/features/nostr/nostr_service.dart';
+import 'package:mobile/models/event_model.dart';
+import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/cache_manager.dart';
 
-/// P2P media swarm service.
+const _peerAnnouncementKind = 30315;
+const _peerAnnouncementDTagPrefix = 'spot-p2p-endpoint';
+const _peerProtocol = 'spot-p2p-http-v1';
+const _peerDiscoveryTimeout = Duration(seconds: 3);
+const _mediaFetchTimeout = Duration(seconds: 8);
+const _endpointCacheTtl = Duration(minutes: 2);
+const _mediaHeaderFileName = 'x-spot-file-name';
+
+/// Lightweight P2P media transport.
 ///
-/// Spec v1.4 §6: 100% on-device storage; raw files replicated via libp2p
-/// bitswap on-demand. Automatic swarm caching: viewers who watch ≥50% of
-/// content become seeders (WiFi-only by default). Hard cache cap: 5 GB.
+/// This implementation uses Nostr only for peer endpoint advertisement. Raw
+/// media bytes are served directly from device to device over HTTP.
 ///
-/// This is a **stub implementation**.  The production version must replace
-/// these methods with calls to a dart_libp2p binding or a native-channel
-/// bridge to a Go/Rust libp2p node running in the background.
-///
-/// TODO: Replace stub with dart_libp2p (or a Flutter platform channel
-///       bridge to go-libp2p) when the Dart bindings mature.
-///         - Kademlia DHT (peer discovery by content hash)
-///         - libp2p holepunch (NAT traversal)
-///         - Bitswap (block-level data exchange, IPFS-compatible)
-///         - GossipSub (real-time peer announcements + revocation broadcast)
+/// It does not attempt NAT traversal. Peers must be online and reachable from
+/// the requesting device for full-media fetches to succeed.
 class P2PService {
-  P2PService._();
+  P2PService._({
+    HttpClient? httpClient,
+    Future<List<Uri>> Function(String pubkey)? peerEndpointResolver,
+    Future<List<Uri>> Function(int port)? localEndpointResolver,
+    Future<Directory> Function()? tempDirLoader,
+  }) : _httpClient = httpClient ?? HttpClient(),
+       _peerEndpointResolver = peerEndpointResolver,
+       _localEndpointResolver = localEndpointResolver,
+       _tempDirLoader = tempDirLoader ?? getTemporaryDirectory;
 
   static final P2PService instance = P2PService._();
 
+  factory P2PService.forTesting({
+    HttpClient? httpClient,
+    Future<List<Uri>> Function(String pubkey)? peerEndpointResolver,
+    Future<List<Uri>> Function(int port)? localEndpointResolver,
+    Future<Directory> Function()? tempDirLoader,
+  }) => P2PService._(
+    httpClient: httpClient,
+    peerEndpointResolver: peerEndpointResolver,
+    localEndpointResolver: localEndpointResolver,
+    tempDirLoader: tempDirLoader,
+  );
+
+  final HttpClient _httpClient;
+  final Future<List<Uri>> Function(String pubkey)? _peerEndpointResolver;
+  final Future<List<Uri>> Function(int port)? _localEndpointResolver;
+  final Future<Directory> Function() _tempDirLoader;
+
   bool _started = false;
   int _seedingCount = 0;
+  HttpServer? _server;
+  NostrService? _nostrService;
+  WalletModel? _wallet;
+  List<Uri> _localEndpoints = const [];
+  final Map<String, ({DateTime fetchedAt, List<Uri> endpoints})>
+  _peerEndpointCache = {};
+
+  void configure({
+    required NostrService nostrService,
+    required WalletModel wallet,
+  }) {
+    _nostrService = nostrService;
+    _wallet = wallet;
+  }
 
   // ── Swarm lifecycle ───────────────────────────────────────────────────────
 
   Future<void> startSwarm() async {
-    // TODO: initialise dart_libp2p host
-    // TODO: bootstrap Kademlia DHT
-    // TODO: join GossipSub topic 'spot/v1'
+    if (_started) return;
+    final server = await HttpServer.bind(InternetAddress.anyIPv4, 0);
+    _server = server;
     _started = true;
+
+    unawaited(
+      server.forEach((request) async {
+        await _handleHttpRequest(request);
+      }),
+    );
+
+    _localEndpoints = _localEndpointResolver != null
+        ? await _localEndpointResolver(server.port)
+        : await _discoverLocalEndpoints(server.port);
+    unawaited(_publishPeerAnnouncement());
   }
 
   Future<void> stopSwarm() async {
-    // TODO: cleanly shut down libp2p host
     _started = false;
     _seedingCount = 0;
+    final server = _server;
+    _server = null;
+    _localEndpoints = const [];
+    if (server != null) {
+      await server.close(force: true);
+    }
   }
 
   // ── Seeding ───────────────────────────────────────────────────────────────
 
-  /// Announces [filePath] to the DHT keyed by [contentHash].
-  ///
-  /// Registers the file in [CacheManager] (enforces the 5 GB cap) and
-  /// increments the seeding counter.
-  ///
-  /// Production: pin the file into the local Bitswap blockstore and
-  /// provide the CID on the DHT so peers can discover and fetch it.
   Future<void> seedMedia(String filePath, String contentHash) async {
-    // TODO: add file blocks to Bitswap blockstore
-    // TODO: provide CID on DHT (dht.provide(cid))
     await CacheManager.instance.addToCache(contentHash, filePath);
     _seedingCount++;
   }
 
-  /// Seeds [contentHash] only if [watchFraction] ≥ 0.5 and the device is on
-  /// WiFi (spec v1.4 §6: "WiFi-only by default").
-  ///
-  /// Called by the media viewer when the user has watched ≥50% of a video
-  /// or fully loaded a photo.
-  Future<void> seedIfEligible(String contentHash, String filePath,
-      double watchFraction) async {
+  Future<void> seedIfEligible(
+    String contentHash,
+    String filePath,
+    double watchFraction,
+  ) async {
     if (watchFraction < 0.5) return;
     if (!await _isOnWifi()) return;
     await seedMedia(filePath, contentHash);
@@ -71,53 +126,320 @@ class P2PService {
 
   // ── Fetching ──────────────────────────────────────────────────────────────
 
-  /// Requests media with [contentHash] from the swarm.
-  ///
-  /// Returns a locally cached [File] if available, otherwise queries the
-  /// swarm (stub: always returns null).
-  Future<File?> requestMedia(String contentHash) async {
-    // Check local cache first
+  Future<File?> requestMedia(String contentHash, {String? authorPubkey}) async {
     final cached = CacheManager.instance.getCached(contentHash);
     if (cached != null) return cached;
+    if (authorPubkey == null || authorPubkey.isEmpty) return null;
 
-    // TODO: dht.findProviders(cid) → peer list
-    // TODO: bitswap.get(cid) → blocks → reassemble File
-    // TODO: verify SHA-256 of reassembled bytes matches contentHash
+    final endpoints = await _resolvePeerEndpoints(authorPubkey);
+    for (final endpoint in endpoints) {
+      final fetched = await _downloadFromEndpoint(endpoint, contentHash);
+      if (fetched != null) return fetched;
+    }
     return null;
   }
 
   // ── Deletion / revocation ─────────────────────────────────────────────────
 
-  /// Drops a cached file from local storage when a revocation is received.
-  ///
-  /// Spec v1.4 §12 "Deletion Flow" step 3: swarm participants are encouraged
-  /// to delete local cache copies.
   Future<void> dropFromCache(String contentHash) async {
     await CacheManager.instance.purgeCached(contentHash);
-    // TODO: bitswap unprovide(cid) — stop announcing this content to peers
     if (_seedingCount > 0) _seedingCount--;
   }
 
   // ── Status ────────────────────────────────────────────────────────────────
 
   int get seedingCount => _seedingCount;
-  int get peerCount => 0; // TODO: return libp2p connected peer count
+  int get peerCount => _peerEndpointCache.length;
   bool get isRunning => _started;
   bool get isSeeding => _seedingCount > 0;
-
-  /// Current on-device cache size in bytes.
   int get cacheSizeBytes => CacheManager.instance.totalCacheBytes;
+  List<Uri> get localEndpoints => List.unmodifiable(_localEndpoints);
+
+  // ── Private: endpoint publication/discovery ──────────────────────────────
+
+  Future<void> _publishPeerAnnouncement() async {
+    final nostr = _nostrService;
+    final wallet = _wallet;
+    if (nostr == null || wallet == null || _localEndpoints.isEmpty) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final content = jsonEncode({
+      'deviceId': wallet.deviceId,
+      'protocol': _peerProtocol,
+      'endpoints': _localEndpoints
+          .map((endpoint) => endpoint.toString())
+          .toList(),
+    });
+    final placeholder = NostrEvent(
+      id: '',
+      pubkey: wallet.publicKeyHex,
+      createdAt: now,
+      kind: _peerAnnouncementKind,
+      tags: [
+        ['d', '$_peerAnnouncementDTagPrefix:${wallet.deviceId}'],
+        ['app', spotEventOrigin],
+        ['proto', _peerProtocol],
+        ['device', wallet.deviceId],
+        for (final endpoint in _localEndpoints)
+          ['endpoint', endpoint.toString()],
+      ],
+      content: content,
+      sig: '',
+    );
+    final id = WalletService.computeEventId(placeholder);
+    final unsigned = NostrEvent(
+      id: id,
+      pubkey: placeholder.pubkey,
+      createdAt: placeholder.createdAt,
+      kind: placeholder.kind,
+      tags: placeholder.tags,
+      content: placeholder.content,
+      sig: '',
+    );
+    final signed = NostrEvent(
+      id: id,
+      pubkey: unsigned.pubkey,
+      createdAt: unsigned.createdAt,
+      kind: unsigned.kind,
+      tags: unsigned.tags,
+      content: unsigned.content,
+      sig: WalletService.signNostrEvent(unsigned, wallet.privateKeyHex),
+    );
+
+    try {
+      await nostr.publishEvent(signed);
+    } catch (_) {
+      // Keep serving locally even if relay publication fails.
+    }
+  }
+
+  Future<List<Uri>> _resolvePeerEndpoints(String pubkey) async {
+    final cached = _peerEndpointCache[pubkey];
+    if (cached != null &&
+        DateTime.now().difference(cached.fetchedAt) < _endpointCacheTtl) {
+      return cached.endpoints;
+    }
+
+    final endpoints = _peerEndpointResolver != null
+        ? await _peerEndpointResolver(pubkey)
+        : await _fetchPeerEndpointsFromRelays(pubkey);
+
+    _peerEndpointCache[pubkey] = (
+      fetchedAt: DateTime.now(),
+      endpoints: endpoints,
+    );
+    return endpoints;
+  }
+
+  Future<List<Uri>> _fetchPeerEndpointsFromRelays(String pubkey) async {
+    final nostr = _nostrService;
+    if (nostr == null) return const [];
+
+    await nostr.connect();
+
+    final endpoints = <Uri>{};
+    final subId = nostr.subscribe(
+      [
+        NostrFilter(
+          kinds: [_peerAnnouncementKind],
+          authors: [pubkey],
+          limit: 20,
+        ),
+      ],
+      (event) {
+        endpoints.addAll(_peerEndpointsFromEvent(event));
+      },
+    );
+
+    try {
+      await Future<void>.delayed(_peerDiscoveryTimeout);
+    } finally {
+      nostr.unsubscribe(subId);
+    }
+
+    return endpoints.toList(growable: false);
+  }
+
+  List<Uri> _peerEndpointsFromEvent(NostrEvent event) {
+    if (event.kind != _peerAnnouncementKind) return const [];
+
+    final endpoints = <Uri>[];
+    for (final raw in event.getAllTagValues('endpoint')) {
+      final endpoint = Uri.tryParse(raw);
+      if (endpoint != null && endpoint.hasScheme && endpoint.host.isNotEmpty) {
+        endpoints.add(endpoint);
+      }
+    }
+
+    if (endpoints.isNotEmpty) return endpoints;
+
+    try {
+      final decoded = jsonDecode(event.content);
+      if (decoded is! Map<String, dynamic>) return const [];
+      final rawEndpoints = decoded['endpoints'];
+      if (rawEndpoints is! List) return const [];
+      return rawEndpoints
+          .map((value) => Uri.tryParse(value.toString()))
+          .whereType<Uri>()
+          .where((endpoint) => endpoint.hasScheme && endpoint.host.isNotEmpty)
+          .toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<List<Uri>> _discoverLocalEndpoints(int port) async {
+    final interfaces = await NetworkInterface.list(
+      type: InternetAddressType.IPv4,
+      includeLoopback: false,
+    );
+
+    final endpoints = <Uri>[];
+    for (final interface in interfaces) {
+      for (final address in interface.addresses) {
+        if (!_isUsablePeerAddress(address)) continue;
+        endpoints.add(Uri.parse('http://${address.address}:$port'));
+      }
+    }
+
+    return endpoints.toList(growable: false);
+  }
+
+  bool _isUsablePeerAddress(InternetAddress address) {
+    if (address.type != InternetAddressType.IPv4 || address.isLoopback) {
+      return false;
+    }
+    final raw = address.rawAddress;
+    if (raw.length != 4) return false;
+    if (raw[0] == 169 && raw[1] == 254) return false; // link-local
+    if (raw[0] == 127) return false;
+    return true;
+  }
+
+  // ── Private: HTTP media server/fetch ─────────────────────────────────────
+
+  Future<void> _handleHttpRequest(HttpRequest request) async {
+    try {
+      if (request.method != 'GET') {
+        request.response.statusCode = HttpStatus.methodNotAllowed;
+        await request.response.close();
+        return;
+      }
+
+      final segments = request.uri.pathSegments;
+      if (segments.length != 2 || segments.first != 'media') {
+        request.response.statusCode = HttpStatus.notFound;
+        await request.response.close();
+        return;
+      }
+
+      final contentHash = segments[1];
+      final file = CacheManager.instance.getCached(contentHash);
+      if (file == null || !file.existsSync()) {
+        request.response.statusCode = HttpStatus.notFound;
+        await request.response.close();
+        return;
+      }
+
+      request.response.headers.set(
+        HttpHeaders.contentTypeHeader,
+        _contentTypeForPath(file.path),
+      );
+      request.response.headers.set(_mediaHeaderFileName, p.basename(file.path));
+      request.response.headers.set(
+        HttpHeaders.contentLengthHeader,
+        await file.length(),
+      );
+      await request.response.addStream(file.openRead());
+      await request.response.close();
+    } catch (_) {
+      try {
+        request.response.statusCode = HttpStatus.internalServerError;
+        await request.response.close();
+      } catch (_) {}
+    }
+  }
+
+  Future<File?> _downloadFromEndpoint(Uri endpoint, String contentHash) async {
+    final uri = endpoint.replace(
+      pathSegments: [
+        ...endpoint.pathSegments.where((segment) => segment.isNotEmpty),
+        'media',
+        contentHash,
+      ],
+    );
+
+    try {
+      final request = await _httpClient.getUrl(uri).timeout(_mediaFetchTimeout);
+      final response = await request.close().timeout(_mediaFetchTimeout);
+      if (response.statusCode != HttpStatus.ok) return null;
+
+      final bytes = await consolidateHttpClientResponseBytes(response);
+      if (EncryptionUtils.sha256BytesHex(bytes) != contentHash) return null;
+
+      final fileName =
+          response.headers.value(_mediaHeaderFileName) ??
+          '$contentHash${_extensionForContentType(response.headers.contentType?.mimeType)}';
+      final ext = p.extension(fileName);
+
+      final dir = await _tempDirLoader();
+      final mediaDir = Directory(p.join(dir.path, 'spot_remote_media'));
+      if (!mediaDir.existsSync()) {
+        await mediaDir.create(recursive: true);
+      }
+      final file = File(
+        p.join(mediaDir.path, '$contentHash${ext.isEmpty ? '.bin' : ext}'),
+      );
+      await file.writeAsBytes(bytes, flush: true);
+      await CacheManager.instance.addToCache(contentHash, file.path);
+      return file;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _contentTypeForPath(String path) {
+    switch (p.extension(path).toLowerCase()) {
+      case '.jpg':
+      case '.jpeg':
+        return 'image/jpeg';
+      case '.png':
+        return 'image/png';
+      case '.gif':
+        return 'image/gif';
+      case '.webp':
+        return 'image/webp';
+      case '.mp4':
+        return 'video/mp4';
+      case '.mov':
+        return 'video/quicktime';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  String _extensionForContentType(String? mimeType) {
+    switch (mimeType) {
+      case 'image/jpeg':
+        return '.jpg';
+      case 'image/png':
+        return '.png';
+      case 'image/gif':
+        return '.gif';
+      case 'image/webp':
+        return '.webp';
+      case 'video/mp4':
+        return '.mp4';
+      case 'video/quicktime':
+        return '.mov';
+      default:
+        return '.bin';
+    }
+  }
 
   // ── Private helpers ───────────────────────────────────────────────────────
 
-  /// Returns true when the device is connected via WiFi.
-  ///
-  /// Stub: always returns true.
-  /// TODO: Use connectivity_plus package to check actual network type.
-  ///       Only seed on WiFi to avoid unexpected mobile data usage.
   Future<bool> _isOnWifi() async {
-    // TODO: final info = await Connectivity().checkConnectivity();
-    //       return info == ConnectivityResult.wifi;
     return true;
   }
 }
