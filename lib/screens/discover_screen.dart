@@ -12,6 +12,7 @@ import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/feed_scoring_service.dart';
 import 'package:mobile/services/location_service.dart';
+import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
@@ -81,6 +82,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       _isLoading = true;
     });
     try {
+      await _loadPersistedPosts();
       await widget.nostrService.connect();
       _sub = _repo.subscribeToEvents().listen(_onEvent);
     } catch (_) {} finally {
@@ -92,6 +94,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     if (!mounted) return;
     final merged = _mergePosts(_posts, event.posts);
     if (merged.length == _posts.length) return;
+    unawaited(LocalPostStore.instance.savePosts(event.posts));
     setState(() => _posts = merged);
   }
 
@@ -110,6 +113,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         _userLon = pos.longitude;
       });
     }
+  }
+
+  Future<void> _loadPersistedPosts() async {
+    final persisted = await LocalPostStore.instance.loadPosts();
+    if (!mounted || persisted.isEmpty) return;
+    setState(() => _posts = _mergePosts(_posts, persisted));
   }
 
   List<MediaPost> _mergePosts(

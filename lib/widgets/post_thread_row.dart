@@ -303,6 +303,8 @@ class _PostMedia extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (post.isTextOnly) return const SizedBox.shrink();
+
     // Collect all locally available paths (danger-mode images show blurred)
     final availablePaths = post.mediaPaths
         .where((p) => File(p).existsSync())
@@ -370,7 +372,7 @@ class _PostMedia extends StatelessWidget {
           const Icon(CupertinoIcons.photo,
               color: SpotColors.overlay, size: 26),
           const SizedBox(height: SpotSpacing.xs),
-          Text('Media not cached',
+          Text('Media not synced yet',
               style:
                   SpotType.caption.copyWith(color: SpotColors.textTertiary)),
         ],

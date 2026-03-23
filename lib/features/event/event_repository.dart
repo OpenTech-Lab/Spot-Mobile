@@ -63,14 +63,20 @@ class EventRepository {
 
   /// Returns true if [event] is marked as originating from Spot.
   ///
-  /// New events carry the relay-indexable single-letter marker (`d:spot`) while
-  /// older events only have the legacy multi-letter marker (`app:spot`).
+  /// New events carry the hidden relay-indexed discovery hashtag
+  /// (`t:spotapp`). Older events may still only have the historical
+  /// `d:spot` or `app:spot` markers, which are accepted client-side when such
+  /// events arrive via generic/echo paths.
   static bool isSpotEvent(NostrEvent event) =>
       event.getTagValue(spotRelayMarkerTag) == spotEventOrigin ||
-      event.getTagValue(legacySpotAppTag) == spotEventOrigin;
+      event.getTagValue(legacySpotAppTag) == spotEventOrigin ||
+      event.getAllTagValues('t').contains(spotDiscoveryHashtag);
 
-  /// Builds kind-1 filters for Spot posts using both the new indexed marker
-  /// and the legacy tag, with an optional client-side-filtered fallback.
+  /// Builds kind-1 filters for Spot posts using only relay-indexed tags.
+  ///
+  /// Public relays reject REQs containing unindexed tag filters such as
+  /// `#d` or `#app`, so Spot discovery queries must use the hidden `#t`
+  /// marker instead.
   static List<NostrFilter> buildSpotPostFilters({
     List<String>? authors,
     int? since,
@@ -86,17 +92,7 @@ class EventRepository {
         until: until,
         limit: limit,
         tags: {
-          spotRelayMarkerTag: [spotEventOrigin],
-        },
-      ),
-      NostrFilter(
-        kinds: [1],
-        authors: authors,
-        since: since,
-        until: until,
-        limit: limit,
-        tags: {
-          legacySpotAppTag: [spotEventOrigin],
+          't': [spotDiscoveryHashtag],
         },
       ),
     ];
@@ -117,6 +113,9 @@ class EventRepository {
   }
 
   /// Builds moderation-event filters used for deletes and reports.
+  ///
+  /// These queries also rely on the hidden relay-indexed `#t` marker so the
+  /// REQ remains valid on public relays.
   static List<NostrFilter> buildSpotModerationFilters({
     List<String>? authors,
     int? since,
@@ -132,17 +131,7 @@ class EventRepository {
         until: until,
         limit: limit,
         tags: {
-          spotRelayMarkerTag: [spotEventOrigin],
-        },
-      ),
-      NostrFilter(
-        kinds: [5, 1984],
-        authors: authors,
-        since: since,
-        until: until,
-        limit: limit,
-        tags: {
-          legacySpotAppTag: [spotEventOrigin],
+          't': [spotDiscoveryHashtag],
         },
       ),
     ];
@@ -360,11 +349,11 @@ class EventRepository {
     // Client-side blocklist filter: drop if any file hash is blocked
     if (hashes.any(CacheManager.instance.isBlocked)) return;
 
-    final hashtag = event.getTagValue('t');
+    final allTags = _visibleSpotTags(event.getAllTagValues('t'));
+    final hashtag = allTags.isEmpty ? null : allTags.first;
     // Posts without an event tag go into '_unsorted' so they still appear in
     // the feed — spec does not require a hashtag on every post.
     final bucket = hashtag ?? '_unsorted';
-    final allTags = event.getAllTagValues('t');
     final post = _nostrEventToMediaPost(event, allTags);
     _mergePost(bucket, post);
   }
@@ -437,8 +426,11 @@ class EventRepository {
 
   /// Public static helper used by [FeedScreen] to convert raw Nostr events
   /// received via ad-hoc subscriptions into [MediaPost] objects.
-  static MediaPost nostrEventToPost(NostrEvent event, String? hashtag) =>
-      _nostrEventToMediaPost(event, hashtag != null ? [hashtag] : []);
+  static MediaPost nostrEventToPost(NostrEvent event) =>
+      _nostrEventToMediaPost(event, _visibleSpotTags(event.getAllTagValues('t')));
+
+  static List<String> _visibleSpotTags(Iterable<String> tags) =>
+      tags.where((tag) => tag != spotDiscoveryHashtag).toList(growable: false);
 
   static MediaPost _nostrEventToMediaPost(
     NostrEvent event,
@@ -497,6 +489,7 @@ class EventRepository {
       isDangerMode: event.getTagValue('danger') == '1',
       isVirtual: event.getTagValue('virtual') == '1',
       isAiGenerated: event.getTagValue('ai_content') == '1',
+      isTextOnly: event.getTagValue('text_only') == '1',
       sourceType: event.getTagValue('source') == 'secondhand'
           ? PostSourceType.secondhand
           : PostSourceType.firsthand,

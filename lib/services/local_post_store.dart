@@ -5,8 +5,8 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:mobile/models/media_post.dart';
 
-/// Persists authored posts locally so they survive app reloads before relays
-/// re-deliver the same events from history.
+/// Persists locally-seen posts so feed metadata survives app reloads even
+/// before relays re-deliver the same events from history.
 class LocalPostStore {
   LocalPostStore._();
 
@@ -22,9 +22,15 @@ class LocalPostStore {
   }
 
   Future<void> savePost(MediaPost post) async {
+    await savePosts([post]);
+  }
+
+  Future<void> savePosts(Iterable<MediaPost> incoming) async {
     final posts = await _readPosts();
     final byId = {for (final existing in posts) existing.id: existing};
-    byId[post.id] = post;
+    for (final post in incoming) {
+      byId[post.id] = post;
+    }
     await _writePosts(byId.values);
   }
 

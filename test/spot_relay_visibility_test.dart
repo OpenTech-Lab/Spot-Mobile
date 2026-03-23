@@ -31,13 +31,31 @@ void main() {
 
       expect(event.getTagValue(spotRelayMarkerTag), spotEventOrigin);
       expect(event.getTagValue(legacySpotAppTag), spotEventOrigin);
-      expect(event.getAllTagValues('t'), ['tokyo']);
+      expect(event.getAllTagValues('t'), containsAll([spotDiscoveryHashtag, 'tokyo']));
       expect(event.content, contains('Test post'));
       await service.disconnect();
     });
 
+    test('publishMediaPost marks text-only posts without media_hash tags', () async {
+      acceptedRelay = await _TestRelay.start(name: 'accepted');
+      final service = NostrService(relayUrls: [acceptedRelay!.url]);
+
+      final event = await service.publishMediaPost(
+        _post().copyWith(
+          contentHashes: const ['temp-hash'],
+          mediaPaths: const [],
+          isTextOnly: true,
+        ),
+        _wallet(),
+      );
+
+      expect(event.getTagValue('text_only'), '1');
+      expect(event.getAllTagValues('media_hash'), isEmpty);
+      await service.disconnect();
+    });
+
     test(
-      'buildSpotPostFilters includes indexed, legacy, and fallback filters',
+      'buildSpotPostFilters uses only indexed discovery tag plus fallback',
       () {
         final filters = EventRepository.buildSpotPostFilters(
           authors: const ['author-1'],
@@ -47,23 +65,49 @@ void main() {
           includeGenericFallback: true,
         );
 
-        expect(filters, hasLength(3));
-        expect(filters[0].toJson()['#d'], [spotEventOrigin]);
-        expect(filters[1].toJson()['#app'], [spotEventOrigin]);
-        expect(filters[2].toJson().containsKey('#d'), isFalse);
-        expect(filters[2].toJson().containsKey('#app'), isFalse);
-        expect(filters[2].toJson()['authors'], ['author-1']);
-        expect(filters[2].toJson()['since'], 10);
-        expect(filters[2].toJson()['until'], 20);
+        expect(filters, hasLength(2));
+        expect(filters[0].toJson()['#t'], [spotDiscoveryHashtag]);
+        expect(filters[0].toJson().containsKey('#d'), isFalse);
+        expect(filters[0].toJson().containsKey('#app'), isFalse);
+        expect(filters[1].toJson().containsKey('#d'), isFalse);
+        expect(filters[1].toJson().containsKey('#app'), isFalse);
+        expect(filters[1].toJson().containsKey('#t'), isFalse);
+        expect(filters[1].toJson()['authors'], ['author-1']);
+        expect(filters[1].toJson()['since'], 10);
+        expect(filters[1].toJson()['until'], 20);
       },
     );
 
-    test('isSpotEvent accepts indexed and legacy markers', () {
+    test(
+      'buildSpotModerationFilters uses only indexed discovery tag plus fallback',
+      () {
+        final filters = EventRepository.buildSpotModerationFilters(
+          authors: const ['author-1'],
+          since: 10,
+          until: 20,
+          limit: 30,
+          includeGenericFallback: true,
+        );
+
+        expect(filters, hasLength(2));
+        expect(filters[0].toJson()['#t'], [spotDiscoveryHashtag]);
+        expect(filters[0].toJson()['kinds'], [5, 1984]);
+        expect(filters[0].toJson().containsKey('#d'), isFalse);
+        expect(filters[0].toJson().containsKey('#app'), isFalse);
+        expect(filters[1].toJson().containsKey('#t'), isFalse);
+        expect(filters[1].toJson()['authors'], ['author-1']);
+      },
+    );
+
+    test('isSpotEvent accepts indexed, legacy, and discovery markers', () {
       final indexedEvent = _eventWithTags([
         [spotRelayMarkerTag, spotEventOrigin],
       ]);
       final legacyEvent = _eventWithTags([
         [legacySpotAppTag, spotEventOrigin],
+      ]);
+      final discoveryEvent = _eventWithTags([
+        ['t', spotDiscoveryHashtag],
       ]);
       final foreignEvent = _eventWithTags([
         ['app', 'other-client'],
@@ -71,7 +115,21 @@ void main() {
 
       expect(EventRepository.isSpotEvent(indexedEvent), isTrue);
       expect(EventRepository.isSpotEvent(legacyEvent), isTrue);
+      expect(EventRepository.isSpotEvent(discoveryEvent), isTrue);
       expect(EventRepository.isSpotEvent(foreignEvent), isFalse);
+    });
+
+    test('nostrEventToPost strips the hidden Spot discovery hashtag', () {
+      final event = _eventWithTags([
+        [spotRelayMarkerTag, spotEventOrigin],
+        ['t', spotDiscoveryHashtag],
+        ['t', 'tokyo'],
+        ['t', 'news'],
+      ]);
+
+      final post = EventRepository.nostrEventToPost(event);
+
+      expect(post.eventTags, ['tokyo', 'news']);
     });
 
     test('connect only reports relays after websocket readiness', () async {

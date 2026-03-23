@@ -203,6 +203,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
     try {
       final hashes = <String>[];
       final paths = <String>[];
+      var isTextOnly = false;
 
       for (final xfile in _mediaFiles) {
         final bytes = await File(xfile.path).readAsBytes();
@@ -212,6 +213,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
       // Text-only post: derive a deterministic temp ID from caption + timestamp
       if (hashes.isEmpty) {
+        isTextOnly = true;
         final caption = _captionCtrl.text.trim();
         hashes.add(
           EncryptionUtils.sha256Hex(
@@ -245,6 +247,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
         isDangerMode: _isDangerMode,
         isVirtual: _isVirtual,
         isAiGenerated: _isAiGenerated,
+        isTextOnly: isTextOnly,
         sourceType: _sourceType,
         caption: caption.isEmpty ? null : caption,
         replyToId: widget.replyToPost?.nostrEventId,
@@ -266,6 +269,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
       final savedPost = post.copyWith(
         id: signed.id,
         nostrEventId: signed.id,
+        contentHashes: isTextOnly ? [signed.id] : post.contentHashes,
         capturedAt: DateTime.fromMillisecondsSinceEpoch(
           signed.createdAt * 1000,
         ),

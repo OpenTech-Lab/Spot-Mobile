@@ -29,12 +29,19 @@ const legacySpotAppTag = 'app';
 /// Shared tag value identifying events originating from Spot.
 const spotEventOrigin = 'spot';
 
+/// Hidden hashtag marker used for relay discovery on public feeds.
+///
+/// Public relays reliably index `t` tags, so every Spot event also carries
+/// this internal marker to make cross-device feed discovery more reliable.
+const spotDiscoveryHashtag = 'spotapp';
+
 /// Nostr event kind for short text / media posts (NIP-01).
 const _kindTextNote = 1;
 
 List<List<String>> _spotOriginTags() => const [
   [spotRelayMarkerTag, spotEventOrigin],
   [legacySpotAppTag, spotEventOrigin],
+  ['t', spotDiscoveryHashtag],
 ];
 
 /// Nostr relay WebSocket client.
@@ -181,11 +188,13 @@ class NostrService {
       // Virtual posts: GPS is recorded locally but NOT published to Nostr.
       if (!post.isVirtual && post.latitude != null && post.longitude != null)
         ['geo', post.latitude.toString(), post.longitude.toString()],
-      for (final hash in post.contentHashes) ['media_hash', hash],
+      if (!post.isTextOnly)
+        for (final hash in post.contentHashes) ['media_hash', hash],
       if (post.ipfsCid != null) ['ipfs', post.ipfsCid!],
       if (post.isDangerMode) ['danger', '1'],
       if (post.isVirtual) ['virtual', '1'],
       if (post.isAiGenerated) ['ai_content', '1'],
+      if (post.isTextOnly) ['text_only', '1'],
       ['source', post.sourceType.name],
     ];
 

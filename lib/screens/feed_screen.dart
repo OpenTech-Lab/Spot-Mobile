@@ -92,6 +92,7 @@ class FeedScreenState extends State<FeedScreen>
     if (!mounted) return;
     final merged = _mergePosts(_posts, event.posts);
     if (merged.length == _posts.length) return;
+    unawaited(LocalPostStore.instance.savePosts(event.posts));
     setState(() => _posts = merged);
   }
 
@@ -104,9 +105,7 @@ class FeedScreenState extends State<FeedScreen>
   }
 
   Future<void> _loadPersistedPosts() async {
-    final persisted = await LocalPostStore.instance.loadPosts(
-      authorPubkey: widget.wallet.publicKeyHex,
-    );
+    final persisted = await LocalPostStore.instance.loadPosts();
     final visible = persisted
         .where(
           (post) => post.contentHashes.every(
@@ -139,7 +138,7 @@ class FeedScreenState extends State<FeedScreen>
         (event) {
           if (!EventRepository.isSpotEvent(event)) return;
           _repo.addPost(
-            EventRepository.nostrEventToPost(event, event.getTagValue('t')),
+            EventRepository.nostrEventToPost(event),
           );
         },
       );

@@ -44,6 +44,9 @@ class MediaPost {
   /// Whether the media/text was generated or significantly assisted by AI.
   final bool isAiGenerated;
 
+  /// Whether this post is text-only and carries no downloadable media.
+  final bool isTextOnly;
+
   /// Whether this is the author's own account or a secondhand report.
   final PostSourceType sourceType;
 
@@ -77,6 +80,7 @@ class MediaPost {
     this.isDangerMode = false,
     this.isVirtual = false,
     this.isAiGenerated = false,
+    this.isTextOnly = false,
     this.sourceType = PostSourceType.firsthand,
     this.caption,
     this.replyToId,
@@ -112,6 +116,7 @@ class MediaPost {
         'isDangerMode': isDangerMode,
         'isVirtual': isVirtual,
         'isAiGenerated': isAiGenerated,
+        'isTextOnly': isTextOnly,
         'sourceType': sourceType.name,
         'caption': caption,
         'replyToId': replyToId,
@@ -140,6 +145,7 @@ class MediaPost {
         isDangerMode: json['isDangerMode'] as bool? ?? false,
         isVirtual: json['isVirtual'] as bool? ?? false,
         isAiGenerated: json['isAiGenerated'] as bool? ?? false,
+        isTextOnly: json['isTextOnly'] as bool? ?? false,
         sourceType: _parseSourceType(json['sourceType'] as String?),
         caption: json['caption'] as String?,
         replyToId: json['replyToId'] as String?,
@@ -164,6 +170,7 @@ class MediaPost {
     String? nostrEventId,
     bool? isVirtual,
     bool? isAiGenerated,
+    bool? isTextOnly,
     PostSourceType? sourceType,
   }) =>
       MediaPost(
@@ -179,6 +186,7 @@ class MediaPost {
         isDangerMode: isDangerMode ?? this.isDangerMode,
         isVirtual: isVirtual ?? this.isVirtual,
         isAiGenerated: isAiGenerated ?? this.isAiGenerated,
+        isTextOnly: isTextOnly ?? this.isTextOnly,
         sourceType: sourceType ?? this.sourceType,
         caption: caption ?? this.caption,
         replyToId: replyToId ?? this.replyToId,
