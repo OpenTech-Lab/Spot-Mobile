@@ -64,6 +64,12 @@ class MediaPost {
   /// When non-null and non-empty, exact GPS is published instead of coarsened.
   final String? spotName;
 
+  /// Number of replies to this post (computed at display time).
+  final int replyCount;
+
+  /// Number of likes / reactions on this post (computed at display time).
+  final int likeCount;
+
   /// Optional text caption added by the author at publish time.
   final String? caption;
 
@@ -98,6 +104,8 @@ class MediaPost {
     this.tags = const [],
     required this.nostrEventId,
     this.spotName,
+    this.replyCount = 0,
+    this.likeCount = 0,
   });
 
   // ── Convenience getters ────────────────────────────────────────────────────
@@ -140,6 +148,8 @@ class MediaPost {
         'tags': tags,
         'nostrEventId': nostrEventId,
         'spotName': spotName,
+        'replyCount': replyCount,
+        'likeCount': likeCount,
       };
 
   factory MediaPost.fromJson(Map<String, dynamic> json) => MediaPost(
@@ -172,6 +182,8 @@ class MediaPost {
         tags: List<String>.from(json['tags'] as List? ?? []),
         nostrEventId: json['nostrEventId'] as String,
         spotName: json['spotName'] as String?,
+        replyCount: json['replyCount'] as int? ?? 0,
+        likeCount: json['likeCount'] as int? ?? 0,
       );
 
   MediaPost copyWith({
@@ -196,6 +208,8 @@ class MediaPost {
     String? previewMimeType,
     PostSourceType? sourceType,
     String? spotName,
+    int? replyCount,
+    int? likeCount,
   }) =>
       MediaPost(
         id: id ?? this.id,
@@ -219,6 +233,8 @@ class MediaPost {
         tags: tags ?? this.tags,
         nostrEventId: nostrEventId ?? this.nostrEventId,
         spotName: spotName ?? this.spotName,
+        replyCount: replyCount ?? this.replyCount,
+        likeCount: likeCount ?? this.likeCount,
       );
 
   static PostSourceType _parseSourceType(String? value) =>

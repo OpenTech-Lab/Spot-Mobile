@@ -17,6 +17,43 @@ List<String> visibleThreadTagsForPost(MediaPost post) {
   return post.eventTags.sublist(1);
 }
 
+@immutable
+class ThreadHeaderLocation {
+  const ThreadHeaderLocation({required this.label, required this.fullLabel});
+
+  final String label;
+  final String fullLabel;
+
+  bool get isExpandable => fullLabel != label;
+}
+
+ThreadHeaderLocation threadHeaderLocationForPost(
+  MediaPost post, {
+  GeoLocation? geoLocation,
+}) {
+  if (post.isVirtual) {
+    return const ThreadHeaderLocation(label: 'Virtual', fullLabel: 'Virtual');
+  }
+
+  if (!post.hasGps) {
+    return const ThreadHeaderLocation(
+      label: 'Location hidden',
+      fullLabel: 'Location hidden',
+    );
+  }
+
+  final geo = geoLocation ?? _geoLocationForPost(post);
+  final shortLabel = geo?.country ?? _coordinateLocationLabelForPost(post);
+  final fullPlace = geo != null
+      ? '${geo.country}/${geo.city}'
+      : _coordinateLocationLabelForPost(post);
+  final fullLabel = post.isSpotCheckIn
+      ? '${post.spotName}  ·  $fullPlace'
+      : fullPlace;
+
+  return ThreadHeaderLocation(label: shortLabel, fullLabel: fullLabel);
+}
+
 /// Twitter/Threads-style thread row for a single [MediaPost].
 ///
 /// Set [isLast] to true on the final row to suppress the connector line.
@@ -27,6 +64,7 @@ class PostThreadRow extends StatelessWidget {
     required this.isLast,
     this.onAvatarTap,
     this.onReply,
+    this.onLike,
     this.onDelete,
     this.onReport,
   });
@@ -35,6 +73,7 @@ class PostThreadRow extends StatelessWidget {
   final bool isLast;
   final VoidCallback? onAvatarTap;
   final VoidCallback? onReply;
+  final VoidCallback? onLike;
   final VoidCallback? onDelete;
   final VoidCallback? onReport;
 
@@ -126,6 +165,7 @@ class PostThreadRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visibleTags = visibleThreadTagsForPost(post);
+    final headerLocation = threadHeaderLocationForPost(post);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         SpotSpacing.lg,
@@ -174,16 +214,28 @@ class PostThreadRow extends StatelessWidget {
                     // Author + timestamp + menu
                     Row(
                       children: [
-                        Text(
-                          _shortKey(post.pubkey),
-                          style: SpotType.bodySecondary,
-                        ),
-                        const SizedBox(width: SpotSpacing.xs),
-                        Text('·', style: SpotType.caption),
-                        const SizedBox(width: SpotSpacing.xs),
-                        Text(
-                          _relativeTime(post.capturedAt),
-                          style: SpotType.caption,
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Text(
+                                _shortKey(post.pubkey),
+                                style: SpotType.bodySecondary,
+                              ),
+                              const SizedBox(width: SpotSpacing.sm),
+                              Flexible(
+                                child: ThreadHeaderLocationLabel(
+                                  location: headerLocation,
+                                ),
+                              ),
+                              const SizedBox(width: SpotSpacing.xs),
+                              Text('·', style: SpotType.caption),
+                              const SizedBox(width: SpotSpacing.xs),
+                              Text(
+                                _relativeTime(post.capturedAt),
+                                style: SpotType.caption,
+                              ),
+                            ],
+                          ),
                         ),
                         if (post.isDangerMode) ...[
                           const SizedBox(width: SpotSpacing.sm),
@@ -270,37 +322,43 @@ class PostThreadRow extends StatelessWidget {
                     const SizedBox(height: SpotSpacing.sm),
                     // Media
                     _PostMedia(post: post),
-                    const SizedBox(height: SpotSpacing.sm),
-                    // GPS row
-                    _GpsRow(post: post),
-                    // Reply button
-                    if (onReply != null) ...[
-                      const SizedBox(height: SpotSpacing.xs),
-                      GestureDetector(
-                        onTap: onReply,
-                        behavior: HitTestBehavior.opaque,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                CupertinoIcons.arrow_turn_up_left,
-                                size: 13,
-                                color: SpotColors.textTertiary,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Reply',
-                                style: SpotType.caption.copyWith(
-                                  color: SpotColors.textTertiary,
-                                ),
-                              ),
-                            ],
-                          ),
+                    // ── Control panel: reply · like · indicators ──
+                    const SizedBox(height: SpotSpacing.xs),
+                    Row(
+                      children: [
+                        // Reply
+                        _ActionButton(
+                          icon: CupertinoIcons.bubble_left,
+                          count: post.replyCount,
+                          onTap: onReply,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: SpotSpacing.lg),
+                        // Like
+                        _ActionButton(
+                          icon: CupertinoIcons.heart,
+                          count: post.likeCount,
+                          onTap: onLike,
+                        ),
+                        const Spacer(),
+                        // AI-generated indicator
+                        Icon(
+                          CupertinoIcons.sparkles,
+                          size: 14,
+                          color: post.isAiGenerated
+                              ? SpotColors.warning
+                              : SpotColors.textTertiary.withAlpha(60),
+                        ),
+                        const SizedBox(width: SpotSpacing.md),
+                        // Repost / secondhand indicator
+                        Icon(
+                          CupertinoIcons.arrow_2_squarepath,
+                          size: 14,
+                          color: post.sourceType == PostSourceType.secondhand
+                              ? SpotColors.accent
+                              : SpotColors.textTertiary.withAlpha(60),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -606,80 +664,36 @@ class PubkeyAvatar extends StatelessWidget {
 
 // ── Private helpers ────────────────────────────────────────────────────────────
 
-// ── GPS row ───────────────────────────────────────────────────────────────────
+class ThreadHeaderLocationLabel extends StatelessWidget {
+  const ThreadHeaderLocationLabel({super.key, required this.location});
 
-/// Displays location as "Country/City(lat,lon)" in normal mode and
-/// "Country/City" in protected (danger) mode.
-class _GpsRow extends StatelessWidget {
-  const _GpsRow({required this.post});
-  final MediaPost post;
+  final ThreadHeaderLocation location;
 
   @override
   Widget build(BuildContext context) {
-    if (post.isVirtual) {
-      return Row(
-        children: [
-          const Icon(
-            CupertinoIcons.gamecontroller,
-            size: 11,
-            color: SpotColors.textTertiary,
-          ),
-          const SizedBox(width: 4),
-          Text('Virtual', style: SpotType.caption),
-        ],
-      );
-    }
+    final label = Text(
+      location.label,
+      style: SpotType.caption.copyWith(
+        color: location.isExpandable
+            ? SpotColors.accent
+            : SpotColors.textTertiary,
+        decoration: location.isExpandable
+            ? TextDecoration.underline
+            : TextDecoration.none,
+        decorationColor: location.isExpandable ? SpotColors.accent : null,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
 
-    if (!post.hasGps) {
-      return Row(
-        children: [
-          const Icon(
-            CupertinoIcons.location_slash,
-            size: 11,
-            color: SpotColors.textTertiary,
-          ),
-          const SizedBox(width: 4),
-          Text('Location hidden', style: SpotType.caption),
-        ],
-      );
-    }
+    if (!location.isExpandable) return label;
 
-    final lat = post.latitude!;
-    final lon = post.longitude!;
-    final geo = GeoLookup.instance.nearest(lat, lon);
-    final place = geo != null
-        ? '${geo.country}/${geo.city}'
-        : '${lat.toStringAsFixed(1)}, ${lon.toStringAsFixed(1)}';
-
-    final IconData icon;
-    final Color iconColor;
-    final String label;
-
-    if (post.isSpotCheckIn) {
-      // Spot check-in: show spot name + location
-      icon = CupertinoIcons.map_pin_ellipse;
-      iconColor = SpotColors.accent;
-      label = '${post.spotName}  ·  $place';
-    } else {
-      // Default: city-level only (all posts are coarsened)
-      icon = CupertinoIcons.location;
-      iconColor = SpotColors.success.withAlpha(160);
-      label = place;
-    }
-
-    return Row(
-      children: [
-        Icon(icon, size: 11, color: iconColor),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Text(
-            label,
-            style: SpotType.caption,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
+    return Tooltip(
+      message: location.fullLabel,
+      triggerMode: TooltipTriggerMode.tap,
+      waitDuration: Duration.zero,
+      showDuration: const Duration(seconds: 3),
+      child: MouseRegion(cursor: SystemMouseCursors.click, child: label),
     );
   }
 }
@@ -709,7 +723,58 @@ class _PostBadge extends StatelessWidget {
   }
 }
 
+// ── Action button (reply / like) ──────────────────────────────────────────────
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.icon,
+    required this.count,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final int count;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: SpotColors.textTertiary),
+            if (count > 0) ...[
+              const SizedBox(width: 4),
+              Text(
+                '$count',
+                style: SpotType.caption.copyWith(
+                  color: SpotColors.textTertiary,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ── Private helpers ────────────────────────────────────────────────────────────
+
+GeoLocation? _geoLocationForPost(MediaPost post) {
+  if (!post.hasGps) return null;
+  return GeoLookup.instance.nearest(post.latitude!, post.longitude!);
+}
+
+String _coordinateLocationLabelForPost(MediaPost post) {
+  final lat = post.latitude!;
+  final lon = post.longitude!;
+  return '${lat.toStringAsFixed(1)}, ${lon.toStringAsFixed(1)}';
+}
 
 String _shortKey(String pubkey) {
   if (pubkey.length <= 12) return pubkey;

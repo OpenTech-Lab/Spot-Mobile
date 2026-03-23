@@ -10,6 +10,7 @@ import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/interests_screen.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
+import 'package:mobile/screens/thread_screen.dart';
 import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/follow_service.dart';
@@ -250,6 +251,7 @@ class FeedScreenState extends State<FeedScreen>
             children: [
               _LatestTab(
                 posts: _posts,
+                allPosts: _posts,
                 isLoading: _isLoading,
                 error: _error,
                 isFetchingMore: _isFetchingMore,
@@ -263,6 +265,7 @@ class FeedScreenState extends State<FeedScreen>
               ),
               _FollowingTab(
                 posts: _followingPosts,
+                allPosts: _posts,
                 isLoading: _isLoading,
                 onRefresh: _refresh,
                 onReport: _reportPost,
@@ -300,6 +303,7 @@ class FeedScreenState extends State<FeedScreen>
 class _LatestTab extends StatefulWidget {
   const _LatestTab({
     required this.posts,
+    required this.allPosts,
     required this.isLoading,
     required this.isFetchingMore,
     this.error,
@@ -313,6 +317,7 @@ class _LatestTab extends StatefulWidget {
   });
 
   final List<MediaPost> posts;
+  final List<MediaPost> allPosts;
   final bool isLoading;
   final bool isFetchingMore;
   final String? error;
@@ -370,16 +375,16 @@ class _LatestTabState extends State<_LatestTab> {
       onRefresh: widget.onRefresh,
       child: Builder(
         builder: (ctx) {
-          final entries = buildThreadedPostEntries(widget.posts);
+          final roots = topLevelThreadPosts(widget.posts);
           return ListView.builder(
             controller: _scrollController,
             padding: const EdgeInsets.only(
               top: SpotSpacing.sm,
               bottom: SpotSpacing.xl,
             ),
-            itemCount: entries.length + 1,
+            itemCount: roots.length + 1,
             itemBuilder: (ctx, i) {
-              if (i == entries.length) {
+              if (i == roots.length) {
                 return widget.isFetchingMore
                     ? const Padding(
                         padding: EdgeInsets.all(SpotSpacing.xl),
@@ -396,19 +401,31 @@ class _LatestTabState extends State<_LatestTab> {
                       )
                     : const SizedBox(height: SpotSpacing.lg);
               }
-              final entry = entries[i];
-              final post = entry.post;
-              return PostThreadRow(
-                post: post,
-                isLast: isLastInThread(entries, i),
-                onAvatarTap: () => widget.onAvatarTap(ctx, post.pubkey),
-                onReport: () => widget.onReport(post),
-                onReply: () => showPostComposer(
-                  ctx,
-                  wallet: widget.wallet,
-                  nostrService: widget.nostrService,
-                  eventRepo: widget.eventRepo,
-                  replyToPost: post,
+              final post = roots[i];
+              return InkWell(
+                onTap: () => Navigator.of(ctx).push(
+                  MaterialPageRoute(
+                    builder: (_) => ThreadScreen(
+                      rootPostId: post.nostrEventId,
+                      initialPosts: widget.allPosts,
+                      wallet: widget.wallet,
+                      nostrService: widget.nostrService,
+                      eventRepo: widget.eventRepo,
+                    ),
+                  ),
+                ),
+                child: PostThreadRow(
+                  post: post,
+                  isLast: true,
+                  onAvatarTap: () => widget.onAvatarTap(ctx, post.pubkey),
+                  onReport: () => widget.onReport(post),
+                  onReply: () => showPostComposer(
+                    ctx,
+                    wallet: widget.wallet,
+                    nostrService: widget.nostrService,
+                    eventRepo: widget.eventRepo,
+                    replyToPost: post,
+                  ),
                 ),
               );
             },
@@ -535,6 +552,7 @@ class _LatestTabState extends State<_LatestTab> {
 class _FollowingTab extends StatelessWidget {
   const _FollowingTab({
     required this.posts,
+    required this.allPosts,
     required this.isLoading,
     required this.onRefresh,
     required this.onReport,
@@ -545,6 +563,7 @@ class _FollowingTab extends StatelessWidget {
   });
 
   final List<MediaPost> posts;
+  final List<MediaPost> allPosts;
   final bool isLoading;
   final Future<void> Function() onRefresh;
   final void Function(MediaPost) onReport;
@@ -628,27 +647,39 @@ class _FollowingTab extends StatelessWidget {
       onRefresh: onRefresh,
       child: Builder(
         builder: (ctx) {
-          final entries = buildThreadedPostEntries(posts);
+          final roots = topLevelThreadPosts(posts);
           return ListView.builder(
             padding: const EdgeInsets.only(
               top: SpotSpacing.sm,
               bottom: SpotSpacing.xl,
             ),
-            itemCount: entries.length,
+            itemCount: roots.length,
             itemBuilder: (ctx, i) {
-              final entry = entries[i];
-              final post = entry.post;
-              return PostThreadRow(
-                post: post,
-                isLast: isLastInThread(entries, i),
-                onAvatarTap: () => onAvatarTap(ctx, post.pubkey),
-                onReport: () => onReport(post),
-                onReply: () => showPostComposer(
-                  ctx,
-                  wallet: wallet,
-                  nostrService: nostrService,
-                  eventRepo: eventRepo,
-                  replyToPost: post,
+              final post = roots[i];
+              return InkWell(
+                onTap: () => Navigator.of(ctx).push(
+                  MaterialPageRoute(
+                    builder: (_) => ThreadScreen(
+                      rootPostId: post.nostrEventId,
+                      initialPosts: allPosts,
+                      wallet: wallet,
+                      nostrService: nostrService,
+                      eventRepo: eventRepo,
+                    ),
+                  ),
+                ),
+                child: PostThreadRow(
+                  post: post,
+                  isLast: true,
+                  onAvatarTap: () => onAvatarTap(ctx, post.pubkey),
+                  onReport: () => onReport(post),
+                  onReply: () => showPostComposer(
+                    ctx,
+                    wallet: wallet,
+                    nostrService: nostrService,
+                    eventRepo: eventRepo,
+                    replyToPost: post,
+                  ),
                 ),
               );
             },

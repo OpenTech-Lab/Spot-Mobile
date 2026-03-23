@@ -81,3 +81,26 @@ bool isLastInThread(List<ThreadedPostEntry> entries, int index) {
   if (index >= entries.length - 1) return true;
   return entries[index].rootId != entries[index + 1].rootId;
 }
+
+List<MediaPost> topLevelThreadPosts(Iterable<MediaPost> posts) {
+  final entries = buildThreadedPostEntries(posts);
+  final seenRoots = <String>{};
+  final roots = <MediaPost>[];
+
+  for (final entry in entries) {
+    if (seenRoots.add(entry.rootId)) {
+      roots.add(entry.post);
+    }
+  }
+
+  return roots;
+}
+
+List<ThreadedPostEntry> threadEntriesForRoot(
+  Iterable<MediaPost> posts,
+  String rootId,
+) {
+  return buildThreadedPostEntries(
+    posts,
+  ).where((entry) => entry.rootId == rootId).toList(growable: false);
+}

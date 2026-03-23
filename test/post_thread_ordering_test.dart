@@ -29,6 +29,67 @@ void main() {
     expect(isLastInThread(entries, 1), isTrue);
     expect(isLastInThread(entries, 2), isTrue);
   });
+
+  test(
+    'topLevelThreadPosts returns only root rows ordered by thread activity',
+    () {
+      final olderRoot = _post(
+        id: 'older-root',
+        capturedAt: DateTime.utc(2026, 3, 23, 10),
+      );
+      final olderReply = _post(
+        id: 'older-reply',
+        capturedAt: DateTime.utc(2026, 3, 23, 11),
+        replyToId: olderRoot.nostrEventId,
+      );
+      final newerRoot = _post(
+        id: 'newer-root',
+        capturedAt: DateTime.utc(2026, 3, 23, 9),
+      );
+      final newerReply = _post(
+        id: 'newer-reply',
+        capturedAt: DateTime.utc(2026, 3, 23, 12),
+        replyToId: newerRoot.nostrEventId,
+      );
+
+      final roots = topLevelThreadPosts([
+        olderRoot,
+        olderReply,
+        newerRoot,
+        newerReply,
+      ]);
+
+      expect(roots.map((post) => post.nostrEventId).toList(), [
+        'newer-root',
+        'older-root',
+      ]);
+    },
+  );
+
+  test('threadEntriesForRoot returns only the selected thread subtree', () {
+    final root = _post(id: 'root', capturedAt: DateTime.utc(2026, 3, 23, 10));
+    final child = _post(
+      id: 'child',
+      capturedAt: DateTime.utc(2026, 3, 23, 11),
+      replyToId: root.nostrEventId,
+    );
+    final otherRoot = _post(
+      id: 'other-root',
+      capturedAt: DateTime.utc(2026, 3, 23, 12),
+    );
+
+    final entries = threadEntriesForRoot([
+      root,
+      child,
+      otherRoot,
+    ], root.nostrEventId);
+
+    expect(entries.map((entry) => entry.post.nostrEventId).toList(), [
+      'root',
+      'child',
+    ]);
+    expect(entries.map((entry) => entry.depth).toList(), [0, 1]);
+  });
 }
 
 MediaPost _post({
