@@ -116,6 +116,10 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
     super.dispose();
   }
 
+  void _dismissKeyboard() {
+    FocusScope.of(context).unfocus();
+  }
+
   void _addTag(String raw) {
     final tag = raw.trim().replaceAll('#', '').toLowerCase();
     if (tag.isEmpty || _tags.contains(tag)) {
@@ -136,6 +140,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
   }
 
   Future<void> _pickGallery() async {
+    _dismissKeyboard();
     final remaining = 4 - _mediaFiles.length;
     if (remaining <= 0) {
       _showSnack('Maximum 4 media items per post');
@@ -143,10 +148,12 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
     }
     final picked = await _picker.pickMultipleMedia(limit: remaining);
     if (picked.isEmpty || !mounted) return;
+    _dismissKeyboard();
     setState(() => _mediaFiles.addAll(picked));
   }
 
   Future<void> _takeMediaWithCamera() async {
+    _dismissKeyboard();
     final choice = await showCupertinoModalPopup<String>(
       context: context,
       builder: (ctx) => CupertinoActionSheet(
@@ -184,6 +191,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
       result = await _picker.pickVideo(source: ImageSource.camera);
     }
     if (result != null && mounted) {
+      _dismissKeyboard();
       setState(() => _mediaFiles.add(result!));
     }
   }
@@ -487,6 +495,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
           // ── Scrollable content area ─────────────────────────────────────
           Expanded(
             child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -528,12 +537,14 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                                 duration: const Duration(milliseconds: 180),
                                 padding: const EdgeInsets.all(SpotSpacing.sm),
                                 decoration: BoxDecoration(
-                                  borderRadius:
-                                      BorderRadius.circular(SpotRadius.sm),
+                                  borderRadius: BorderRadius.circular(
+                                    SpotRadius.sm,
+                                  ),
                                   border: Border.all(
                                     color: _captionFocus.hasFocus
-                                        ? SpotColors.accent
-                                            .withValues(alpha: 0.45)
+                                        ? SpotColors.accent.withValues(
+                                            alpha: 0.45,
+                                          )
                                         : SpotColors.border,
                                     width: 0.5,
                                   ),
@@ -641,8 +652,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                       }),
                       onAiChanged: (v) => setState(() => _isAiGenerated = v),
                       onSourceChanged: (v) => setState(() => _sourceType = v),
-                      onSpotNameChanged: (v) =>
-                          setState(() => _spotName = v),
+                      onSpotNameChanged: (v) => setState(() => _spotName = v),
                     ),
                     const SizedBox(height: SpotSpacing.sm),
                     const Divider(
@@ -659,78 +669,85 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
           // ── Bottom toolbar (pinned above keyboard) ──────────────────────────
           const Divider(color: SpotColors.border, height: 1, thickness: 0.5),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
-            child: Row(
-              children: [
-                // Gallery picker
-                _ToolButton(
-                  icon: CupertinoIcons.photo_on_rectangle,
-                  onTap: _pickGallery,
-                ),
-                const SizedBox(width: SpotSpacing.sm),
-                // Camera
-                _ToolButton(
-                  icon: CupertinoIcons.camera,
-                  onTap: _takeMediaWithCamera,
-                ),
-                const SizedBox(width: SpotSpacing.sm),
-                // More options toggle
-                _ToolButton(
-                  icon: CupertinoIcons.slider_horizontal_3,
-                  onTap: () => setState(() => _showOptions = !_showOptions),
-                  active:
-                      _showOptions ||
-                      _isDangerMode ||
-                      _isVirtual ||
-                      _isAiGenerated ||
-                      _spotName?.isNotEmpty == true ||
-                      _sourceType == PostSourceType.secondhand,
-                ),
-                const Spacer(),
-                // Post button
-                GestureDetector(
-                  onTap: _canPost ? _onPost : null,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: SpotSpacing.lg,
-                      vertical: SpotSpacing.sm,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _canPost
-                          ? SpotColors.accent
-                          : SpotColors.surfaceHigh,
-                      borderRadius: BorderRadius.circular(SpotRadius.full),
-                    ),
-                    child: _isPublishing
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 1.5,
-                              color: SpotColors.onAccent,
-                            ),
-                          )
-                        : Text(
-                            'Post',
-                            style: SpotType.label.copyWith(
-                              color: _canPost
-                                  ? SpotColors.onAccent
-                                  : SpotColors.textTertiary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+          AnimatedPadding(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            padding: EdgeInsets.only(bottom: bottomInset),
+            child: SafeArea(
+              top: false,
+              minimum: const EdgeInsets.only(
+                left: SpotSpacing.lg,
+                right: SpotSpacing.lg,
+                bottom: SpotSpacing.md,
+              ),
+              child: Row(
+                children: [
+                  // Gallery picker
+                  _ToolButton(
+                    icon: CupertinoIcons.photo_on_rectangle,
+                    onTap: _pickGallery,
                   ),
-                ),
-              ],
+                  const SizedBox(width: SpotSpacing.sm),
+                  // Camera
+                  _ToolButton(
+                    icon: CupertinoIcons.camera,
+                    onTap: _takeMediaWithCamera,
+                  ),
+                  const SizedBox(width: SpotSpacing.sm),
+                  // More options toggle
+                  _ToolButton(
+                    icon: CupertinoIcons.slider_horizontal_3,
+                    onTap: () {
+                      _dismissKeyboard();
+                      setState(() => _showOptions = !_showOptions);
+                    },
+                    active:
+                        _showOptions ||
+                        _isDangerMode ||
+                        _isVirtual ||
+                        _isAiGenerated ||
+                        _spotName?.isNotEmpty == true ||
+                        _sourceType == PostSourceType.secondhand,
+                  ),
+                  const Spacer(),
+                  // Post button
+                  GestureDetector(
+                    onTap: _canPost ? _onPost : null,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: SpotSpacing.lg,
+                        vertical: SpotSpacing.sm,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _canPost
+                            ? SpotColors.accent
+                            : SpotColors.surfaceHigh,
+                        borderRadius: BorderRadius.circular(SpotRadius.full),
+                      ),
+                      child: _isPublishing
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: SpotColors.onAccent,
+                              ),
+                            )
+                          : Text(
+                              'Post',
+                              style: SpotType.label.copyWith(
+                                color: _canPost
+                                    ? SpotColors.onAccent
+                                    : SpotColors.textTertiary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          // Keyboard spacer — grows as keyboard slides up so toolbar
-          // always stays visible above it.
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 80),
-            height: bottomInset > 0 ? bottomInset : SpotSpacing.md,
           ),
         ],
       ),

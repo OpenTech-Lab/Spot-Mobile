@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -42,6 +43,83 @@ void main() {
     expect(find.text('Write a reply…'), findsOneWidget);
     expect(find.text("What's happening?"), findsNothing);
   });
+
+  testWidgets('options toggle dismisses the focused caption field', (
+    tester,
+  ) async {
+    final wallet = _wallet();
+
+    await tester.pumpWidget(_ComposerHarness(wallet: wallet));
+
+    await tester.tap(find.text('Compose'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final captionField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.hintText == "What's happening?",
+    );
+
+    expect(captionField, findsOneWidget);
+    await tester.tap(captionField);
+    await tester.pump();
+
+    expect(tester.widget<TextField>(captionField).focusNode?.hasFocus, isTrue);
+
+    await tester.tap(find.byIcon(CupertinoIcons.slider_horizontal_3));
+    await tester.pump();
+
+    expect(tester.widget<TextField>(captionField).focusNode?.hasFocus, isFalse);
+  });
+
+  testWidgets('composer content scroll view dismisses keyboard on drag', (
+    tester,
+  ) async {
+    final wallet = _wallet();
+
+    await tester.pumpWidget(_ComposerHarness(wallet: wallet));
+
+    await tester.tap(find.text('Compose'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final scrollView = tester.widget<SingleChildScrollView>(
+      find.byType(SingleChildScrollView).first,
+    );
+
+    expect(
+      scrollView.keyboardDismissBehavior,
+      ScrollViewKeyboardDismissBehavior.onDrag,
+    );
+  });
+}
+
+class _ComposerHarness extends StatelessWidget {
+  const _ComposerHarness({required this.wallet});
+
+  final WalletModel wallet;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => TextButton(
+            onPressed: () {
+              showPostComposer(
+                context,
+                wallet: wallet,
+                nostrService: NostrService(relayUrls: const []),
+                gpsLoader: () async => null,
+              );
+            },
+            child: const Text('Compose'),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 WalletModel _wallet() => WalletModel(
