@@ -42,14 +42,22 @@ class EventRepository {
   Stream<CivicEvent> subscribeToEvents() {
     _globalSubId ??= _nostr.subscribe(
       [
-        // kind-1: media posts (app-filtered)
+        // Primary filter: relays that support multi-letter tag queries
+        // (#app) will filter server-side and return only Spot events.
+        NostrFilter(
+          kinds: [1],
+          limit: 200,
+          since: _sevenDaysAgo(),
+          tags: {'app': ['spot']},
+        ),
+        // Fallback filter (no #app): catches relays that don't support
+        // multi-letter tag queries. The client-side guard in
+        // _handleNostrEvent() discards any event without app:spot, so
+        // non-Spot events are never shown.  limit:50 caps relay load.
         NostrFilter(
           kinds: [1],
           limit: 50,
-          // #app filter tells the relay to send only Spot-originated events.
-          // Relays that support multi-letter tag queries filter server-side;
-          // others send more, and the client-side check below discards them.
-          tags: {'app': ['spot']},
+          since: _sevenDaysAgo(),
         ),
         // kind-5: revocation events (spec v1.4 §12 "Deletion Flow")
         // kind-1984: community reports (spec v1.4 §12.B)
@@ -60,6 +68,14 @@ class EventRepository {
 
     return _controller.stream;
   }
+
+  /// Unix timestamp for 7 days ago — used as `since` on subscriptions so
+  /// relays deliver recent stored events and then stream live ones.
+  static int _sevenDaysAgo() =>
+      DateTime.now()
+          .subtract(const Duration(days: 7))
+          .millisecondsSinceEpoch ~/
+      1000;
 
   // ── Query ─────────────────────────────────────────────────────────────────
 
