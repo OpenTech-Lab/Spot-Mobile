@@ -16,6 +16,7 @@ class PostThreadRow extends StatelessWidget {
     super.key,
     required this.post,
     required this.isLast,
+    this.onAvatarTap,
     this.onReply,
     this.onDelete,
     this.onReport,
@@ -23,6 +24,7 @@ class PostThreadRow extends StatelessWidget {
 
   final MediaPost post;
   final bool isLast;
+  final VoidCallback? onAvatarTap;
   final VoidCallback? onReply;
   final VoidCallback? onDelete;
   final VoidCallback? onReport;
@@ -124,7 +126,11 @@ class PostThreadRow extends StatelessWidget {
               child: Column(
                 children: [
                   const SizedBox(height: 2),
-                  PubkeyAvatar(pubkey: post.pubkey),
+                  GestureDetector(
+                    onTap: onAvatarTap,
+                    behavior: HitTestBehavior.opaque,
+                    child: PubkeyAvatar(pubkey: post.pubkey),
+                  ),
                   if (!isLast)
                     Expanded(
                       child: Center(

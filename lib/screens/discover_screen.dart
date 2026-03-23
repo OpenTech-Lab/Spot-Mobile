@@ -1,0 +1,360 @@
+import 'dart:async';
+
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+
+import 'package:mobile/features/camera/camera_screen.dart';
+import 'package:mobile/features/event/event_repository.dart';
+import 'package:mobile/features/nostr/nostr_service.dart';
+import 'package:mobile/models/event_model.dart';
+import 'package:mobile/models/media_post.dart';
+import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/screens/user_profile_screen.dart';
+import 'package:mobile/services/feed_scoring_service.dart';
+import 'package:mobile/services/location_service.dart';
+import 'package:mobile/services/user_prefs_service.dart';
+import 'package:mobile/theme/spot_theme.dart';
+import 'package:mobile/widgets/post_thread_row.dart';
+
+/// Discover screen — TRENDING / FOR YOU / NEARBY.
+///
+/// Shows algorithmically ranked and geo-filtered content.
+/// Moving discovery tabs here keeps the home feed focused on chronology.
+class DiscoverScreen extends StatefulWidget {
+  const DiscoverScreen({
+    super.key,
+    required this.nostrService,
+    required this.wallet,
+  });
+
+  final NostrService nostrService;
+  final WalletModel wallet;
+
+  @override
+  State<DiscoverScreen> createState() => _DiscoverScreenState();
+}
+
+class _DiscoverScreenState extends State<DiscoverScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+  late final EventRepository _repo;
+  StreamSubscription<CivicEvent>? _sub;
+
+  List<MediaPost> _posts = [];
+  bool _isLoading = true;
+
+  double? _userLat;
+  double? _userLon;
+
+  final _scoring = const FeedScoringService();
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_onTabChanged);
+    _repo = EventRepository(nostrService: widget.nostrService);
+    _initFeed();
+    _loadLocation();
+  }
+
+  @override
+  void dispose() {
+    _tabController.removeListener(_onTabChanged);
+    _tabController.dispose();
+    _sub?.cancel();
+    _repo.dispose();
+    super.dispose();
+  }
+
+  void _onTabChanged() {
+    if (_tabController.indexIsChanging) return;
+    if (_tabController.index == 2 && _userLat == null) {
+      _loadLocation();
+    }
+  }
+
+  // ── Data loading ──────────────────────────────────────────────────────────
+
+  Future<void> _initFeed() async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      await widget.nostrService.connect();
+      _sub = _repo.subscribeToEvents().listen(_onEvent);
+    } catch (_) {} finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _onEvent(CivicEvent event) {
+    if (!mounted) return;
+    final merged = _mergePosts(_posts, event.posts);
+    if (merged.length == _posts.length) return;
+    setState(() => _posts = merged);
+  }
+
+  Future<void> _refresh() async {
+    await _sub?.cancel();
+    _repo.reset();
+    setState(() => _posts = []);
+    await _initFeed();
+  }
+
+  Future<void> _loadLocation() async {
+    final pos = await LocationService.instance.getCurrentPosition();
+    if (pos != null && mounted) {
+      setState(() {
+        _userLat = pos.latitude;
+        _userLon = pos.longitude;
+      });
+    }
+  }
+
+  List<MediaPost> _mergePosts(
+    List<MediaPost> current,
+    Iterable<MediaPost> incoming,
+  ) {
+    final byId = {for (final p in current) p.id: p};
+    for (final p in incoming) {
+      byId[p.id] = p;
+    }
+    return byId.values.toList()
+      ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+  }
+
+  // ── Post actions ──────────────────────────────────────────────────────────
+
+  Future<void> _reportPost(MediaPost post) async {
+    try {
+      await widget.nostrService.reportContent(
+        eventId: post.nostrEventId,
+        contentHash: post.contentHash,
+        reason: 'harmful',
+        wallet: widget.wallet,
+      );
+      setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Reported. Content hidden.')),
+        );
+      }
+    } catch (_) {}
+  }
+
+  void _openUserProfile(BuildContext ctx, String pubkey) {
+    if (pubkey == widget.wallet.publicKeyHex) return;
+    Navigator.of(ctx).push(
+      MaterialPageRoute(
+        builder: (_) => UserProfileScreen(
+          pubkey: pubkey,
+          wallet: widget.wallet,
+          nostrService: widget.nostrService,
+        ),
+      ),
+    );
+  }
+
+  // ── Scoring ───────────────────────────────────────────────────────────────
+
+  List<MediaPost> get _trendingPosts {
+    final events = _repo.getAllEvents();
+    final scored = events
+        .where((e) => DateTime.now().difference(e.firstSeen).inHours <= 48)
+        .toList()
+      ..sort((a, b) =>
+          _scoring.trendingScore(b).compareTo(_scoring.trendingScore(a)));
+
+    final result = <MediaPost>[];
+    for (final event in scored) {
+      result.addAll(event.postsByNewest);
+    }
+    final untagged =
+        _posts.where((p) => p.eventTag == null || p.eventTag == '_unsorted');
+    result.addAll(untagged);
+
+    final seen = <String>{};
+    return result.where((p) => seen.add(p.id)).toList();
+  }
+
+  List<MediaPost> get _forYouPosts {
+    final interests = UserPrefsService.instance.interests;
+    final viewed    = UserPrefsService.instance.viewedHashtags;
+    return List<MediaPost>.from(_posts)
+      ..sort((a, b) {
+        final sa = _scoring.recommendationScore(
+          post: a,
+          userInterests: interests,
+          viewedHashtags: viewed,
+          userLat: _userLat,
+          userLon: _userLon,
+        );
+        final sb = _scoring.recommendationScore(
+          post: b,
+          userInterests: interests,
+          viewedHashtags: viewed,
+          userLat: _userLat,
+          userLon: _userLon,
+        );
+        return sb.compareTo(sa);
+      });
+  }
+
+  List<MediaPost> get _nearbyPosts {
+    if (_userLat == null || _userLon == null) return [];
+    return List<MediaPost>.from(_posts.where((p) => p.hasGps))
+      ..sort((a, b) {
+        final sa = _scoring.nearbyScore(a, _userLat!, _userLon!);
+        final sb = _scoring.nearbyScore(b, _userLat!, _userLon!);
+        return sb.compareTo(sa);
+      });
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _buildTabBar(),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildScoredList(
+                posts: _trendingPosts,
+                emptyLabel: 'Nothing trending in the last 48 h',
+              ),
+              _buildScoredList(
+                posts: _forYouPosts,
+                emptyLabel: UserPrefsService.instance.hasSetInterests
+                    ? 'No recommended posts yet'
+                    : 'Set your interests to see personalised content',
+              ),
+              _buildNearbyList(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTabBar() {
+    return TabBar(
+      controller: _tabController,
+      labelColor: SpotColors.accent,
+      unselectedLabelColor: SpotColors.textTertiary,
+      indicatorColor: SpotColors.accent,
+      indicatorWeight: 1.5,
+      labelStyle:
+          SpotType.caption.copyWith(letterSpacing: 0.8, fontSize: 11),
+      tabs: const [
+        Tab(text: 'TRENDING'),
+        Tab(text: 'FOR YOU'),
+        Tab(text: 'NEARBY'),
+      ],
+    );
+  }
+
+  Widget _buildScoredList({
+    required List<MediaPost> posts,
+    required String emptyLabel,
+  }) {
+    if (_isLoading && posts.isEmpty) {
+      return const Center(
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+              color: SpotColors.accent, strokeWidth: 1),
+        ),
+      );
+    }
+    if (posts.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(SpotSpacing.xxxl),
+          child: Text(emptyLabel,
+              style: SpotType.bodySecondary, textAlign: TextAlign.center),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      color: SpotColors.accent,
+      backgroundColor: SpotColors.surface,
+      displacement: 28,
+      onRefresh: _refresh,
+      child: ListView.builder(
+        padding: const EdgeInsets.only(
+            top: SpotSpacing.sm, bottom: SpotSpacing.xl),
+        itemCount: posts.length,
+        itemBuilder: (ctx, i) {
+          final post = posts[i];
+          return PostThreadRow(
+            post: post,
+            isLast: i == posts.length - 1,
+            onAvatarTap: () => _openUserProfile(ctx, post.pubkey),
+            onReport: () => _reportPost(post),
+            onReply: () => Navigator.of(ctx).push(
+              MaterialPageRoute(
+                builder: (_) => CameraScreen(
+                  wallet: widget.wallet,
+                  nostrService: widget.nostrService,
+                  replyToPost: post,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildNearbyList() {
+    if (!(_userLat != null)) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(SpotSpacing.xxxl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(CupertinoIcons.location_slash,
+                  color: SpotColors.textTertiary, size: 32),
+              const SizedBox(height: SpotSpacing.xl),
+              const Text(
+                'Enable location to see nearby events',
+                style: SpotType.bodySecondary,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: SpotSpacing.xl),
+              GestureDetector(
+                onTap: _loadLocation,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: SpotSpacing.xl,
+                    vertical: SpotSpacing.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    border:
+                        Border.all(color: SpotColors.border, width: 0.5),
+                    borderRadius:
+                        BorderRadius.circular(SpotRadius.sm),
+                  ),
+                  child: const Text('Allow Location',
+                      style: SpotType.bodySecondary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return _buildScoredList(
+      posts: _nearbyPosts,
+      emptyLabel: 'No events near you',
+    );
+  }
+}

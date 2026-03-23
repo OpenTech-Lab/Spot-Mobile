@@ -11,21 +11,15 @@ import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/interests_screen.dart';
+import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
-import 'package:mobile/services/feed_scoring_service.dart';
+import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/services/local_post_store.dart';
-import 'package:mobile/services/location_service.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
-/// Four-tab discovery feed (v1.5 Feed Discovery Upgrade).
-///
-/// Tabs:
-/// - **Latest** – reverse-chronological, real-time, infinite scroll
-/// - **For You** – Scheme B client-side recommendation (hashtag + GPS + freshness)
-/// - **Trending** – Scheme A local scoring over last 48 h
-/// - **Nearby** – GPS-proximity filtered
+/// Home feed — LATEST (real-time) and FOLLOWING (people you follow).
 class FeedScreen extends StatefulWidget {
   const FeedScreen({
     super.key,
@@ -50,42 +44,26 @@ class _FeedScreenState extends State<FeedScreen>
   bool _isLoading = true;
   String? _error;
 
-  // Infinite scroll state (Latest tab)
+  // Infinite scroll (Latest tab)
   bool _isFetchingMore = false;
-  int? _oldestTimestamp; // unix seconds
-
-  final _scoring = const FeedScoringService();
-
-  // Current device location (Nearby + For You)
-  double? _userLat;
-  double? _userLon;
+  int? _oldestTimestamp;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-    _tabController.addListener(_onTabChanged);
+    _tabController = TabController(length: 2, vsync: this);
     _repo = EventRepository(nostrService: widget.nostrService);
+    FollowService.instance.init();
     _initFeed();
-    _loadLocation();
     _showInterestsIfNeeded();
   }
 
   @override
   void dispose() {
-    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _sub?.cancel();
     _repo.dispose();
     super.dispose();
-  }
-
-  void _onTabChanged() {
-    if (_tabController.indexIsChanging) return;
-    // Record that Nearby was opened → load location if not yet available
-    if (_tabController.index == 3 && _userLat == null) {
-      _loadLocation();
-    }
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -135,16 +113,13 @@ class _FeedScreenState extends State<FeedScreen>
     setState(() => _posts = _mergePosts(_posts, visible));
   }
 
-  /// Fetches older posts via a Nostr REQ with `until: [timestamp]`.
   Future<void> _loadMorePosts() async {
-    if (_isFetchingMore) return;
-    if (_posts.isEmpty) return;
+    if (_isFetchingMore || _posts.isEmpty) return;
 
     final cursor = _oldestTimestamp ??
         (_posts.last.capturedAt.millisecondsSinceEpoch ~/ 1000) - 1;
 
     setState(() => _isFetchingMore = true);
-
     try {
       final completer = Completer<void>();
       Timer? timeout;
@@ -192,35 +167,6 @@ class _FeedScreenState extends State<FeedScreen>
     }
   }
 
-  Future<void> _loadLocation() async {
-    final pos = await LocationService.instance.getCurrentPosition();
-    if (pos != null && mounted) {
-      setState(() {
-        _userLat = pos.latitude;
-        _userLon = pos.longitude;
-      });
-    }
-  }
-
-  Future<void> _showInterestsIfNeeded() async {
-    await UserPrefsService.instance.init();
-    if (UserPrefsService.instance.hasSetInterests) return;
-    if (!mounted) return;
-    // Small delay so the feed is visible first
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => InterestsScreen(
-        onDone: () => setState(() {}),
-      ),
-    );
-  }
-
-  // ── Post helpers ──────────────────────────────────────────────────────────
-
   List<MediaPost> _mergePosts(
     List<MediaPost> current,
     Iterable<MediaPost> incoming,
@@ -252,63 +198,40 @@ class _FeedScreenState extends State<FeedScreen>
     } catch (_) {}
   }
 
-  // ── Scoring ───────────────────────────────────────────────────────────────
-
-  List<MediaPost> get _forYouPosts {
-    final interests = UserPrefsService.instance.interests;
-    final viewed = UserPrefsService.instance.viewedHashtags;
-    return List<MediaPost>.from(_posts)
-      ..sort((a, b) {
-        final sa = _scoring.recommendationScore(
-          post: a,
-          userInterests: interests,
-          viewedHashtags: viewed,
-          userLat: _userLat,
-          userLon: _userLon,
-        );
-        final sb = _scoring.recommendationScore(
-          post: b,
-          userInterests: interests,
-          viewedHashtags: viewed,
-          userLat: _userLat,
-          userLon: _userLon,
-        );
-        return sb.compareTo(sa);
-      });
+  Future<void> _showInterestsIfNeeded() async {
+    await UserPrefsService.instance.init();
+    if (UserPrefsService.instance.hasSetInterests) return;
+    if (!mounted) return;
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => InterestsScreen(
+        onDone: () => setState(() {}),
+      ),
+    );
   }
 
-  List<MediaPost> get _trendingPosts {
-    // Group by eventTag, compute per-event trending score, then flatten posts
-    final events = _repo.getAllEvents();
-    final scored = events
-        .where((e) => DateTime.now().difference(e.firstSeen).inHours <= 48)
-        .toList()
-      ..sort((a, b) =>
-          _scoring.trendingScore(b).compareTo(_scoring.trendingScore(a)));
-
-    final result = <MediaPost>[];
-    for (final event in scored) {
-      result.addAll(event.postsByNewest);
-    }
-    // Also include untagged posts sorted by recency
-    final untagged =
-        _posts.where((p) => p.eventTag == null || p.eventTag == '_unsorted');
-    result.addAll(untagged);
-
-    // Deduplicate
-    final seen = <String>{};
-    return result.where((p) => seen.add(p.id)).toList();
+  void _openUserProfile(BuildContext ctx, String pubkey) {
+    if (pubkey == widget.wallet.publicKeyHex) return;
+    Navigator.of(ctx).push(
+      MaterialPageRoute(
+        builder: (_) => UserProfileScreen(
+          pubkey: pubkey,
+          wallet: widget.wallet,
+          nostrService: widget.nostrService,
+        ),
+      ),
+    );
   }
 
-  List<MediaPost> get _nearbyPosts {
-    if (_userLat == null || _userLon == null) return [];
-    return List<MediaPost>.from(_posts.where((p) => p.hasGps))
-      ..sort((a, b) {
-        final sa = _scoring.nearbyScore(a, _userLat!, _userLon!);
-        final sb = _scoring.nearbyScore(b, _userLat!, _userLon!);
-        return sb.compareTo(sa);
-      });
-  }
+  // ── Following filter ──────────────────────────────────────────────────────
+
+  List<MediaPost> get _followingPosts => _posts
+      .where((p) => FollowService.instance.isFollowing(p.pubkey))
+      .toList();
 
   // ── Build ─────────────────────────────────────────────────────────────────
 
@@ -329,38 +252,18 @@ class _FeedScreenState extends State<FeedScreen>
                 onRefresh: _refresh,
                 onLoadMore: _loadMorePosts,
                 onReport: _reportPost,
+                onAvatarTap: _openUserProfile,
                 wallet: widget.wallet,
                 nostrService: widget.nostrService,
               ),
-              _ScoredTab(
-                posts: _forYouPosts,
+              _FollowingTab(
+                posts: _followingPosts,
                 isLoading: _isLoading,
-                emptyLabel: UserPrefsService.instance.hasSetInterests
-                    ? 'No recommended posts yet'
-                    : 'Set your interests to see personalised content',
                 onRefresh: _refresh,
                 onReport: _reportPost,
+                onAvatarTap: _openUserProfile,
                 wallet: widget.wallet,
                 nostrService: widget.nostrService,
-              ),
-              _ScoredTab(
-                posts: _trendingPosts,
-                isLoading: _isLoading,
-                emptyLabel: 'Nothing trending in the last 48 h',
-                onRefresh: _refresh,
-                onReport: _reportPost,
-                wallet: widget.wallet,
-                nostrService: widget.nostrService,
-              ),
-              _NearbyTab(
-                posts: _nearbyPosts,
-                isLoading: _isLoading,
-                hasLocation: _userLat != null,
-                onRefresh: _refresh,
-                onReport: _reportPost,
-                wallet: widget.wallet,
-                nostrService: widget.nostrService,
-                onRequestLocation: _loadLocation,
               ),
             ],
           ),
@@ -380,9 +283,7 @@ class _FeedScreenState extends State<FeedScreen>
           SpotType.caption.copyWith(letterSpacing: 0.8, fontSize: 11),
       tabs: const [
         Tab(text: 'LATEST'),
-        Tab(text: 'FOR YOU'),
-        Tab(text: 'TRENDING'),
-        Tab(text: 'NEARBY'),
+        Tab(text: 'FOLLOWING'),
       ],
     );
   }
@@ -390,7 +291,6 @@ class _FeedScreenState extends State<FeedScreen>
 
 // ── Latest tab ────────────────────────────────────────────────────────────────
 
-/// Reverse-chronological feed with real-time updates and infinite scroll.
 class _LatestTab extends StatefulWidget {
   const _LatestTab({
     required this.posts,
@@ -400,6 +300,7 @@ class _LatestTab extends StatefulWidget {
     required this.onRefresh,
     required this.onLoadMore,
     required this.onReport,
+    required this.onAvatarTap,
     required this.wallet,
     required this.nostrService,
   });
@@ -411,6 +312,7 @@ class _LatestTab extends StatefulWidget {
   final Future<void> Function() onRefresh;
   final Future<void> Function() onLoadMore;
   final void Function(MediaPost) onReport;
+  final void Function(BuildContext, String) onAvatarTap;
   final WalletModel wallet;
   final NostrService nostrService;
 
@@ -487,6 +389,7 @@ class _LatestTabState extends State<_LatestTab> {
           return PostThreadRow(
             post: post,
             isLast: i == widget.posts.length - 1,
+            onAvatarTap: () => widget.onAvatarTap(ctx, post.pubkey),
             onReport: () => widget.onReport(post),
             onReply: () => Navigator.of(ctx).push(
               MaterialPageRoute(
@@ -577,25 +480,24 @@ class _LatestTabState extends State<_LatestTab> {
       );
 }
 
-// ── Scored tab (For You / Trending) ───────────────────────────────────────────
+// ── Following tab ─────────────────────────────────────────────────────────────
 
-/// Generic tab that displays a pre-scored [posts] list.
-class _ScoredTab extends StatelessWidget {
-  const _ScoredTab({
+class _FollowingTab extends StatelessWidget {
+  const _FollowingTab({
     required this.posts,
     required this.isLoading,
-    required this.emptyLabel,
     required this.onRefresh,
     required this.onReport,
+    required this.onAvatarTap,
     required this.wallet,
     required this.nostrService,
   });
 
   final List<MediaPost> posts;
   final bool isLoading;
-  final String emptyLabel;
   final Future<void> Function() onRefresh;
   final void Function(MediaPost) onReport;
+  final void Function(BuildContext, String) onAvatarTap;
   final WalletModel wallet;
   final NostrService nostrService;
 
@@ -612,141 +514,27 @@ class _ScoredTab extends StatelessWidget {
       );
     }
     if (posts.isEmpty) {
-      return Center(
+      return const Center(
         child: Padding(
-          padding: const EdgeInsets.all(SpotSpacing.xxxl),
-          child: Text(emptyLabel, style: SpotType.bodySecondary,
-              textAlign: TextAlign.center),
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      color: SpotColors.accent,
-      backgroundColor: SpotColors.surface,
-      displacement: 28,
-      onRefresh: onRefresh,
-      child: ListView.builder(
-        padding: const EdgeInsets.only(
-          top: SpotSpacing.sm,
-          bottom: SpotSpacing.xl,
-        ),
-        itemCount: posts.length,
-        itemBuilder: (ctx, i) {
-          final post = posts[i];
-          return PostThreadRow(
-            post: post,
-            isLast: i == posts.length - 1,
-            onReport: () => onReport(post),
-            onReply: () => Navigator.of(ctx).push(
-              MaterialPageRoute(
-                builder: (_) => CameraScreen(
-                  wallet: wallet,
-                  nostrService: nostrService,
-                  replyToPost: post,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ── Nearby tab ────────────────────────────────────────────────────────────────
-
-/// GPS-filtered feed sorted by proximity to the current device location.
-class _NearbyTab extends StatelessWidget {
-  const _NearbyTab({
-    required this.posts,
-    required this.isLoading,
-    required this.hasLocation,
-    required this.onRefresh,
-    required this.onReport,
-    required this.wallet,
-    required this.nostrService,
-    required this.onRequestLocation,
-  });
-
-  final List<MediaPost> posts;
-  final bool isLoading;
-  final bool hasLocation;
-  final Future<void> Function() onRefresh;
-  final void Function(MediaPost) onReport;
-  final WalletModel wallet;
-  final NostrService nostrService;
-  final Future<void> Function() onRequestLocation;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!hasLocation) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(SpotSpacing.xxxl),
+          padding: EdgeInsets.all(SpotSpacing.xxxl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(CupertinoIcons.location_slash,
-                  color: SpotColors.textTertiary, size: 32),
-              const SizedBox(height: SpotSpacing.xl),
-              const Text(
-                'Enable location to see nearby events',
-                style: SpotType.bodySecondary,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: SpotSpacing.xl),
-              GestureDetector(
-                onTap: onRequestLocation,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: SpotSpacing.xl,
-                    vertical: SpotSpacing.sm,
-                  ),
-                  decoration: BoxDecoration(
-                    border:
-                        Border.all(color: SpotColors.border, width: 0.5),
-                    borderRadius: BorderRadius.circular(SpotRadius.sm),
-                  ),
-                  child: const Text('Allow Location',
-                      style: SpotType.bodySecondary),
-                ),
-              ),
+              Icon(CupertinoIcons.person_2,
+                  color: SpotColors.overlay, size: 36),
+              SizedBox(height: SpotSpacing.lg),
+              Text('No posts from people you follow',
+                  style: SpotType.bodySecondary,
+                  textAlign: TextAlign.center),
+              SizedBox(height: SpotSpacing.xs),
+              Text('Tap an avatar to follow someone',
+                  style: SpotType.caption),
             ],
           ),
         ),
       );
     }
 
-    if (isLoading && posts.isEmpty) {
-      return const Center(
-        child: SizedBox(
-          width: 18,
-          height: 18,
-          child: CircularProgressIndicator(
-              color: SpotColors.accent, strokeWidth: 1),
-        ),
-      );
-    }
-
-    if (posts.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(CupertinoIcons.location,
-                color: SpotColors.overlay, size: 36),
-            const SizedBox(height: SpotSpacing.lg),
-            Text(
-              'No events near you',
-              style:
-                  SpotType.bodySecondary.copyWith(fontWeight: FontWeight.w300),
-            ),
-          ],
-        ),
-      );
-    }
-
     return RefreshIndicator(
       color: SpotColors.accent,
       backgroundColor: SpotColors.surface,
@@ -763,6 +551,7 @@ class _NearbyTab extends StatelessWidget {
           return PostThreadRow(
             post: post,
             isLast: i == posts.length - 1,
+            onAvatarTap: () => onAvatarTap(ctx, post.pubkey),
             onReport: () => onReport(post),
             onReply: () => Navigator.of(ctx).push(
               MaterialPageRoute(

@@ -5,6 +5,7 @@ import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/event/event_screen.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/screens/discover_screen.dart';
 import 'package:mobile/screens/feed_screen.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/profile_screen.dart';
@@ -43,6 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Tabs built once and preserved via IndexedStack
   late final List<Widget> _tabs = [
     FeedScreen(nostrService: _nostrService, wallet: widget.wallet),
+    DiscoverScreen(nostrService: _nostrService, wallet: widget.wallet),
     _EventsListTab(
       eventRepo: _eventRepo,
       nostrService: _nostrService,
@@ -64,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SpotColors.bg,
-      appBar: _selectedTab == 2
+      appBar: _selectedTab == 3
           ? null // ProfileScreen provides its own AppBar with settings button
           : _selectedTab == 0
               ? AppBar(
@@ -76,13 +78,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     fit: BoxFit.contain,
                   ),
                 )
-              : AppBar(
-                  backgroundColor: SpotColors.bg,
-                  title: const Text('Events', style: SpotType.subheading),
-                ),
+              : _selectedTab == 1
+                  ? AppBar(
+                      backgroundColor: SpotColors.bg,
+                      title: const Text('Discover', style: SpotType.subheading),
+                    )
+                  : AppBar(
+                      backgroundColor: SpotColors.bg,
+                      title: const Text('Events', style: SpotType.subheading),
+                    ),
       body: IndexedStack(index: _selectedTab, children: _tabs),
       bottomNavigationBar: _buildBottomNav(),
-      floatingActionButton: _selectedTab != 0 ? null : GestureDetector(
+      floatingActionButton: _selectedTab != 0 && _selectedTab != 1 ? null : GestureDetector(
         onTap: _openComposer,
         child: Container(
           width: 48,
@@ -98,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      floatingActionButtonLocation: _selectedTab != 0 ? null : FloatingActionButtonLocation.endFloat,
+      floatingActionButtonLocation: _selectedTab != 0 && _selectedTab != 1 ? null : FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -120,16 +127,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: () => setState(() => _selectedTab = 0),
               ),
               _NavItem(
-                icon: CupertinoIcons.folder,
-                label: 'Events',
+                icon: CupertinoIcons.compass,
+                label: 'Discover',
                 selected: _selectedTab == 1,
                 onTap: () => setState(() => _selectedTab = 1),
               ),
               _NavItem(
-                icon: CupertinoIcons.person,
-                label: 'Profile',
+                icon: CupertinoIcons.folder,
+                label: 'Events',
                 selected: _selectedTab == 2,
                 onTap: () => setState(() => _selectedTab = 2),
+              ),
+              _NavItem(
+                icon: CupertinoIcons.person,
+                label: 'Profile',
+                selected: _selectedTab == 3,
+                onTap: () => setState(() => _selectedTab = 3),
               ),
             ],
           ),
