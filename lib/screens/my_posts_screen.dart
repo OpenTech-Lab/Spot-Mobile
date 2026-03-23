@@ -10,6 +10,7 @@ import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
@@ -216,14 +217,21 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
       backgroundColor: SpotColors.surface,
       displacement: 28,
       onRefresh: _refresh,
-      child: ListView.builder(
-        padding: const EdgeInsets.only(
-          top: SpotSpacing.sm,
-          bottom: SpotSpacing.xl,
-        ),
-        itemCount: _posts.length,
-        itemBuilder: (ctx, i) =>
-            PostThreadRow(post: _posts[i], isLast: i == _posts.length - 1),
+      child: Builder(
+        builder: (ctx) {
+          final entries = buildThreadedPostEntries(_posts);
+          return ListView.builder(
+            padding: const EdgeInsets.only(
+              top: SpotSpacing.sm,
+              bottom: SpotSpacing.xl,
+            ),
+            itemCount: entries.length,
+            itemBuilder: (ctx, i) => PostThreadRow(
+              post: entries[i].post,
+              isLast: isLastInThread(entries, i),
+            ),
+          );
+        },
       ),
     );
   }

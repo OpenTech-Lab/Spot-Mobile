@@ -14,6 +14,7 @@ import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
@@ -367,44 +368,50 @@ class _LatestTabState extends State<_LatestTab> {
       backgroundColor: SpotColors.surface,
       displacement: 28,
       onRefresh: widget.onRefresh,
-      child: ListView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.only(
-          top: SpotSpacing.sm,
-          bottom: SpotSpacing.xl,
-        ),
-        itemCount: widget.posts.length + 1,
-        itemBuilder: (ctx, i) {
-          if (i == widget.posts.length) {
-            return widget.isFetchingMore
-                ? const Padding(
-                    padding: EdgeInsets.all(SpotSpacing.xl),
-                    child: Center(
-                      child: SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1,
-                          color: SpotColors.textTertiary,
-                        ),
-                      ),
-                    ),
-                  )
-                : const SizedBox(height: SpotSpacing.lg);
-          }
-          final post = widget.posts[i];
-          return PostThreadRow(
-            post: post,
-            isLast: i == widget.posts.length - 1,
-            onAvatarTap: () => widget.onAvatarTap(ctx, post.pubkey),
-            onReport: () => widget.onReport(post),
-            onReply: () => showPostComposer(
-              ctx,
-              wallet: widget.wallet,
-              nostrService: widget.nostrService,
-              eventRepo: widget.eventRepo,
-              replyToPost: post,
+      child: Builder(
+        builder: (ctx) {
+          final entries = buildThreadedPostEntries(widget.posts);
+          return ListView.builder(
+            controller: _scrollController,
+            padding: const EdgeInsets.only(
+              top: SpotSpacing.sm,
+              bottom: SpotSpacing.xl,
             ),
+            itemCount: entries.length + 1,
+            itemBuilder: (ctx, i) {
+              if (i == entries.length) {
+                return widget.isFetchingMore
+                    ? const Padding(
+                        padding: EdgeInsets.all(SpotSpacing.xl),
+                        child: Center(
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1,
+                              color: SpotColors.textTertiary,
+                            ),
+                          ),
+                        ),
+                      )
+                    : const SizedBox(height: SpotSpacing.lg);
+              }
+              final entry = entries[i];
+              final post = entry.post;
+              return PostThreadRow(
+                post: post,
+                isLast: isLastInThread(entries, i),
+                onAvatarTap: () => widget.onAvatarTap(ctx, post.pubkey),
+                onReport: () => widget.onReport(post),
+                onReply: () => showPostComposer(
+                  ctx,
+                  wallet: widget.wallet,
+                  nostrService: widget.nostrService,
+                  eventRepo: widget.eventRepo,
+                  replyToPost: post,
+                ),
+              );
+            },
           );
         },
       ),
@@ -619,26 +626,32 @@ class _FollowingTab extends StatelessWidget {
       backgroundColor: SpotColors.surface,
       displacement: 28,
       onRefresh: onRefresh,
-      child: ListView.builder(
-        padding: const EdgeInsets.only(
-          top: SpotSpacing.sm,
-          bottom: SpotSpacing.xl,
-        ),
-        itemCount: posts.length,
-        itemBuilder: (ctx, i) {
-          final post = posts[i];
-          return PostThreadRow(
-            post: post,
-            isLast: i == posts.length - 1,
-            onAvatarTap: () => onAvatarTap(ctx, post.pubkey),
-            onReport: () => onReport(post),
-            onReply: () => showPostComposer(
-              ctx,
-              wallet: wallet,
-              nostrService: nostrService,
-              eventRepo: eventRepo,
-              replyToPost: post,
+      child: Builder(
+        builder: (ctx) {
+          final entries = buildThreadedPostEntries(posts);
+          return ListView.builder(
+            padding: const EdgeInsets.only(
+              top: SpotSpacing.sm,
+              bottom: SpotSpacing.xl,
             ),
+            itemCount: entries.length,
+            itemBuilder: (ctx, i) {
+              final entry = entries[i];
+              final post = entry.post;
+              return PostThreadRow(
+                post: post,
+                isLast: isLastInThread(entries, i),
+                onAvatarTap: () => onAvatarTap(ctx, post.pubkey),
+                onReport: () => onReport(post),
+                onReply: () => showPostComposer(
+                  ctx,
+                  wallet: wallet,
+                  nostrService: nostrService,
+                  eventRepo: eventRepo,
+                  replyToPost: post,
+                ),
+              );
+            },
           );
         },
       ),

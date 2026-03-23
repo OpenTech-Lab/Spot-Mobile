@@ -26,6 +26,7 @@ Future<void> showPostComposer(
   EventRepository? eventRepo,
   MediaPost? replyToPost,
   Future<GpsLock?> Function()? gpsLoader,
+  void Function(MediaPost post)? onPublished,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -40,6 +41,7 @@ Future<void> showPostComposer(
       eventRepo: eventRepo,
       replyToPost: replyToPost,
       gpsLoader: gpsLoader,
+      onPublished: onPublished,
     ),
   );
 }
@@ -53,6 +55,7 @@ class PostComposerSheet extends StatefulWidget {
     this.eventRepo,
     this.replyToPost,
     this.gpsLoader,
+    this.onPublished,
   });
 
   final WalletModel wallet;
@@ -60,6 +63,7 @@ class PostComposerSheet extends StatefulWidget {
   final EventRepository? eventRepo;
   final MediaPost? replyToPost;
   final Future<GpsLock?> Function()? gpsLoader;
+  final void Function(MediaPost post)? onPublished;
 
   @override
   State<PostComposerSheet> createState() => _PostComposerSheetState();
@@ -238,8 +242,9 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
       final caption = _captionCtrl.text.trim();
 
-      final effectiveSpotName =
-          _spotName?.trim().isNotEmpty == true ? _spotName!.trim() : null;
+      final effectiveSpotName = _spotName?.trim().isNotEmpty == true
+          ? _spotName!.trim()
+          : null;
 
       final post = MediaPost(
         id: hashes.first,
@@ -289,6 +294,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
       await LocalPostStore.instance.savePost(savedPost);
       widget.eventRepo?.addPost(savedPost);
+      widget.onPublished?.call(savedPost);
 
       for (var i = 0; i < hashes.length; i++) {
         if (i < paths.length) {
@@ -763,9 +769,11 @@ class _ComposerOptions extends StatelessWidget {
               value: hasSpot,
               onChanged: (v) {
                 if (v) {
-                  onSpotNameChanged(spotNameCtrl.text.trim().isEmpty
-                      ? ' '
-                      : spotNameCtrl.text.trim());
+                  onSpotNameChanged(
+                    spotNameCtrl.text.trim().isEmpty
+                        ? ' '
+                        : spotNameCtrl.text.trim(),
+                  );
                 } else {
                   spotNameCtrl.clear();
                   onSpotNameChanged(null);

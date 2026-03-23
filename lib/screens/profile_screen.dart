@@ -13,6 +13,7 @@ import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/settings_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
@@ -182,6 +183,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final threadedPosts = buildThreadedPostEntries(_posts);
     return Scaffold(
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
@@ -267,10 +269,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             else
               SliverList(
                 delegate: SliverChildBuilderDelegate((ctx, i) {
-                  final post = _posts[i];
+                  final entry = threadedPosts[i];
+                  final post = entry.post;
                   return PostThreadRow(
                     post: post,
-                    isLast: i == _posts.length - 1,
+                    isLast: isLastInThread(threadedPosts, i),
                     onReply: () => showPostComposer(
                       ctx,
                       wallet: widget.wallet,
@@ -281,7 +284,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onDelete: () => _deletePost(post),
                     onReport: () => _reportPost(post),
                   );
-                }, childCount: _posts.length),
+                }, childCount: threadedPosts.length),
               ),
           ],
         ),

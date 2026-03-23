@@ -13,6 +13,7 @@ import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/feed_scoring_service.dart';
 import 'package:mobile/services/location_service.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
@@ -314,26 +315,32 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       backgroundColor: SpotColors.surface,
       displacement: 28,
       onRefresh: _refresh,
-      child: ListView.builder(
-        padding: const EdgeInsets.only(
-          top: SpotSpacing.sm,
-          bottom: SpotSpacing.xl,
-        ),
-        itemCount: posts.length,
-        itemBuilder: (ctx, i) {
-          final post = posts[i];
-          return PostThreadRow(
-            post: post,
-            isLast: i == posts.length - 1,
-            onAvatarTap: () => _openUserProfile(ctx, post.pubkey),
-            onReport: () => _reportPost(post),
-            onReply: () => showPostComposer(
-              ctx,
-              wallet: widget.wallet,
-              nostrService: widget.nostrService,
-              eventRepo: _repo,
-              replyToPost: post,
+      child: Builder(
+        builder: (ctx) {
+          final entries = buildThreadedPostEntries(posts);
+          return ListView.builder(
+            padding: const EdgeInsets.only(
+              top: SpotSpacing.sm,
+              bottom: SpotSpacing.xl,
             ),
+            itemCount: entries.length,
+            itemBuilder: (ctx, i) {
+              final entry = entries[i];
+              final post = entry.post;
+              return PostThreadRow(
+                post: post,
+                isLast: isLastInThread(entries, i),
+                onAvatarTap: () => _openUserProfile(ctx, post.pubkey),
+                onReport: () => _reportPost(post),
+                onReply: () => showPostComposer(
+                  ctx,
+                  wallet: widget.wallet,
+                  nostrService: widget.nostrService,
+                  eventRepo: _repo,
+                  replyToPost: post,
+                ),
+              );
+            },
           );
         },
       ),

@@ -10,6 +10,7 @@ import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/services/follow_service.dart';
+import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
@@ -255,6 +256,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final threadedPosts = buildThreadedPostEntries(_posts);
     return Scaffold(
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
@@ -318,19 +320,24 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             else
               SliverList(
                 delegate: SliverChildBuilderDelegate((ctx, i) {
-                  final post = _posts[i];
+                  final entry = threadedPosts[i];
+                  final post = entry.post;
                   return PostThreadRow(
                     post: post,
-                    isLast: i == _posts.length - 1,
+                    isLast: isLastInThread(threadedPosts, i),
                     onReport: () => _reportPost(post),
                     onReply: () => showPostComposer(
                       ctx,
                       wallet: widget.wallet,
                       nostrService: widget.nostrService,
                       replyToPost: post,
+                      onPublished: (reply) {
+                        if (!mounted) return;
+                        setState(() => _posts = _mergePosts(_posts, [reply]));
+                      },
                     ),
                   );
-                }, childCount: _posts.length),
+                }, childCount: threadedPosts.length),
               ),
           ],
         ),
