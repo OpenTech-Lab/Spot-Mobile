@@ -30,6 +30,26 @@ void main() {
     expect(isLastInThread(entries, 2), isTrue);
   });
 
+  test('thread ordering computes reply counts from visible descendants', () {
+    final root = _post(id: 'root', capturedAt: DateTime.utc(2026, 3, 23, 10));
+    final child = _post(
+      id: 'child',
+      capturedAt: DateTime.utc(2026, 3, 23, 11),
+      replyToId: root.nostrEventId,
+    );
+    final grandchild = _post(
+      id: 'grandchild',
+      capturedAt: DateTime.utc(2026, 3, 23, 12),
+      replyToId: child.nostrEventId,
+    );
+
+    final entries = buildThreadedPostEntries([root, child, grandchild]);
+
+    expect(entries[0].post.replyCount, 2);
+    expect(entries[1].post.replyCount, 1);
+    expect(entries[2].post.replyCount, 0);
+  });
+
   test(
     'topLevelThreadPosts returns only root rows ordered by thread activity',
     () {

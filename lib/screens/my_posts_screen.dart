@@ -10,6 +10,7 @@ import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
@@ -102,14 +103,12 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
   List<MediaPost> _mergePosts(
     List<MediaPost> current,
     Iterable<MediaPost> incoming,
-  ) {
-    final byId = {for (final post in current) post.id: post};
-    for (final post in incoming) {
-      byId[post.id] = post;
-    }
-    final merged = byId.values.toList()
-      ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
-    return merged;
+  ) => mergePostsPreservingLocalState(current, incoming);
+
+  void _toggleLike(MediaPost post) {
+    final updated = post.copyWith(isLikedByMe: !post.isLikedByMe);
+    setState(() => _posts = replacePostsById(_posts, [updated]));
+    unawaited(LocalPostStore.instance.setLikedByMe(post, updated.isLikedByMe));
   }
 
   @override
@@ -229,6 +228,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
             itemBuilder: (ctx, i) => PostThreadRow(
               post: entries[i].post,
               isLast: isLastInThread(entries, i),
+              onLike: () => _toggleLike(entries[i].post),
             ),
           );
         },

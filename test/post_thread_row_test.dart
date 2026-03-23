@@ -1,15 +1,17 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/services/geo_lookup.dart';
+import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
 void main() {
-  test('visibleThreadTagsForPost shows only category tag on root posts', () {
+  test('visibleThreadTagsForPost hides inline tags on root posts', () {
     final post = _post(eventTags: const ['tokyo', 'news', 'urgent']);
 
-    expect(visibleThreadTagsForPost(post), ['tokyo']);
+    expect(visibleThreadTagsForPost(post), isEmpty);
   });
 
   test('visibleThreadTagsForPost shows only sub tags on replies', () {
@@ -27,101 +29,70 @@ void main() {
     expect(visibleThreadTagsForPost(post), isEmpty);
   });
 
-  test('threadHeaderLocationForPost shows hidden label without GPS', () {
+  test('visibleThreadLocationTextForPost shows hidden label without GPS', () {
     final post = _post(eventTags: const ['tokyo']);
-    final location = threadHeaderLocationForPost(post);
+    final location = visibleThreadLocationTextForPost(post);
 
-    expect(location.label, 'Location hidden');
-    expect(location.fullLabel, 'Location hidden');
-    expect(location.isExpandable, isFalse);
+    expect(location, 'Location hidden');
   });
 
-  test('threadHeaderLocationForPost shows virtual label', () {
+  test('visibleThreadLocationTextForPost shows virtual label', () {
     final post = _post(eventTags: const ['tokyo'], isVirtual: true);
-    final location = threadHeaderLocationForPost(post);
+    final location = visibleThreadLocationTextForPost(post);
 
-    expect(location.label, 'Virtual');
-    expect(location.fullLabel, 'Virtual');
-    expect(location.isExpandable, isFalse);
-  });
-
-  test('threadHeaderLocationForPost shows country in header for check-ins', () {
-    final post = _post(
-      eventTags: const ['tokyo'],
-      latitude: 35.7,
-      longitude: 139.7,
-      spotName: 'Shibuya Crossing',
-    );
-    final location = threadHeaderLocationForPost(
-      post,
-      geoLocation: const GeoLocation(city: 'Tokyo', country: 'Japan'),
-    );
-
-    expect(location.label, 'Japan');
-    expect(location.fullLabel, 'Shibuya Crossing  ·  Japan/Tokyo');
-    expect(location.isExpandable, isTrue);
+    expect(location, 'Virtual');
   });
 
   test(
-    'threadHeaderLocationForPost shows country label and full place for geo posts',
+    'visibleThreadLocationTextForPost shows spot name and place for check-ins',
     () {
       final post = _post(
         eventTags: const ['tokyo'],
-        latitude: 35.6895,
-        longitude: 139.6917,
+        latitude: 35.7,
+        longitude: 139.7,
+        spotName: 'Shibuya Crossing',
       );
-      final location = threadHeaderLocationForPost(
+      final location = visibleThreadLocationTextForPost(
         post,
         geoLocation: const GeoLocation(city: 'Tokyo', country: 'Japan'),
       );
 
-      expect(location.label, 'Japan');
-      expect(location.fullLabel, 'Japan/Tokyo');
-      expect(location.isExpandable, isTrue);
+      expect(location, 'Shibuya Crossing - Japan/Tokyo (35.7, 139.7)');
     },
   );
 
   test(
-    'threadHeaderLocationForPost falls back to coarse coordinates without geo lookup',
+    'visibleThreadLocationTextForPost shows place only for normal geo posts',
     () {
       final post = _post(
         eventTags: const ['tokyo'],
         latitude: 35.6895,
         longitude: 139.6917,
       );
-      final location = threadHeaderLocationForPost(post);
-
-      expect(location.label, '35.7, 139.7');
-      expect(location.fullLabel, '35.7, 139.7');
-      expect(location.isExpandable, isFalse);
-    },
-  );
-
-  testWidgets(
-    'ThreadHeaderLocationLabel wraps expandable locations in a tap tooltip',
-    (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: const ThreadHeaderLocationLabel(
-              location: ThreadHeaderLocation(
-                label: 'Japan',
-                fullLabel: 'Japan/Tokyo',
-              ),
-            ),
-          ),
-        ),
+      final location = visibleThreadLocationTextForPost(
+        post,
+        geoLocation: const GeoLocation(city: 'Tokyo', country: 'Japan'),
       );
 
-      final tooltip = tester.widget<Tooltip>(find.byType(Tooltip));
-
-      expect(find.text('Japan'), findsOneWidget);
-      expect(tooltip.message, 'Japan/Tokyo');
-      expect(tooltip.triggerMode, TooltipTriggerMode.tap);
+      expect(location, 'Japan/Tokyo');
     },
   );
 
-  testWidgets('PostThreadRow shows hidden location only once in the header', (
+  test(
+    'visibleThreadLocationTextForPost falls back to coarse coordinates without geo lookup',
+    () {
+      final post = _post(
+        eventTags: const ['tokyo'],
+        latitude: 35.6895,
+        longitude: 139.6917,
+      );
+      final location = visibleThreadLocationTextForPost(post);
+
+      expect(location, '35.7, 139.7');
+    },
+  );
+
+  testWidgets('PostThreadRow shows hidden location once in the location row', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -137,6 +108,119 @@ void main() {
 
     expect(find.text('Location hidden'), findsOneWidget);
   });
+
+  testWidgets('PostThreadRow shows category tag in the header only once', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PostThreadRow(
+            post: _post(eventTags: const ['tokyo', 'news']),
+            isLast: true,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.textContaining('#tokyo'), findsOneWidget);
+  });
+
+  testWidgets(
+    'PostThreadRow shows full spot location between body and actions',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: PostThreadRow(
+              post: _post(
+                eventTags: const ['tokyo'],
+                latitude: 35.7,
+                longitude: 139.7,
+                spotName: 'Shibuya Crossing',
+              ),
+              isLast: true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Shibuya Crossing - 35.7, 139.7'), findsOneWidget);
+    },
+  );
+
+  testWidgets('PostThreadRow does not overflow on narrow widths', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 240,
+              child: PostThreadRow(
+                post: _post(
+                  eventTags: const ['very-long-category-name', 'news'],
+                  latitude: 35.6895,
+                  longitude: 139.6917,
+                ),
+                isLast: true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('PostThreadRow shows zero counts for reply and like by default', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PostThreadRow(
+            post: _post(
+              eventTags: const ['tokyo'],
+              replyCount: 0,
+              likeCount: 0,
+            ),
+            isLast: true,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('0'), findsNWidgets(2));
+  });
+
+  testWidgets('PostThreadRow like button turns red and increments count', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: _LikeHarness(post: _post(eventTags: const ['tokyo'])),
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.favorite_border), findsNothing);
+    expect(find.byIcon(CupertinoIcons.heart), findsOneWidget);
+    expect(find.text('1'), findsNothing);
+
+    await tester.tap(find.byIcon(CupertinoIcons.heart));
+    await tester.pump();
+
+    final icon = tester.widget<Icon>(find.byIcon(CupertinoIcons.heart_fill));
+    final count = tester.widget<Text>(find.text('1'));
+
+    expect(icon.color, SpotColors.danger);
+    expect(count.style?.color, SpotColors.danger);
+  });
 }
 
 MediaPost _post({
@@ -146,6 +230,9 @@ MediaPost _post({
   double? longitude,
   bool isVirtual = false,
   String? spotName,
+  int replyCount = 0,
+  int likeCount = 0,
+  bool isLikedByMe = false,
 }) => MediaPost(
   id: 'post-id',
   pubkey: 'pubkey',
@@ -157,5 +244,40 @@ MediaPost _post({
   longitude: longitude,
   isVirtual: isVirtual,
   spotName: spotName,
+  replyCount: replyCount,
+  likeCount: likeCount,
+  isLikedByMe: isLikedByMe,
   nostrEventId: 'post-id',
 );
+
+class _LikeHarness extends StatefulWidget {
+  const _LikeHarness({required this.post});
+
+  final MediaPost post;
+
+  @override
+  State<_LikeHarness> createState() => _LikeHarnessState();
+}
+
+class _LikeHarnessState extends State<_LikeHarness> {
+  late MediaPost _post;
+
+  @override
+  void initState() {
+    super.initState();
+    _post = widget.post;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PostThreadRow(
+      post: _post,
+      isLast: true,
+      onLike: () {
+        setState(() {
+          _post = _post.copyWith(isLikedByMe: !_post.isLikedByMe);
+        });
+      },
+    );
+  }
+}

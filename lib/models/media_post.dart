@@ -70,6 +70,9 @@ class MediaPost {
   /// Number of likes / reactions on this post (computed at display time).
   final int likeCount;
 
+  /// Whether the local device has liked this post.
+  final bool isLikedByMe;
+
   /// Optional text caption added by the author at publish time.
   final String? caption;
 
@@ -106,6 +109,7 @@ class MediaPost {
     this.spotName,
     this.replyCount = 0,
     this.likeCount = 0,
+    this.isLikedByMe = false,
   });
 
   // ── Convenience getters ────────────────────────────────────────────────────
@@ -121,70 +125,74 @@ class MediaPost {
 
   bool get hasGps => latitude != null && longitude != null;
 
+  int get displayLikeCount => likeCount + (isLikedByMe ? 1 : 0);
+
   /// Whether this post is a Spot check-in with a named place.
   bool get isSpotCheckIn => spotName != null && spotName!.isNotEmpty;
 
   // ── Serialisation ──────────────────────────────────────────────────────────
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'pubkey': pubkey,
-        'contentHashes': contentHashes,
-        'mediaPaths': mediaPaths,
-        'ipfsCid': ipfsCid,
-        'latitude': latitude,
-        'longitude': longitude,
-        'capturedAt': capturedAt.toIso8601String(),
-        'eventTags': eventTags,
-        'isDangerMode': isDangerMode,
-        'isVirtual': isVirtual,
-        'isAiGenerated': isAiGenerated,
-        'isTextOnly': isTextOnly,
-        'previewBase64': previewBase64,
-        'previewMimeType': previewMimeType,
-        'sourceType': sourceType.name,
-        'caption': caption,
-        'replyToId': replyToId,
-        'tags': tags,
-        'nostrEventId': nostrEventId,
-        'spotName': spotName,
-        'replyCount': replyCount,
-        'likeCount': likeCount,
-      };
+    'id': id,
+    'pubkey': pubkey,
+    'contentHashes': contentHashes,
+    'mediaPaths': mediaPaths,
+    'ipfsCid': ipfsCid,
+    'latitude': latitude,
+    'longitude': longitude,
+    'capturedAt': capturedAt.toIso8601String(),
+    'eventTags': eventTags,
+    'isDangerMode': isDangerMode,
+    'isVirtual': isVirtual,
+    'isAiGenerated': isAiGenerated,
+    'isTextOnly': isTextOnly,
+    'previewBase64': previewBase64,
+    'previewMimeType': previewMimeType,
+    'sourceType': sourceType.name,
+    'caption': caption,
+    'replyToId': replyToId,
+    'tags': tags,
+    'nostrEventId': nostrEventId,
+    'spotName': spotName,
+    'replyCount': replyCount,
+    'likeCount': likeCount,
+    'isLikedByMe': isLikedByMe,
+  };
 
   factory MediaPost.fromJson(Map<String, dynamic> json) => MediaPost(
-        id: json['id'] as String,
-        pubkey: json['pubkey'] as String,
-        // Support both old single-hash format and new list format
-        contentHashes: json['contentHashes'] != null
-            ? List<String>.from(json['contentHashes'] as List)
-            : [json['contentHash'] as String],
-        mediaPaths: json['mediaPaths'] != null
-            ? List<String>.from(json['mediaPaths'] as List)
-            : (json['mediaPath'] != null ? [json['mediaPath'] as String] : []),
-        ipfsCid: json['ipfsCid'] as String?,
-        latitude: (json['latitude'] as num?)?.toDouble(),
-        longitude: (json['longitude'] as num?)?.toDouble(),
-        capturedAt: DateTime.parse(json['capturedAt'] as String),
-        // Backward compat: read new list field, fall back to old single string
-        eventTags: json['eventTags'] != null
-            ? List<String>.from(json['eventTags'] as List)
-            : (json['eventTag'] != null ? [json['eventTag'] as String] : []),
-        isDangerMode: json['isDangerMode'] as bool? ?? false,
-        isVirtual: json['isVirtual'] as bool? ?? false,
-        isAiGenerated: json['isAiGenerated'] as bool? ?? false,
-        isTextOnly: json['isTextOnly'] as bool? ?? false,
-        previewBase64: json['previewBase64'] as String?,
-        previewMimeType: json['previewMimeType'] as String?,
-        sourceType: _parseSourceType(json['sourceType'] as String?),
-        caption: json['caption'] as String?,
-        replyToId: json['replyToId'] as String?,
-        tags: List<String>.from(json['tags'] as List? ?? []),
-        nostrEventId: json['nostrEventId'] as String,
-        spotName: json['spotName'] as String?,
-        replyCount: json['replyCount'] as int? ?? 0,
-        likeCount: json['likeCount'] as int? ?? 0,
-      );
+    id: json['id'] as String,
+    pubkey: json['pubkey'] as String,
+    // Support both old single-hash format and new list format
+    contentHashes: json['contentHashes'] != null
+        ? List<String>.from(json['contentHashes'] as List)
+        : [json['contentHash'] as String],
+    mediaPaths: json['mediaPaths'] != null
+        ? List<String>.from(json['mediaPaths'] as List)
+        : (json['mediaPath'] != null ? [json['mediaPath'] as String] : []),
+    ipfsCid: json['ipfsCid'] as String?,
+    latitude: (json['latitude'] as num?)?.toDouble(),
+    longitude: (json['longitude'] as num?)?.toDouble(),
+    capturedAt: DateTime.parse(json['capturedAt'] as String),
+    // Backward compat: read new list field, fall back to old single string
+    eventTags: json['eventTags'] != null
+        ? List<String>.from(json['eventTags'] as List)
+        : (json['eventTag'] != null ? [json['eventTag'] as String] : []),
+    isDangerMode: json['isDangerMode'] as bool? ?? false,
+    isVirtual: json['isVirtual'] as bool? ?? false,
+    isAiGenerated: json['isAiGenerated'] as bool? ?? false,
+    isTextOnly: json['isTextOnly'] as bool? ?? false,
+    previewBase64: json['previewBase64'] as String?,
+    previewMimeType: json['previewMimeType'] as String?,
+    sourceType: _parseSourceType(json['sourceType'] as String?),
+    caption: json['caption'] as String?,
+    replyToId: json['replyToId'] as String?,
+    tags: List<String>.from(json['tags'] as List? ?? []),
+    nostrEventId: json['nostrEventId'] as String,
+    spotName: json['spotName'] as String?,
+    replyCount: json['replyCount'] as int? ?? 0,
+    likeCount: json['likeCount'] as int? ?? 0,
+    isLikedByMe: json['isLikedByMe'] as bool? ?? false,
+  );
 
   MediaPost copyWith({
     String? id,
@@ -210,38 +218,41 @@ class MediaPost {
     String? spotName,
     int? replyCount,
     int? likeCount,
-  }) =>
-      MediaPost(
-        id: id ?? this.id,
-        pubkey: pubkey ?? this.pubkey,
-        contentHashes: contentHashes ?? this.contentHashes,
-        mediaPaths: mediaPaths ?? this.mediaPaths,
-        ipfsCid: ipfsCid ?? this.ipfsCid,
-        latitude: latitude ?? this.latitude,
-        longitude: longitude ?? this.longitude,
-        capturedAt: capturedAt ?? this.capturedAt,
-        eventTags: eventTags ?? this.eventTags,
-        isDangerMode: isDangerMode ?? this.isDangerMode,
-        isVirtual: isVirtual ?? this.isVirtual,
-        isAiGenerated: isAiGenerated ?? this.isAiGenerated,
-        isTextOnly: isTextOnly ?? this.isTextOnly,
-        previewBase64: previewBase64 ?? this.previewBase64,
-        previewMimeType: previewMimeType ?? this.previewMimeType,
-        sourceType: sourceType ?? this.sourceType,
-        caption: caption ?? this.caption,
-        replyToId: replyToId ?? this.replyToId,
-        tags: tags ?? this.tags,
-        nostrEventId: nostrEventId ?? this.nostrEventId,
-        spotName: spotName ?? this.spotName,
-        replyCount: replyCount ?? this.replyCount,
-        likeCount: likeCount ?? this.likeCount,
-      );
+    bool? isLikedByMe,
+  }) => MediaPost(
+    id: id ?? this.id,
+    pubkey: pubkey ?? this.pubkey,
+    contentHashes: contentHashes ?? this.contentHashes,
+    mediaPaths: mediaPaths ?? this.mediaPaths,
+    ipfsCid: ipfsCid ?? this.ipfsCid,
+    latitude: latitude ?? this.latitude,
+    longitude: longitude ?? this.longitude,
+    capturedAt: capturedAt ?? this.capturedAt,
+    eventTags: eventTags ?? this.eventTags,
+    isDangerMode: isDangerMode ?? this.isDangerMode,
+    isVirtual: isVirtual ?? this.isVirtual,
+    isAiGenerated: isAiGenerated ?? this.isAiGenerated,
+    isTextOnly: isTextOnly ?? this.isTextOnly,
+    previewBase64: previewBase64 ?? this.previewBase64,
+    previewMimeType: previewMimeType ?? this.previewMimeType,
+    sourceType: sourceType ?? this.sourceType,
+    caption: caption ?? this.caption,
+    replyToId: replyToId ?? this.replyToId,
+    tags: tags ?? this.tags,
+    nostrEventId: nostrEventId ?? this.nostrEventId,
+    spotName: spotName ?? this.spotName,
+    replyCount: replyCount ?? this.replyCount,
+    likeCount: likeCount ?? this.likeCount,
+    isLikedByMe: isLikedByMe ?? this.isLikedByMe,
+  );
 
-  static PostSourceType _parseSourceType(String? value) =>
-      switch (value) {
-        'secondhand' => PostSourceType.secondhand,
-        _ => PostSourceType.firsthand,
-      };
+  MediaPost mergeLocalStateFrom(MediaPost existing) =>
+      copyWith(isLikedByMe: existing.isLikedByMe);
+
+  static PostSourceType _parseSourceType(String? value) => switch (value) {
+    'secondhand' => PostSourceType.secondhand,
+    _ => PostSourceType.firsthand,
+  };
 
   @override
   String toString() =>

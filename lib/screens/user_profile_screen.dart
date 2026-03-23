@@ -10,6 +10,8 @@ import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/services/follow_service.dart';
+import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
@@ -61,6 +63,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   Future<void> _initFeed() async {
     setState(() => _isLoading = true);
     try {
+      await _loadPersistedPosts();
       await widget.nostrService.connect();
       _sub = _repo.subscribeToAuthorPosts(widget.pubkey).listen(_onEvent);
     } catch (_) {
@@ -75,6 +78,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     if (posts.isEmpty) return;
     final merged = _mergePosts(_posts, posts);
     if (merged.length == _posts.length) return;
+    unawaited(LocalPostStore.instance.savePosts(posts));
     setState(() => _posts = merged);
   }
 
@@ -88,13 +92,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   List<MediaPost> _mergePosts(
     List<MediaPost> current,
     Iterable<MediaPost> incoming,
-  ) {
-    final byId = {for (final p in current) p.id: p};
-    for (final p in incoming) {
-      byId[p.id] = p;
-    }
-    return byId.values.toList()
-      ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+  ) => mergePostsPreservingLocalState(current, incoming);
+
+  Future<void> _loadPersistedPosts() async {
+    final persisted = await LocalPostStore.instance.loadPosts(
+      authorPubkey: widget.pubkey,
+    );
+    if (!mounted || persisted.isEmpty) return;
+    setState(() => _posts = _mergePosts(_posts, persisted));
+  }
+
+  void _toggleLike(MediaPost post) {
+    final updated = post.copyWith(isLikedByMe: !post.isLikedByMe);
+    setState(() => _posts = replacePostsById(_posts, [updated]));
+    unawaited(LocalPostStore.instance.setLikedByMe(post, updated.isLikedByMe));
   }
 
   // ── Follow ────────────────────────────────────────────────────────────────
@@ -326,6 +337,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     post: post,
                     isLast: isLastInThread(threadedPosts, i),
                     onReport: () => _reportPost(post),
+                    onLike: () => _toggleLike(post),
                     onReply: () => showPostComposer(
                       ctx,
                       wallet: widget.wallet,

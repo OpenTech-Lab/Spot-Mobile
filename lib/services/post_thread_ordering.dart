@@ -17,6 +17,7 @@ List<ThreadedPostEntry> buildThreadedPostEntries(Iterable<MediaPost> posts) {
 
   final visibleIds = postsByEventId.keys.toSet();
   final latestActivityCache = <String, DateTime>{};
+  final replyCountCache = <String, int>{};
 
   DateTime latestActivity(MediaPost post) {
     final cached = latestActivityCache[post.nostrEventId];
@@ -29,6 +30,18 @@ List<ThreadedPostEntry> buildThreadedPostEntries(Iterable<MediaPost> posts) {
     }
     latestActivityCache[post.nostrEventId] = latest;
     return latest;
+  }
+
+  int replyCount(MediaPost post) {
+    final cached = replyCountCache[post.nostrEventId];
+    if (cached != null) return cached;
+
+    var total = 0;
+    for (final child in childrenByParent[post.nostrEventId] ?? const []) {
+      total += 1 + replyCount(child);
+    }
+    replyCountCache[post.nostrEventId] = total;
+    return total;
   }
 
   int newestFirst(MediaPost a, MediaPost b) {
@@ -52,7 +65,11 @@ List<ThreadedPostEntry> buildThreadedPostEntries(Iterable<MediaPost> posts) {
   void append(MediaPost post, {required int depth, required String rootId}) {
     if (!visited.add(post.nostrEventId)) return;
 
-    ordered.add((depth: depth, post: post, rootId: rootId));
+    ordered.add((
+      depth: depth,
+      post: post.copyWith(replyCount: replyCount(post)),
+      rootId: rootId,
+    ));
 
     final replies = [...?childrenByParent[post.nostrEventId]]
       ..sort((a, b) => a.capturedAt.compareTo(b.capturedAt));

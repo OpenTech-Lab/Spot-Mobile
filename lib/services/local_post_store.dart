@@ -29,9 +29,21 @@ class LocalPostStore {
     final posts = await _readPosts();
     final byId = {for (final existing in posts) existing.id: existing};
     for (final post in incoming) {
-      byId[post.id] = post;
+      final existing = byId[post.id];
+      byId[post.id] = existing == null
+          ? post
+          : post.mergeLocalStateFrom(existing);
     }
     await _writePosts(byId.values);
+  }
+
+  Future<MediaPost> setLikedByMe(MediaPost post, bool isLikedByMe) async {
+    final updated = post.copyWith(isLikedByMe: isLikedByMe);
+    final posts = await _readPosts();
+    final byId = {for (final existing in posts) existing.id: existing};
+    byId[updated.id] = updated;
+    await _writePosts(byId.values);
+    return updated;
   }
 
   Future<void> removePost(String postId) async {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
@@ -6,6 +8,8 @@ import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/user_profile_screen.dart';
+import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
@@ -81,9 +85,13 @@ class _ThreadScreenState extends State<ThreadScreen> {
   }
 
   void _mergePost(MediaPost post) {
-    final byId = {for (final existing in _posts) existing.id: existing};
-    byId[post.id] = post;
-    setState(() => _posts = byId.values.toList());
+    setState(() => _posts = mergePostsPreservingLocalState(_posts, [post]));
+  }
+
+  void _toggleLike(MediaPost post) {
+    final updated = post.copyWith(isLikedByMe: !post.isLikedByMe);
+    setState(() => _posts = replacePostsById(_posts, [updated]));
+    unawaited(LocalPostStore.instance.setLikedByMe(post, updated.isLikedByMe));
   }
 
   @override
@@ -121,6 +129,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
                   isLast: i == entries.length - 1,
                   onAvatarTap: () => _openUserProfile(ctx, post.pubkey),
                   onReport: () => _reportPost(post),
+                  onLike: () => _toggleLike(post),
                   onReply: () => showPostComposer(
                     ctx,
                     wallet: widget.wallet,

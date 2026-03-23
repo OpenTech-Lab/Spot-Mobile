@@ -15,6 +15,7 @@ import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
@@ -171,14 +172,18 @@ class FeedScreenState extends State<FeedScreen>
     List<MediaPost> current,
     Iterable<MediaPost> incoming,
   ) {
-    final byId = {for (final post in current) post.id: post};
-    for (final post in incoming) {
-      if (!CacheManager.instance.isBlocked(post.contentHash)) {
-        byId[post.id] = post;
-      }
-    }
-    return byId.values.toList()
-      ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+    return mergePostsPreservingLocalState(
+      current,
+      incoming.where(
+        (post) => !CacheManager.instance.isBlocked(post.contentHash),
+      ),
+    );
+  }
+
+  void _toggleLike(MediaPost post) {
+    final updated = post.copyWith(isLikedByMe: !post.isLikedByMe);
+    setState(() => _posts = replacePostsById(_posts, [updated]));
+    unawaited(LocalPostStore.instance.setLikedByMe(post, updated.isLikedByMe));
   }
 
   Future<void> _reportPost(MediaPost post) async {
@@ -258,6 +263,7 @@ class FeedScreenState extends State<FeedScreen>
                 onRefresh: _refresh,
                 onLoadMore: _loadMorePosts,
                 onReport: _reportPost,
+                onLike: _toggleLike,
                 onAvatarTap: _openUserProfile,
                 wallet: widget.wallet,
                 nostrService: widget.nostrService,
@@ -269,6 +275,7 @@ class FeedScreenState extends State<FeedScreen>
                 isLoading: _isLoading,
                 onRefresh: _refresh,
                 onReport: _reportPost,
+                onLike: _toggleLike,
                 onAvatarTap: _openUserProfile,
                 wallet: widget.wallet,
                 nostrService: widget.nostrService,
@@ -310,6 +317,7 @@ class _LatestTab extends StatefulWidget {
     required this.onRefresh,
     required this.onLoadMore,
     required this.onReport,
+    required this.onLike,
     required this.onAvatarTap,
     required this.wallet,
     required this.nostrService,
@@ -324,6 +332,7 @@ class _LatestTab extends StatefulWidget {
   final Future<void> Function() onRefresh;
   final Future<void> Function() onLoadMore;
   final void Function(MediaPost) onReport;
+  final void Function(MediaPost) onLike;
   final void Function(BuildContext, String) onAvatarTap;
   final WalletModel wallet;
   final NostrService nostrService;
@@ -419,6 +428,7 @@ class _LatestTabState extends State<_LatestTab> {
                   isLast: true,
                   onAvatarTap: () => widget.onAvatarTap(ctx, post.pubkey),
                   onReport: () => widget.onReport(post),
+                  onLike: () => widget.onLike(post),
                   onReply: () => showPostComposer(
                     ctx,
                     wallet: widget.wallet,
@@ -556,6 +566,7 @@ class _FollowingTab extends StatelessWidget {
     required this.isLoading,
     required this.onRefresh,
     required this.onReport,
+    required this.onLike,
     required this.onAvatarTap,
     required this.wallet,
     required this.nostrService,
@@ -567,6 +578,7 @@ class _FollowingTab extends StatelessWidget {
   final bool isLoading;
   final Future<void> Function() onRefresh;
   final void Function(MediaPost) onReport;
+  final void Function(MediaPost) onLike;
   final void Function(BuildContext, String) onAvatarTap;
   final WalletModel wallet;
   final NostrService nostrService;
@@ -673,6 +685,7 @@ class _FollowingTab extends StatelessWidget {
                   isLast: true,
                   onAvatarTap: () => onAvatarTap(ctx, post.pubkey),
                   onReport: () => onReport(post),
+                  onLike: () => onLike(post),
                   onReply: () => showPostComposer(
                     ctx,
                     wallet: wallet,

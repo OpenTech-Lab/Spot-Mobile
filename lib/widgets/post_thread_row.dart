@@ -12,46 +12,34 @@ import 'package:mobile/theme/spot_theme.dart';
 
 List<String> visibleThreadTagsForPost(MediaPost post) {
   if (post.eventTags.isEmpty) return const [];
-  if (post.replyToId == null) return [post.eventTags.first];
+  if (post.replyToId == null) return const [];
   if (post.eventTags.length == 1) return const [];
   return post.eventTags.sublist(1);
 }
 
-@immutable
-class ThreadHeaderLocation {
-  const ThreadHeaderLocation({required this.label, required this.fullLabel});
-
-  final String label;
-  final String fullLabel;
-
-  bool get isExpandable => fullLabel != label;
-}
-
-ThreadHeaderLocation threadHeaderLocationForPost(
+String visibleThreadLocationTextForPost(
   MediaPost post, {
   GeoLocation? geoLocation,
 }) {
   if (post.isVirtual) {
-    return const ThreadHeaderLocation(label: 'Virtual', fullLabel: 'Virtual');
+    return 'Virtual';
   }
 
   if (!post.hasGps) {
-    return const ThreadHeaderLocation(
-      label: 'Location hidden',
-      fullLabel: 'Location hidden',
-    );
+    return 'Location hidden';
   }
 
   final geo = geoLocation ?? _geoLocationForPost(post);
-  final shortLabel = geo?.country ?? _coordinateLocationLabelForPost(post);
-  final fullPlace = geo != null
-      ? '${geo.country}/${geo.city}'
-      : _coordinateLocationLabelForPost(post);
-  final fullLabel = post.isSpotCheckIn
-      ? '${post.spotName}  ·  $fullPlace'
-      : fullPlace;
+  final coordinates = _coordinateLocationLabelForPost(post);
+  final place = geo != null ? '${geo.country}/${geo.city}' : null;
 
-  return ThreadHeaderLocation(label: shortLabel, fullLabel: fullLabel);
+  if (post.isSpotCheckIn) {
+    if (place != null) return '${post.spotName} - $place ($coordinates)';
+    return '${post.spotName} - $coordinates';
+  }
+
+  if (place != null) return place;
+  return coordinates;
 }
 
 /// Twitter/Threads-style thread row for a single [MediaPost].
@@ -165,7 +153,7 @@ class PostThreadRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visibleTags = visibleThreadTagsForPost(post);
-    final headerLocation = threadHeaderLocationForPost(post);
+    final headerCategoryTag = post.eventTag;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         SpotSpacing.lg,
@@ -215,23 +203,31 @@ class PostThreadRow extends StatelessWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: Row(
+                          child: Wrap(
+                            spacing: SpotSpacing.xs,
+                            runSpacing: 2,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               Text(
                                 _shortKey(post.pubkey),
                                 style: SpotType.bodySecondary,
                               ),
-                              const SizedBox(width: SpotSpacing.sm),
-                              Flexible(
-                                child: ThreadHeaderLocationLabel(
-                                  location: headerLocation,
+                              if (headerCategoryTag != null)
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 96,
+                                  ),
+                                  child: Text(
+                                    '#$headerCategoryTag',
+                                    style: SpotType.caption.copyWith(
+                                      color: SpotColors.accent,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: SpotSpacing.xs),
-                              Text('·', style: SpotType.caption),
-                              const SizedBox(width: SpotSpacing.xs),
                               Text(
-                                _relativeTime(post.capturedAt),
+                                '· ${_relativeTime(post.capturedAt)}',
                                 style: SpotType.caption,
                               ),
                             ],
@@ -322,6 +318,8 @@ class PostThreadRow extends StatelessWidget {
                     const SizedBox(height: SpotSpacing.sm),
                     // Media
                     _PostMedia(post: post),
+                    const SizedBox(height: SpotSpacing.sm),
+                    _PostLocationRow(post: post),
                     // ── Control panel: reply · like · indicators ──
                     const SizedBox(height: SpotSpacing.xs),
                     Row(
@@ -334,9 +332,9 @@ class PostThreadRow extends StatelessWidget {
                         ),
                         const SizedBox(width: SpotSpacing.lg),
                         // Like
-                        _ActionButton(
-                          icon: CupertinoIcons.heart,
-                          count: post.likeCount,
+                        _LikeActionButton(
+                          count: post.displayLikeCount,
+                          liked: post.isLikedByMe,
                           onTap: onLike,
                         ),
                         const Spacer(),
@@ -664,36 +662,46 @@ class PubkeyAvatar extends StatelessWidget {
 
 // ── Private helpers ────────────────────────────────────────────────────────────
 
-class ThreadHeaderLocationLabel extends StatelessWidget {
-  const ThreadHeaderLocationLabel({super.key, required this.location});
+class _PostLocationRow extends StatelessWidget {
+  const _PostLocationRow({required this.post});
 
-  final ThreadHeaderLocation location;
+  final MediaPost post;
 
   @override
   Widget build(BuildContext context) {
-    final label = Text(
-      location.label,
-      style: SpotType.caption.copyWith(
-        color: location.isExpandable
-            ? SpotColors.accent
-            : SpotColors.textTertiary,
-        decoration: location.isExpandable
-            ? TextDecoration.underline
-            : TextDecoration.none,
-        decorationColor: location.isExpandable ? SpotColors.accent : null,
-      ),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-    );
+    final label = visibleThreadLocationTextForPost(post);
+    final IconData icon;
+    final Color color;
 
-    if (!location.isExpandable) return label;
+    if (post.isVirtual) {
+      icon = CupertinoIcons.gamecontroller;
+      color = SpotColors.textTertiary;
+    } else if (!post.hasGps) {
+      icon = CupertinoIcons.location_slash;
+      color = SpotColors.textTertiary;
+    } else if (post.isSpotCheckIn) {
+      icon = CupertinoIcons.map_pin_ellipse;
+      color = SpotColors.accent;
+    } else {
+      icon = CupertinoIcons.location;
+      color = SpotColors.success.withAlpha(160);
+    }
 
-    return Tooltip(
-      message: location.fullLabel,
-      triggerMode: TooltipTriggerMode.tap,
-      waitDuration: Duration.zero,
-      showDuration: const Duration(seconds: 3),
-      child: MouseRegion(cursor: SystemMouseCursors.click, child: label),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Icon(icon, size: 12, color: color),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            label,
+            style: SpotType.caption.copyWith(color: SpotColors.textSecondary),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -726,11 +734,7 @@ class _PostBadge extends StatelessWidget {
 // ── Action button (reply / like) ──────────────────────────────────────────────
 
 class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.icon,
-    required this.count,
-    this.onTap,
-  });
+  const _ActionButton({required this.icon, required this.count, this.onTap});
 
   final IconData icon;
   final int count;
@@ -747,15 +751,48 @@ class _ActionButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 16, color: SpotColors.textTertiary),
-            if (count > 0) ...[
-              const SizedBox(width: 4),
-              Text(
-                '$count',
-                style: SpotType.caption.copyWith(
-                  color: SpotColors.textTertiary,
-                ),
-              ),
-            ],
+            const SizedBox(width: 4),
+            Text(
+              '$count',
+              style: SpotType.caption.copyWith(color: SpotColors.textTertiary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LikeActionButton extends StatelessWidget {
+  const _LikeActionButton({
+    required this.count,
+    required this.liked,
+    this.onTap,
+  });
+
+  final int count;
+  final bool liked;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = liked ? SpotColors.danger : SpotColors.textTertiary;
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              liked ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
+              size: 16,
+              color: color,
+            ),
+            const SizedBox(width: 4),
+            Text('$count', style: SpotType.caption.copyWith(color: color)),
           ],
         ),
       ),

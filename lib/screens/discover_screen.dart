@@ -13,6 +13,7 @@ import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/feed_scoring_service.dart';
 import 'package:mobile/services/location_service.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
@@ -126,13 +127,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   List<MediaPost> _mergePosts(
     List<MediaPost> current,
     Iterable<MediaPost> incoming,
-  ) {
-    final byId = {for (final p in current) p.id: p};
-    for (final p in incoming) {
-      byId[p.id] = p;
-    }
-    return byId.values.toList()
-      ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+  ) => mergePostsPreservingLocalState(current, incoming);
+
+  void _toggleLike(MediaPost post) {
+    final updated = post.copyWith(isLikedByMe: !post.isLikedByMe);
+    setState(() => _posts = replacePostsById(_posts, [updated]));
+    unawaited(LocalPostStore.instance.setLikedByMe(post, updated.isLikedByMe));
   }
 
   // ── Post actions ──────────────────────────────────────────────────────────
@@ -332,6 +332,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 isLast: isLastInThread(entries, i),
                 onAvatarTap: () => _openUserProfile(ctx, post.pubkey),
                 onReport: () => _reportPost(post),
+                onLike: () => _toggleLike(post),
                 onReply: () => showPostComposer(
                   ctx,
                   wallet: widget.wallet,
