@@ -259,41 +259,52 @@ class _NavItemState extends State<_NavItem>
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  transitionBuilder: (child, anim) => ScaleTransition(
-                    scale: CurvedAnimation(
-                      parent: anim,
-                      curve: Curves.easeOutBack,
+            child: SizedBox(
+              height: 36,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  AnimatedSlide(
+                    offset: widget.selected
+                        ? const Offset(0, -0.28)
+                        : Offset.zero,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      transitionBuilder: (child, anim) => ScaleTransition(
+                        scale: CurvedAnimation(
+                          parent: anim,
+                          curve: Curves.easeOutBack,
+                        ),
+                        child: child,
+                      ),
+                      child: Icon(
+                        currentIcon,
+                        key: ValueKey(currentIcon),
+                        color: widget.selected
+                            ? SpotColors.accent
+                            : SpotColors.textSecondary,
+                        size: 20,
+                      ),
                     ),
-                    child: child,
                   ),
-                  child: Icon(
-                    currentIcon,
-                    key: ValueKey(currentIcon),
-                    color: widget.selected
-                        ? SpotColors.accent
-                        : SpotColors.textSecondary,
-                    size: 20,
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: AnimatedOpacity(
+                      opacity: widget.selected ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Text(
+                        widget.label,
+                        style: SpotType.caption.copyWith(
+                          color: SpotColors.accent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 3),
-                AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 200),
-                  style: SpotType.caption.copyWith(
-                    color: widget.selected
-                        ? SpotColors.accent
-                        : SpotColors.textSecondary,
-                    fontWeight: widget.selected
-                        ? FontWeight.w600
-                        : FontWeight.w400,
-                  ),
-                  child: Text(widget.label),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
