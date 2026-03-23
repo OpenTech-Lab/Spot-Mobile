@@ -284,6 +284,7 @@ class FeedScreenState extends State<FeedScreen>
       unselectedLabelColor: SpotColors.textTertiary,
       indicatorColor: SpotColors.accent,
       indicatorWeight: 1.5,
+      dividerColor: Colors.transparent,
       labelStyle:
           SpotType.caption.copyWith(letterSpacing: 0.8, fontSize: 11),
       tabs: const [
@@ -411,20 +412,24 @@ class _LatestTabState extends State<_LatestTab> {
     );
   }
 
-  Widget _buildLoading() => const Center(
+  Widget _buildLoading() => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: 18,
-              height: 18,
+            Image.asset(
+              'assets/logo_transparent.png',
+              height: 40,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: SpotSpacing.xl),
+            const SizedBox(
+              width: 16,
+              height: 16,
               child: CircularProgressIndicator(
                 color: SpotColors.accent,
                 strokeWidth: 1,
               ),
             ),
-            SizedBox(height: SpotSpacing.xl),
-            Text('Connecting', style: SpotType.label),
           ],
         ),
       );
@@ -540,12 +545,23 @@ class _FollowingTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isLoading && posts.isEmpty) {
-      return const Center(
-        child: SizedBox(
-          width: 18,
-          height: 18,
-          child: CircularProgressIndicator(
-              color: SpotColors.accent, strokeWidth: 1),
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'assets/logo_transparent.png',
+              height: 40,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: SpotSpacing.xl),
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                  color: SpotColors.accent, strokeWidth: 1),
+            ),
+          ],
         ),
       );
     }

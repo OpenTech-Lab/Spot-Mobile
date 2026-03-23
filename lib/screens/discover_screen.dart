@@ -247,6 +247,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       unselectedLabelColor: SpotColors.textTertiary,
       indicatorColor: SpotColors.accent,
       indicatorWeight: 1.5,
+      dividerColor: Colors.transparent,
       labelStyle:
           SpotType.caption.copyWith(letterSpacing: 0.8, fontSize: 11),
       tabs: const [
@@ -262,12 +263,23 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     required String emptyLabel,
   }) {
     if (_isLoading && posts.isEmpty) {
-      return const Center(
-        child: SizedBox(
-          width: 18,
-          height: 18,
-          child: CircularProgressIndicator(
-              color: SpotColors.accent, strokeWidth: 1),
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'assets/logo_transparent.png',
+              height: 40,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: SpotSpacing.xl),
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                  color: SpotColors.accent, strokeWidth: 1),
+            ),
+          ],
         ),
       );
     }
