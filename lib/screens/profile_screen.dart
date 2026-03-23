@@ -10,7 +10,7 @@ import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
-import 'package:mobile/screens/wallet_screen.dart';
+import 'package:mobile/screens/settings_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/theme/spot_theme.dart';
@@ -171,7 +171,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _openSettings() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => WalletScreen(wallet: widget.wallet)),
+      MaterialPageRoute(
+        builder: (_) => SettingsScreen(
+          wallet: widget.wallet,
+          nostrService: widget.nostrService,
+        ),
+      ),
     );
   }
 

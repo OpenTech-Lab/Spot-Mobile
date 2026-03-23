@@ -457,6 +457,9 @@ class NostrService {
     }
   }
 
+  /// All configured relay URLs (regardless of connection state).
+  List<String> get relayUrls => List.unmodifiable(_relayUrls);
+
   /// List of currently connected relay URLs.
   List<String> get connectedRelays => List.unmodifiable(_channels.keys);
 }
