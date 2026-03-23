@@ -25,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0;
   late final NostrService _nostrService;
   late final EventRepository _eventRepo;
+  final _feedKey = GlobalKey<FeedScreenState>();
 
   @override
   void initState() {
@@ -43,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Tabs built once and preserved via IndexedStack
   late final List<Widget> _tabs = [
-    FeedScreen(nostrService: _nostrService, wallet: widget.wallet),
+    FeedScreen(key: _feedKey, nostrService: _nostrService, wallet: widget.wallet),
     DiscoverScreen(nostrService: _nostrService, wallet: widget.wallet),
     _EventsListTab(
       eventRepo: _eventRepo,
@@ -125,6 +126,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: 'Home',
                 selected: _selectedTab == 0,
                 onTap: () => setState(() => _selectedTab = 0),
+                onDoubleTap: () {
+                  setState(() => _selectedTab = 0);
+                  _feedKey.currentState?.triggerRefresh();
+                },
               ),
               _NavItem(
                 icon: CupertinoIcons.compass,
@@ -160,18 +165,21 @@ class _NavItem extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.onDoubleTap,
   });
 
   final IconData icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final VoidCallback? onDoubleTap;
 
   @override
   Widget build(BuildContext context) {
     final color = selected ? SpotColors.accent : SpotColors.textSecondary;
     return GestureDetector(
       onTap: onTap,
+      onDoubleTap: onDoubleTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg, vertical: SpotSpacing.xs),

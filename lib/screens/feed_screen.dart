@@ -31,10 +31,10 @@ class FeedScreen extends StatefulWidget {
   final WalletModel wallet;
 
   @override
-  State<FeedScreen> createState() => _FeedScreenState();
+  State<FeedScreen> createState() => FeedScreenState();
 }
 
-class _FeedScreenState extends State<FeedScreen>
+class FeedScreenState extends State<FeedScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   late final EventRepository _repo;
@@ -65,6 +65,11 @@ class _FeedScreenState extends State<FeedScreen>
     _repo.dispose();
     super.dispose();
   }
+
+  // ── Public API ────────────────────────────────────────────────────────────
+
+  /// Called externally (e.g. double-tap on Home nav icon) to reload the feed.
+  void triggerRefresh() => _refresh();
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
@@ -424,57 +429,88 @@ class _LatestTabState extends State<_LatestTab> {
         ),
       );
 
-  Widget _buildError(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(SpotSpacing.xxxl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                CupertinoIcons.wifi_slash,
-                color: SpotColors.textTertiary,
-                size: 32,
-              ),
-              const SizedBox(height: SpotSpacing.xl),
-              const Text(
-                'Could not connect to relays',
-                style: SpotType.bodySecondary,
-              ),
-              const SizedBox(height: SpotSpacing.xl),
-              GestureDetector(
-                onTap: widget.onRefresh,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: SpotSpacing.xl,
-                    vertical: SpotSpacing.sm,
+  Widget _buildError(BuildContext context) => RefreshIndicator(
+        onRefresh: widget.onRefresh,
+        color: SpotColors.accent,
+        backgroundColor: SpotColors.surface,
+        displacement: 28,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(SpotSpacing.xxxl),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        CupertinoIcons.wifi_slash,
+                        color: SpotColors.textTertiary,
+                        size: 32,
+                      ),
+                      const SizedBox(height: SpotSpacing.xl),
+                      const Text(
+                        'Could not connect to relays',
+                        style: SpotType.bodySecondary,
+                      ),
+                      const SizedBox(height: SpotSpacing.xl),
+                      GestureDetector(
+                        onTap: widget.onRefresh,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: SpotSpacing.xl,
+                            vertical: SpotSpacing.sm,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                                color: SpotColors.border, width: 0.5),
+                            borderRadius:
+                                BorderRadius.circular(SpotRadius.sm),
+                          ),
+                          child: const Text('Retry',
+                              style: SpotType.bodySecondary),
+                        ),
+                      ),
+                    ],
                   ),
-                  decoration: BoxDecoration(
-                    border:
-                        Border.all(color: SpotColors.border, width: 0.5),
-                    borderRadius: BorderRadius.circular(SpotRadius.sm),
-                  ),
-                  child: const Text('Retry', style: SpotType.bodySecondary),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
 
-  Widget _buildEmpty() => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(CupertinoIcons.tray,
-                color: SpotColors.overlay, size: 36),
-            const SizedBox(height: SpotSpacing.lg),
-            Text(
-              'No posts yet',
-              style:
-                  SpotType.bodySecondary.copyWith(fontWeight: FontWeight.w300),
+  Widget _buildEmpty() => RefreshIndicator(
+        onRefresh: widget.onRefresh,
+        color: SpotColors.accent,
+        backgroundColor: SpotColors.surface,
+        displacement: 28,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(CupertinoIcons.tray,
+                        color: SpotColors.overlay, size: 36),
+                    const SizedBox(height: SpotSpacing.lg),
+                    Text(
+                      'No posts yet',
+                      style: SpotType.bodySecondary
+                          .copyWith(fontWeight: FontWeight.w300),
+                    ),
+                    const SizedBox(height: SpotSpacing.xs),
+                    const Text('Be the first to record',
+                        style: SpotType.caption),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: SpotSpacing.xs),
-            const Text('Be the first to record', style: SpotType.caption),
           ],
         ),
       );
@@ -514,23 +550,37 @@ class _FollowingTab extends StatelessWidget {
       );
     }
     if (posts.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(SpotSpacing.xxxl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(CupertinoIcons.person_2,
-                  color: SpotColors.overlay, size: 36),
-              SizedBox(height: SpotSpacing.lg),
-              Text('No posts from people you follow',
-                  style: SpotType.bodySecondary,
-                  textAlign: TextAlign.center),
-              SizedBox(height: SpotSpacing.xs),
-              Text('Tap an avatar to follow someone',
-                  style: SpotType.caption),
-            ],
-          ),
+      return RefreshIndicator(
+        onRefresh: onRefresh,
+        color: SpotColors.accent,
+        backgroundColor: SpotColors.surface,
+        displacement: 28,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.all(SpotSpacing.xxxl),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(CupertinoIcons.person_2,
+                          color: SpotColors.overlay, size: 36),
+                      SizedBox(height: SpotSpacing.lg),
+                      Text('No posts from people you follow',
+                          style: SpotType.bodySecondary,
+                          textAlign: TextAlign.center),
+                      SizedBox(height: SpotSpacing.xs),
+                      Text('Tap an avatar to follow someone',
+                          style: SpotType.caption),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
