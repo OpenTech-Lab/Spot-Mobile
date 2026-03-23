@@ -255,9 +255,74 @@ void main() {
           event.tags.where((tag) => tag.isNotEmpty && tag.first == 'preview'),
           isEmpty,
         );
-        expect(acceptedRelay!.receivedEventIds, hasLength(2));
-        expect(acceptedRelay!.receivedPreviewFlags, [true, false]);
+        expect(acceptedRelay!.receivedEventIds.length, greaterThanOrEqualTo(2));
+        expect(acceptedRelay!.receivedPreviewFlags.last, isFalse);
+        expect(
+          acceptedRelay!.receivedPreviewFlags
+              .takeWhile((flag) => flag)
+              .isNotEmpty,
+          isTrue,
+        );
         expect(acceptedRelay!.receivedEventIds.last, event.id);
+        await service.disconnect();
+      },
+    );
+
+    test(
+      'publishMediaPost retries with smaller preview before dropping it entirely',
+      () async {
+        acceptedRelay = await _TestRelay.start(
+          name: 'accepted',
+          maxPreviewBase64Length: 1800,
+        );
+        final service = NostrService(relayUrls: [acceptedRelay!.url]);
+        final tempDir = await Directory.systemTemp.createTemp(
+          'spot-preview-resize-test-',
+        );
+        addTearDown(() => tempDir.delete(recursive: true));
+
+        final imageFile = File('${tempDir.path}/preview.jpg');
+        final image = img.Image(width: 1024, height: 768);
+        for (var y = 0; y < image.height; y++) {
+          for (var x = 0; x < image.width; x++) {
+            image.setPixelRgba(
+              x,
+              y,
+              (x * 17 + y * 13) % 256,
+              (x * 11 + y * 7) % 256,
+              (x * 5 + y * 19) % 256,
+              255,
+            );
+          }
+        }
+        await imageFile.writeAsBytes(img.encodeJpg(image, quality: 95));
+
+        final event = await service.publishMediaPost(
+          _post().copyWith(mediaPaths: [imageFile.path]),
+          _wallet(),
+        );
+
+        final previewTag = event.tags.firstWhere(
+          (tag) => tag.isNotEmpty && tag.first == 'preview',
+        );
+
+        expect(acceptedRelay!.receivedEventIds.length, greaterThanOrEqualTo(2));
+        expect(
+          acceptedRelay!.receivedPreviewFlags.every((flag) => flag),
+          isTrue,
+        );
+        expect(
+          acceptedRelay!.receivedPreviewLengths.first,
+          greaterThan(acceptedRelay!.maxPreviewBase64Length!),
+        );
+        expect(
+          acceptedRelay!.receivedPreviewLengths.last,
+          lessThanOrEqualTo(acceptedRelay!.maxPreviewBase64Length!),
+        );
+        expect(
+          previewTag[2].length,
+          acceptedRelay!.receivedPreviewLengths.last,
+        );
         await service.disconnect();
       },
     );
@@ -334,6 +399,7 @@ class _TestRelay {
     required this.acceptEvents,
     required this.okMessage,
     required this.rejectPreviewEvents,
+    required this.maxPreviewBase64Length,
   });
 
   final String name;
@@ -341,9 +407,11 @@ class _TestRelay {
   final bool acceptEvents;
   final String okMessage;
   final bool rejectPreviewEvents;
+  final int? maxPreviewBase64Length;
   final List<WebSocket> _sockets = [];
   final List<String> receivedEventIds = [];
   final List<bool> receivedPreviewFlags = [];
+  final List<int> receivedPreviewLengths = [];
 
   String get url => 'ws://${server.address.host}:${server.port}';
 
@@ -352,6 +420,7 @@ class _TestRelay {
     bool acceptEvents = true,
     String okMessage = 'saved',
     bool rejectPreviewEvents = false,
+    int? maxPreviewBase64Length,
   }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final relay = _TestRelay._(
@@ -360,6 +429,7 @@ class _TestRelay {
       acceptEvents: acceptEvents,
       okMessage: okMessage,
       rejectPreviewEvents: rejectPreviewEvents,
+      maxPreviewBase64Length: maxPreviewBase64Length,
     );
     relay._listen();
     return relay;
@@ -383,12 +453,26 @@ class _TestRelay {
             final hasPreview = tags.any(
               (tag) => tag.isNotEmpty && tag.first == 'preview',
             );
+            final previewLength = tags
+                .where((tag) => tag.isNotEmpty && tag.first == 'preview')
+                .map((tag) => tag.length >= 3 ? tag[2].length : 0)
+                .fold<int>(
+                  0,
+                  (current, length) => length > current ? length : current,
+                );
             receivedEventIds.add(eventId);
             receivedPreviewFlags.add(hasPreview);
+            receivedPreviewLengths.add(previewLength);
 
             final accepted =
-                acceptEvents && !(rejectPreviewEvents && hasPreview);
-            final message = rejectPreviewEvents && hasPreview
+                acceptEvents &&
+                !(rejectPreviewEvents && hasPreview) &&
+                !(maxPreviewBase64Length != null &&
+                    previewLength > maxPreviewBase64Length!);
+            final message =
+                ((rejectPreviewEvents && hasPreview) ||
+                    (maxPreviewBase64Length != null &&
+                        previewLength > maxPreviewBase64Length!))
                 ? 'invalid: event too large'
                 : okMessage;
             socket.add(jsonEncode(['OK', eventId, accepted, message]));

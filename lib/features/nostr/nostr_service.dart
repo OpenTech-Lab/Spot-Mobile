@@ -22,6 +22,16 @@ const _defaultRelays = [
 const _relayConnectTimeout = Duration(seconds: 5);
 const _publishAckTimeout = Duration(seconds: 4);
 const _maxInlinePreviewBytes = 4 * 1024;
+const _previewCandidates = <({int maxDimension, int quality})>[
+  (maxDimension: 320, quality: 55),
+  (maxDimension: 240, quality: 45),
+  (maxDimension: 160, quality: 35),
+  (maxDimension: 128, quality: 30),
+  (maxDimension: 96, quality: 25),
+  (maxDimension: 72, quality: 20),
+  (maxDimension: 56, quality: 16),
+  (maxDimension: 40, quality: 12),
+];
 
 /// Relay-indexable single-letter marker used to discover Spot events.
 const spotRelayMarkerTag = 'd';
@@ -183,24 +193,30 @@ class NostrService {
       contentParts.add('#$t');
     }
     final content = contentParts.join('\n');
-    final previewTag = await _buildPreviewTag(post);
-    var signed = _signMediaPostEvent(
-      post,
-      wallet,
-      now: now,
-      content: content,
-      previewTag: previewTag,
-    );
+    final previewTags = await _buildPreviewTags(post);
+    NostrEvent? signed;
+    StateError? lastError;
 
-    try {
-      await publishEvent(signed);
-    } on StateError {
-      if (previewTag == null) rethrow;
+    for (final previewTag in [...previewTags, null]) {
+      signed = _signMediaPostEvent(
+        post,
+        wallet,
+        now: now,
+        content: content,
+        previewTag: previewTag,
+      );
 
-      // Some relays reject larger events. Retry once without the inline
-      // preview so image replies still publish instead of failing outright.
-      signed = _signMediaPostEvent(post, wallet, now: now, content: content);
-      await publishEvent(signed);
+      try {
+        await publishEvent(signed);
+        break;
+      } on StateError catch (error) {
+        lastError = error;
+        if (previewTag == null) rethrow;
+      }
+    }
+
+    if (signed == null) {
+      throw lastError ?? StateError('Failed to publish media post');
     }
 
     // Self-deliver immediately so the post appears in the feed without
@@ -574,34 +590,36 @@ class NostrService {
     }
   }
 
-  Future<List<String>?> _buildPreviewTag(MediaPost post) async {
-    if (post.isTextOnly || post.mediaPaths.isEmpty) return null;
+  Future<List<List<String>>> _buildPreviewTags(MediaPost post) async {
+    if (post.isTextOnly || post.mediaPaths.isEmpty) return const [];
 
     final path = post.mediaPaths.first;
-    if (_isVideoPath(path)) return null;
+    if (_isVideoPath(path)) return const [];
 
     final file = File(path);
-    if (!file.existsSync()) return null;
+    if (!file.existsSync()) return const [];
 
     try {
       final bytes = await file.readAsBytes();
       final decoded = img.decodeImage(bytes);
-      if (decoded == null) return null;
+      if (decoded == null) return const [];
 
-      for (final maxDimension in const [320, 240, 160]) {
-        final resized = _resizeToFit(decoded, maxDimension);
-        for (final quality in const [55, 45, 35]) {
-          final encoded = img.encodeJpg(resized, quality: quality);
-          if (encoded.length <= _maxInlinePreviewBytes) {
-            return ['preview', 'image/jpeg', base64Encode(encoded)];
-          }
+      final tags = <List<String>>[];
+      final seenBase64 = <String>{};
+      for (final candidate in _previewCandidates) {
+        final resized = _resizeToFit(decoded, candidate.maxDimension);
+        final encoded = img.encodeJpg(resized, quality: candidate.quality);
+        if (encoded.length > _maxInlinePreviewBytes) {
+          continue;
         }
+        final base64 = base64Encode(encoded);
+        if (!seenBase64.add(base64)) continue;
+        tags.add(['preview', 'image/jpeg', base64]);
       }
+      return tags;
     } catch (_) {
-      return null;
+      return const [];
     }
-
-    return null;
   }
 
   img.Image _resizeToFit(img.Image image, int maxDimension) {
