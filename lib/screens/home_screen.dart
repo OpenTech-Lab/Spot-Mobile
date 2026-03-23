@@ -88,7 +88,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       backgroundColor: SpotColors.bg,
                       title: const Text('Events', style: SpotType.subheading),
                     ),
-      body: IndexedStack(index: _selectedTab, children: _tabs),
+      body: Stack(
+        children: [
+          for (int i = 0; i < _tabs.length; i++)
+            IgnorePointer(
+              ignoring: _selectedTab != i,
+              child: AnimatedOpacity(
+                opacity: _selectedTab == i ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeInOut,
+                child: _tabs[i],
+              ),
+            ),
+        ],
+      ),
       bottomNavigationBar: _buildBottomNav(),
       floatingActionButton: _selectedTab != 0 && _selectedTab != 1 ? null : GestureDetector(
         onTap: _openComposer,
@@ -122,7 +135,8 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _NavItem(
-                icon: CupertinoIcons.list_bullet,
+                icon: CupertinoIcons.house,
+                selectedIcon: CupertinoIcons.house_fill,
                 label: 'Home',
                 selected: _selectedTab == 0,
                 onTap: () => setState(() => _selectedTab = 0),
@@ -139,12 +153,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               _NavItem(
                 icon: CupertinoIcons.folder,
+                selectedIcon: CupertinoIcons.folder_fill,
                 label: 'Events',
                 selected: _selectedTab == 2,
                 onTap: () => setState(() => _selectedTab = 2),
               ),
               _NavItem(
                 icon: CupertinoIcons.person,
+                selectedIcon: CupertinoIcons.person_fill,
                 label: 'Profile',
                 selected: _selectedTab == 3,
                 onTap: () => setState(() => _selectedTab = 3),
@@ -159,37 +175,127 @@ class _HomeScreenState extends State<HomeScreen> {
 
 // ── Nav item ──────────────────────────────────────────────────────────────────
 
-class _NavItem extends StatelessWidget {
+class _NavItem extends StatefulWidget {
   const _NavItem({
     required this.icon,
     required this.label,
     required this.selected,
     required this.onTap,
+    this.selectedIcon,
     this.onDoubleTap,
   });
 
   final IconData icon;
+  final IconData? selectedIcon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback? onDoubleTap;
 
   @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _scaleCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 70),
+      reverseDuration: const Duration(milliseconds: 300),
+      lowerBound: 0.82,
+      upperBound: 1.0,
+      value: 1.0,
+    );
+  }
+
+  @override
+  void dispose() {
+    _scaleCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails _) => _scaleCtrl.reverse();
+  void _onTapUp(TapUpDetails _) => _scaleCtrl.fling(velocity: 1.5);
+  void _onTapCancel() => _scaleCtrl.fling(velocity: 1.5);
+
+  @override
   Widget build(BuildContext context) {
-    final color = selected ? SpotColors.accent : SpotColors.textSecondary;
+    final activeIcon = widget.selectedIcon ?? widget.icon;
+    final currentIcon = widget.selected ? activeIcon : widget.icon;
+
     return GestureDetector(
-      onTap: onTap,
-      onDoubleTap: onDoubleTap,
+      onTap: widget.onTap,
+      onDoubleTap: widget.onDoubleTap,
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
       behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg, vertical: SpotSpacing.xs),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(height: 3),
-            Text(label, style: SpotType.caption.copyWith(color: color)),
-          ],
+      child: ScaleTransition(
+        scale: CurvedAnimation(
+          parent: _scaleCtrl,
+          curve: Curves.easeOut,
+          reverseCurve: Curves.easeIn,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: SpotSpacing.sm,
+            vertical: SpotSpacing.xs,
+          ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeInOut,
+            padding: const EdgeInsets.symmetric(
+              horizontal: SpotSpacing.lg,
+              vertical: SpotSpacing.xs,
+            ),
+            decoration: BoxDecoration(
+              color: widget.selected
+                  ? SpotColors.accent.withValues(alpha: 0.12)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  transitionBuilder: (child, anim) => ScaleTransition(
+                    scale: CurvedAnimation(
+                      parent: anim,
+                      curve: Curves.easeOutBack,
+                    ),
+                    child: child,
+                  ),
+                  child: Icon(
+                    currentIcon,
+                    key: ValueKey(currentIcon),
+                    color: widget.selected
+                        ? SpotColors.accent
+                        : SpotColors.textSecondary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  style: SpotType.caption.copyWith(
+                    color: widget.selected
+                        ? SpotColors.accent
+                        : SpotColors.textSecondary,
+                    fontWeight: widget.selected
+                        ? FontWeight.w600
+                        : FontWeight.w400,
+                  ),
+                  child: Text(widget.label),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
