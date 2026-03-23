@@ -15,6 +15,7 @@ import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/camera_service.dart';
 import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/media_processing_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
 /// Full-screen camera UI.
@@ -90,7 +91,7 @@ class _CameraScreenState extends State<CameraScreen>
       if (_cameras.isEmpty) return;
       _controller = CameraController(
         _cameras.first,
-        ResolutionPreset.high,
+        ResolutionPreset.medium,
         enableAudio: true,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
@@ -167,6 +168,10 @@ class _CameraScreenState extends State<CameraScreen>
       if (_isDangerMode && !_capturedIsVideos[i]) {
         f = await CameraService.instance.applyFaceBlur(f);
       }
+      f = await MediaProcessingService.instance.optimizeForUpload(
+        f,
+        isVideo: _capturedIsVideos[i],
+      );
       processedFiles.add(f);
     }
 
@@ -186,8 +191,9 @@ class _CameraScreenState extends State<CameraScreen>
     final primaryHash = hashes.first;
     final paths = processedFiles.map((f) => f.path).toList();
 
-    final effectiveSpotName =
-        _spotName?.trim().isNotEmpty == true ? _spotName!.trim() : null;
+    final effectiveSpotName = _spotName?.trim().isNotEmpty == true
+        ? _spotName!.trim()
+        : null;
 
     final post = MediaPost(
       id: primaryHash,
@@ -360,7 +366,9 @@ class _CameraScreenState extends State<CameraScreen>
                     borderRadius: BorderRadius.circular(SpotRadius.xs),
                   ),
                   child: Text(
-                    _isVirtualMode ? 'Virtual · no location published' : 'Faces blurred',
+                    _isVirtualMode
+                        ? 'Virtual · no location published'
+                        : 'Faces blurred',
                     style: SpotType.label.copyWith(
                       color: _isVirtualMode
                           ? SpotColors.onAccent
@@ -715,7 +723,10 @@ class _PreviewScreenState extends State<_PreviewScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('Cancel', style: TextStyle(color: SpotColors.textSecondary)),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: SpotColors.textSecondary),
+            ),
           ),
           TextButton(
             onPressed: () {

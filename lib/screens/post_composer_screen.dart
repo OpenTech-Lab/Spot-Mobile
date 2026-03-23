@@ -15,6 +15,7 @@ import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/camera_service.dart';
 import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/media_processing_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
@@ -173,7 +174,12 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
     }
     XFile? result;
     if (choice == 'photo') {
-      result = await _picker.pickImage(source: ImageSource.camera);
+      result = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 82,
+        maxWidth: 1600,
+        maxHeight: 1600,
+      );
     } else {
       result = await _picker.pickVideo(source: ImageSource.camera);
     }
@@ -217,9 +223,17 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
       var isTextOnly = false;
 
       for (final xfile in _mediaFiles) {
-        final bytes = await File(xfile.path).readAsBytes();
+        final optimized = await MediaProcessingService.instance
+            .optimizeForUpload(
+              File(xfile.path),
+              isVideo: MediaProcessingService.instance.isVideoPath(
+                xfile.path,
+                mimeType: xfile.mimeType,
+              ),
+            );
+        final bytes = await optimized.readAsBytes();
         hashes.add(EncryptionUtils.sha256BytesHex(Uint8List.fromList(bytes)));
-        paths.add(xfile.path);
+        paths.add(optimized.path);
       }
 
       // Text-only post: derive a deterministic temp ID from caption + timestamp

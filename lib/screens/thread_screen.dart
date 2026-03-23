@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
+import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/media_sync_service.dart';
 import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
@@ -22,6 +24,7 @@ class ThreadScreen extends StatefulWidget {
     required this.wallet,
     required this.nostrService,
     this.eventRepo,
+    this.mediaFetcher,
   });
 
   final String rootPostId;
@@ -29,6 +32,7 @@ class ThreadScreen extends StatefulWidget {
   final WalletModel wallet;
   final NostrService nostrService;
   final EventRepository? eventRepo;
+  final MediaFetcher? mediaFetcher;
 
   @override
   State<ThreadScreen> createState() => _ThreadScreenState();
@@ -41,6 +45,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
   void initState() {
     super.initState();
     _posts = List<MediaPost>.from(widget.initialPosts);
+    unawaited(_syncThreadMedia());
   }
 
   List<ThreadedPostEntry> get _entries =>
@@ -92,6 +97,20 @@ class _ThreadScreenState extends State<ThreadScreen> {
     final updated = post.copyWith(isLikedByMe: !post.isLikedByMe);
     setState(() => _posts = replacePostsById(_posts, [updated]));
     unawaited(LocalPostStore.instance.setLikedByMe(post, updated.isLikedByMe));
+  }
+
+  Future<void> _syncThreadMedia() async {
+    await P2PService.instance.startSwarm();
+    final sync = MediaSyncService(
+      fetchMedia: widget.mediaFetcher ?? P2PService.instance.requestMedia,
+    );
+    final updatedPosts = await sync.hydratePosts(
+      _entries.map((entry) => entry.post),
+    );
+    if (!mounted || updatedPosts.isEmpty) return;
+
+    setState(() => _posts = replacePostsById(_posts, updatedPosts));
+    await LocalPostStore.instance.savePosts(updatedPosts);
   }
 
   @override
