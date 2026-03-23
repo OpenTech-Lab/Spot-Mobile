@@ -14,8 +14,7 @@ import 'package:mobile/services/cache_manager.dart';
 /// The repository maintains an in-memory cache of [CivicEvent]s keyed by
 /// hashtag.  Callers can stream live updates or query the current snapshot.
 class EventRepository {
-  EventRepository({required NostrService nostrService})
-      : _nostr = nostrService;
+  EventRepository({required NostrService nostrService}) : _nostr = nostrService;
 
   final NostrService _nostr;
   final _trust = const TrustService();
@@ -40,31 +39,18 @@ class EventRepository {
   /// Each incoming event is parsed into a [MediaPost] and merged into
   /// the appropriate [CivicEvent] for its hashtag.
   Stream<CivicEvent> subscribeToEvents() {
-    _globalSubId ??= _nostr.subscribe(
-      [
-        // Primary filter: relays that support multi-letter tag queries
-        // (#app) will filter server-side and return only Spot events.
-        NostrFilter(
-          kinds: [1],
-          limit: 200,
-          since: _sevenDaysAgo(),
-          tags: {'app': ['spot']},
-        ),
-        // Fallback filter (no #app): catches relays that don't support
-        // multi-letter tag queries. The client-side guard in
-        // _handleNostrEvent() discards any event without app:spot, so
-        // non-Spot events are never shown.  limit:50 caps relay load.
-        NostrFilter(
-          kinds: [1],
-          limit: 50,
-          since: _sevenDaysAgo(),
-        ),
-        // kind-5: revocation events (spec v1.4 §12 "Deletion Flow")
-        // kind-1984: community reports (spec v1.4 §12.B)
-        NostrFilter(kinds: [5, 1984], limit: 100, tags: {'app': ['spot']}),
-      ],
-      _handleNostrEvent,
-    );
+    _globalSubId ??= _nostr.subscribe([
+      ...buildSpotPostFilters(
+        since: _sevenDaysAgo(),
+        limit: 200,
+        includeGenericFallback: true,
+      ),
+      ...buildSpotModerationFilters(
+        since: _sevenDaysAgo(),
+        limit: 100,
+        includeGenericFallback: true,
+      ),
+    ], _handleNostrEvent);
 
     return _controller.stream;
   }
@@ -72,10 +58,109 @@ class EventRepository {
   /// Unix timestamp for 7 days ago — used as `since` on subscriptions so
   /// relays deliver recent stored events and then stream live ones.
   static int _sevenDaysAgo() =>
-      DateTime.now()
-          .subtract(const Duration(days: 7))
-          .millisecondsSinceEpoch ~/
+      DateTime.now().subtract(const Duration(days: 7)).millisecondsSinceEpoch ~/
       1000;
+
+  /// Returns true if [event] is marked as originating from Spot.
+  ///
+  /// New events carry the relay-indexable single-letter marker (`d:spot`) while
+  /// older events only have the legacy multi-letter marker (`app:spot`).
+  static bool isSpotEvent(NostrEvent event) =>
+      event.getTagValue(spotRelayMarkerTag) == spotEventOrigin ||
+      event.getTagValue(legacySpotAppTag) == spotEventOrigin;
+
+  /// Builds kind-1 filters for Spot posts using both the new indexed marker
+  /// and the legacy tag, with an optional client-side-filtered fallback.
+  static List<NostrFilter> buildSpotPostFilters({
+    List<String>? authors,
+    int? since,
+    int? until,
+    required int limit,
+    bool includeGenericFallback = false,
+  }) {
+    final filters = <NostrFilter>[
+      NostrFilter(
+        kinds: [1],
+        authors: authors,
+        since: since,
+        until: until,
+        limit: limit,
+        tags: {
+          spotRelayMarkerTag: [spotEventOrigin],
+        },
+      ),
+      NostrFilter(
+        kinds: [1],
+        authors: authors,
+        since: since,
+        until: until,
+        limit: limit,
+        tags: {
+          legacySpotAppTag: [spotEventOrigin],
+        },
+      ),
+    ];
+
+    if (includeGenericFallback) {
+      filters.add(
+        NostrFilter(
+          kinds: [1],
+          authors: authors,
+          since: since,
+          until: until,
+          limit: limit,
+        ),
+      );
+    }
+
+    return filters;
+  }
+
+  /// Builds moderation-event filters used for deletes and reports.
+  static List<NostrFilter> buildSpotModerationFilters({
+    List<String>? authors,
+    int? since,
+    int? until,
+    required int limit,
+    bool includeGenericFallback = false,
+  }) {
+    final filters = <NostrFilter>[
+      NostrFilter(
+        kinds: [5, 1984],
+        authors: authors,
+        since: since,
+        until: until,
+        limit: limit,
+        tags: {
+          spotRelayMarkerTag: [spotEventOrigin],
+        },
+      ),
+      NostrFilter(
+        kinds: [5, 1984],
+        authors: authors,
+        since: since,
+        until: until,
+        limit: limit,
+        tags: {
+          legacySpotAppTag: [spotEventOrigin],
+        },
+      ),
+    ];
+
+    if (includeGenericFallback) {
+      filters.add(
+        NostrFilter(
+          kinds: [5, 1984],
+          authors: authors,
+          since: since,
+          until: until,
+          limit: limit,
+        ),
+      );
+    }
+
+    return filters;
+  }
 
   // ── Query ─────────────────────────────────────────────────────────────────
 
@@ -119,18 +204,18 @@ class EventRepository {
   /// Uses an author filter so the relay returns only that user's posts even on
   /// busy relays where a generic `limit: 50` would miss them.
   Stream<CivicEvent> subscribeToAuthorPosts(String authorPubkey) {
-    final subId = _nostr.subscribe(
-      [
-        NostrFilter(
-          kinds: [1],
-          limit: 200,
-          authors: [authorPubkey],
-          tags: {'app': ['spot']},
-        ),
-        NostrFilter(kinds: [5, 1984], limit: 50, authors: [authorPubkey]),
-      ],
-      _handleNostrEvent,
-    );
+    final subId = _nostr.subscribe([
+      ...buildSpotPostFilters(
+        authors: [authorPubkey],
+        limit: 200,
+        includeGenericFallback: true,
+      ),
+      ...buildSpotModerationFilters(
+        authors: [authorPubkey],
+        limit: 50,
+        includeGenericFallback: true,
+      ),
+    ], _handleNostrEvent);
     _authorSubIds.add(subId);
     return _controller.stream;
   }
@@ -184,7 +269,7 @@ class EventRepository {
 
   void _handleNostrEvent(NostrEvent event) {
     // Client-side guard: discard events not tagged as Spot-originated.
-    if (event.getTagValue('app') != 'spot') return;
+    if (!isSpotEvent(event)) return;
 
     switch (event.kind) {
       case 5:
@@ -214,7 +299,8 @@ class EventRepository {
             userId: event.pubkey,
             type: WitnessType.seen,
             timestamp: DateTime.fromMillisecondsSinceEpoch(
-                event.createdAt * 1000),
+              event.createdAt * 1000,
+            ),
             weight: 0.5,
           ),
       _cache[hashtag]!,
@@ -229,8 +315,9 @@ class EventRepository {
     if (alreadyPresent) return;
 
     final updatedWitnesses = [...existing.witnesses, witness];
-    final updatedEvent =
-        _applyTrust(existing.copyWith(witnesses: updatedWitnesses));
+    final updatedEvent = _applyTrust(
+      existing.copyWith(witnesses: updatedWitnesses),
+    );
     _cache[hashtag] = updatedEvent;
     if (!_controller.isClosed) _controller.add(updatedEvent);
   }
@@ -302,24 +389,23 @@ class EventRepository {
       _cache[hashtag] = _applyTrust(civic);
     } else {
       // Deduplicate by post ID
-      final alreadyPresent =
-          existing.posts.any((p) => p.id == post.id);
+      final alreadyPresent = existing.posts.any((p) => p.id == post.id);
       if (alreadyPresent) return;
 
       final updatedPosts = [...existing.posts, post]
         ..sort((a, b) => a.capturedAt.compareTo(b.capturedAt));
 
-      final uniquePubkeys =
-          updatedPosts.map((p) => p.pubkey).toSet();
+      final uniquePubkeys = updatedPosts.map((p) => p.pubkey).toSet();
 
       // Recompute centre as average of GPS-tagged posts
-      final geoTagged =
-          updatedPosts.where((p) => p.hasGps).toList();
+      final geoTagged = updatedPosts.where((p) => p.hasGps).toList();
       double? lat, lon;
       if (geoTagged.isNotEmpty) {
-        lat = geoTagged.map((p) => p.latitude!).reduce((a, b) => a + b) /
+        lat =
+            geoTagged.map((p) => p.latitude!).reduce((a, b) => a + b) /
             geoTagged.length;
-        lon = geoTagged.map((p) => p.longitude!).reduce((a, b) => a + b) /
+        lon =
+            geoTagged.map((p) => p.longitude!).reduce((a, b) => a + b) /
             geoTagged.length;
       }
 
@@ -355,7 +441,9 @@ class EventRepository {
       _nostrEventToMediaPost(event, hashtag != null ? [hashtag] : []);
 
   static MediaPost _nostrEventToMediaPost(
-      NostrEvent event, List<String> eventTags) {
+    NostrEvent event,
+    List<String> eventTags,
+  ) {
     // geo tag format: ["geo", "lat", "lon"]
     double? latitude, longitude;
     for (final tag in event.tags) {
@@ -384,8 +472,9 @@ class EventRepository {
     final rawContent = event.content.trim();
     if (rawContent.isNotEmpty) {
       final lines = rawContent.split('\n');
-      final captionLines =
-          lines.where((l) => !l.trim().startsWith('#')).toList();
+      final captionLines = lines
+          .where((l) => !l.trim().startsWith('#'))
+          .toList();
       final joined = captionLines.join('\n').trim();
       if (joined.isNotEmpty) caption = joined;
     }
@@ -403,8 +492,7 @@ class EventRepository {
       mediaPaths: cachedPaths,
       latitude: latitude,
       longitude: longitude,
-      capturedAt:
-          DateTime.fromMillisecondsSinceEpoch(event.createdAt * 1000),
+      capturedAt: DateTime.fromMillisecondsSinceEpoch(event.createdAt * 1000),
       eventTags: eventTags,
       isDangerMode: event.getTagValue('danger') == '1',
       isVirtual: event.getTagValue('virtual') == '1',

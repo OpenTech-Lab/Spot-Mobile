@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 import 'package:mobile/features/camera/camera_screen.dart';
 import 'package:mobile/features/event/event_repository.dart';
-import 'package:mobile/features/nostr/nostr_models.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
@@ -110,8 +109,9 @@ class FeedScreenState extends State<FeedScreen>
     );
     final visible = persisted
         .where(
-          (post) => post.contentHashes
-              .every((hash) => !CacheManager.instance.isBlocked(hash)),
+          (post) => post.contentHashes.every(
+            (hash) => !CacheManager.instance.isBlocked(hash),
+          ),
         )
         .toList();
     if (!mounted || visible.isEmpty) return;
@@ -121,7 +121,8 @@ class FeedScreenState extends State<FeedScreen>
   Future<void> _loadMorePosts() async {
     if (_isFetchingMore || _posts.isEmpty) return;
 
-    final cursor = _oldestTimestamp ??
+    final cursor =
+        _oldestTimestamp ??
         (_posts.last.capturedAt.millisecondsSinceEpoch ~/ 1000) - 1;
 
     setState(() => _isFetchingMore = true);
@@ -130,15 +131,13 @@ class FeedScreenState extends State<FeedScreen>
       Timer? timeout;
 
       final subId = widget.nostrService.subscribe(
-        [
-          NostrFilter(
-            kinds: [1],
-            limit: 20,
-            until: cursor,
-            tags: {'app': ['spot']},
-          ),
-        ],
+        EventRepository.buildSpotPostFilters(
+          until: cursor,
+          limit: 20,
+          includeGenericFallback: true,
+        ),
         (event) {
+          if (!EventRepository.isSpotEvent(event)) return;
           _repo.addPost(
             EventRepository.nostrEventToPost(event, event.getTagValue('t')),
           );
@@ -155,10 +154,7 @@ class FeedScreenState extends State<FeedScreen>
       widget.nostrService.unsubscribe(subId);
 
       if (mounted) {
-        final allPosts = _repo
-            .getAllEvents()
-            .expand((e) => e.posts)
-            .toList()
+        final allPosts = _repo.getAllEvents().expand((e) => e.posts).toList()
           ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
         final merged = _mergePosts(_posts, allPosts);
         if (merged.isNotEmpty) {
@@ -213,9 +209,7 @@ class FeedScreenState extends State<FeedScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => InterestsScreen(
-        onDone: () => setState(() {}),
-      ),
+      builder: (_) => InterestsScreen(onDone: () => setState(() {})),
     );
   }
 
@@ -237,9 +231,11 @@ class FeedScreenState extends State<FeedScreen>
   List<MediaPost> get _followingPosts {
     final tags = FollowService.instance.followedTags.toSet();
     return _posts
-        .where((p) =>
-            FollowService.instance.isFollowing(p.pubkey) ||
-            p.eventTags.any(tags.contains))
+        .where(
+          (p) =>
+              FollowService.instance.isFollowing(p.pubkey) ||
+              p.eventTags.any(tags.contains),
+        )
         .toList();
   }
 
@@ -290,8 +286,7 @@ class FeedScreenState extends State<FeedScreen>
       indicatorColor: SpotColors.accent,
       indicatorWeight: 1.5,
       dividerColor: Colors.transparent,
-      labelStyle:
-          SpotType.caption.copyWith(letterSpacing: 0.8, fontSize: 11),
+      labelStyle: SpotType.caption.copyWith(letterSpacing: 0.8, fontSize: 11),
       tabs: const [
         Tab(text: 'LATEST'),
         Tab(text: 'FOLLOWING'),
@@ -418,112 +413,115 @@ class _LatestTabState extends State<_LatestTab> {
   }
 
   Widget _buildLoading() => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              'assets/logo_transparent.png',
-              height: 40,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(height: SpotSpacing.xl),
-            const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                color: SpotColors.accent,
-                strokeWidth: 1,
-              ),
-            ),
-          ],
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Image.asset(
+          'assets/logo_transparent.png',
+          height: 40,
+          fit: BoxFit.contain,
         ),
-      );
+        const SizedBox(height: SpotSpacing.xl),
+        const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(
+            color: SpotColors.accent,
+            strokeWidth: 1,
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _buildError(BuildContext context) => RefreshIndicator(
-        onRefresh: widget.onRefresh,
-        color: SpotColors.accent,
-        backgroundColor: SpotColors.surface,
-        displacement: 28,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(SpotSpacing.xxxl),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        CupertinoIcons.wifi_slash,
-                        color: SpotColors.textTertiary,
-                        size: 32,
-                      ),
-                      const SizedBox(height: SpotSpacing.xl),
-                      const Text(
-                        'Could not connect to relays',
-                        style: SpotType.bodySecondary,
-                      ),
-                      const SizedBox(height: SpotSpacing.xl),
-                      GestureDetector(
-                        onTap: widget.onRefresh,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: SpotSpacing.xl,
-                            vertical: SpotSpacing.sm,
-                          ),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                                color: SpotColors.border, width: 0.5),
-                            borderRadius:
-                                BorderRadius.circular(SpotRadius.sm),
-                          ),
-                          child: const Text('Retry',
-                              style: SpotType.bodySecondary),
-                        ),
-                      ),
-                    ],
+    onRefresh: widget.onRefresh,
+    color: SpotColors.accent,
+    backgroundColor: SpotColors.surface,
+    displacement: 28,
+    child: CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(SpotSpacing.xxxl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    CupertinoIcons.wifi_slash,
+                    color: SpotColors.textTertiary,
+                    size: 32,
                   ),
-                ),
+                  const SizedBox(height: SpotSpacing.xl),
+                  const Text(
+                    'Could not connect to relays',
+                    style: SpotType.bodySecondary,
+                  ),
+                  const SizedBox(height: SpotSpacing.xl),
+                  GestureDetector(
+                    onTap: widget.onRefresh,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: SpotSpacing.xl,
+                        vertical: SpotSpacing.sm,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: SpotColors.border,
+                          width: 0.5,
+                        ),
+                        borderRadius: BorderRadius.circular(SpotRadius.sm),
+                      ),
+                      child: const Text('Retry', style: SpotType.bodySecondary),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
-      );
+      ],
+    ),
+  );
 
   Widget _buildEmpty() => RefreshIndicator(
-        onRefresh: widget.onRefresh,
-        color: SpotColors.accent,
-        backgroundColor: SpotColors.surface,
-        displacement: 28,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(CupertinoIcons.tray,
-                        color: SpotColors.overlay, size: 36),
-                    const SizedBox(height: SpotSpacing.lg),
-                    Text(
-                      'No posts yet',
-                      style: SpotType.bodySecondary
-                          .copyWith(fontWeight: FontWeight.w300),
-                    ),
-                    const SizedBox(height: SpotSpacing.xs),
-                    const Text('Be the first to record',
-                        style: SpotType.caption),
-                  ],
+    onRefresh: widget.onRefresh,
+    color: SpotColors.accent,
+    backgroundColor: SpotColors.surface,
+    displacement: 28,
+    child: CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  CupertinoIcons.tray,
+                  color: SpotColors.overlay,
+                  size: 36,
                 ),
-              ),
+                const SizedBox(height: SpotSpacing.lg),
+                Text(
+                  'No posts yet',
+                  style: SpotType.bodySecondary.copyWith(
+                    fontWeight: FontWeight.w300,
+                  ),
+                ),
+                const SizedBox(height: SpotSpacing.xs),
+                const Text('Be the first to record', style: SpotType.caption),
+              ],
             ),
-          ],
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 // ── Following tab ─────────────────────────────────────────────────────────────
@@ -564,7 +562,9 @@ class _FollowingTab extends StatelessWidget {
               width: 16,
               height: 16,
               child: CircularProgressIndicator(
-                  color: SpotColors.accent, strokeWidth: 1),
+                color: SpotColors.accent,
+                strokeWidth: 1,
+              ),
             ),
           ],
         ),
@@ -587,15 +587,22 @@ class _FollowingTab extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(CupertinoIcons.person_2,
-                          color: SpotColors.overlay, size: 36),
+                      Icon(
+                        CupertinoIcons.person_2,
+                        color: SpotColors.overlay,
+                        size: 36,
+                      ),
                       SizedBox(height: SpotSpacing.lg),
-                      Text('No posts from people you follow',
-                          style: SpotType.bodySecondary,
-                          textAlign: TextAlign.center),
+                      Text(
+                        'No posts from people you follow',
+                        style: SpotType.bodySecondary,
+                        textAlign: TextAlign.center,
+                      ),
                       SizedBox(height: SpotSpacing.xs),
-                      Text('Tap an avatar to follow someone',
-                          style: SpotType.caption),
+                      Text(
+                        'Tap an avatar to follow someone',
+                        style: SpotType.caption,
+                      ),
                     ],
                   ),
                 ),

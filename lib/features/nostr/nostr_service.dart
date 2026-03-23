@@ -17,8 +17,22 @@ const _defaultRelays = [
   'wss://relay.nostr.band',
 ];
 
+/// Relay-indexable single-letter marker used to discover Spot events.
+const spotRelayMarkerTag = 'd';
+
+/// Legacy multi-letter marker kept for backward compatibility.
+const legacySpotAppTag = 'app';
+
+/// Shared tag value identifying events originating from Spot.
+const spotEventOrigin = 'spot';
+
 /// Nostr event kind for short text / media posts (NIP-01).
 const _kindTextNote = 1;
+
+List<List<String>> _spotOriginTags() => const [
+  [spotRelayMarkerTag, spotEventOrigin],
+  [legacySpotAppTag, spotEventOrigin],
+];
 
 /// Nostr relay WebSocket client.
 ///
@@ -34,7 +48,7 @@ const _kindTextNote = 1;
 /// ```
 class NostrService {
   NostrService({List<String>? relayUrls})
-      : _relayUrls = relayUrls ?? _defaultRelays;
+    : _relayUrls = relayUrls ?? _defaultRelays;
 
   final List<String> _relayUrls;
   final _uuid = const Uuid();
@@ -102,7 +116,9 @@ class NostrService {
   /// Builds and publishes a Nostr kind-1 event for [post].
   /// Returns the signed [NostrEvent] that was broadcast.
   Future<NostrEvent> publishMediaPost(
-      MediaPost post, WalletModel wallet) async {
+    MediaPost post,
+    WalletModel wallet,
+  ) async {
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
     // Build content: optional caption + optional #tag lines
@@ -114,13 +130,11 @@ class NostrService {
     final content = contentParts.join('\n');
 
     final tags = <List<String>>[
-      ['app', 'spot'], // identifies events originating from the Spot app
+      ..._spotOriginTags(),
       if (post.replyToId != null) ['e', post.replyToId!, '', 'reply'],
       for (final t in post.eventTags) ['t', t],
       // Virtual posts: GPS is recorded locally but NOT published to Nostr.
-      if (!post.isVirtual &&
-          post.latitude != null &&
-          post.longitude != null)
+      if (!post.isVirtual && post.latitude != null && post.longitude != null)
         ['geo', post.latitude.toString(), post.longitude.toString()],
       for (final hash in post.contentHashes) ['media_hash', hash],
       if (post.ipfsCid != null) ['ipfs', post.ipfsCid!],
@@ -190,7 +204,7 @@ class NostrService {
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
     final tags = <List<String>>[
-      ['app', 'spot'],
+      ..._spotOriginTags(),
       ['t', hashtag],
       ['witness', witnessType],
       if (lat != null && lon != null) ['geo', lat.toString(), lon.toString()],
@@ -243,13 +257,16 @@ class NostrService {
   /// Spec v1.4 §12 "Deletion Flow" step 1: include the content hash so that
   /// compliant clients can block by hash in addition to event ID.
   Future<void> deletePost(
-      String eventId, String contentHash, WalletModel wallet) async {
+    String eventId,
+    String contentHash,
+    WalletModel wallet,
+  ) async {
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
     final tags = <List<String>>[
+      ..._spotOriginTags(),
       ['e', eventId],
       ['media_hash', contentHash], // hash-based revocation (spec v1.4 §12)
-      ['app', 'spot'],
     ];
 
     final placeholder = NostrEvent(
@@ -300,9 +317,9 @@ class NostrService {
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
     final tags = <List<String>>[
+      ..._spotOriginTags(),
       ['e', eventId, reason],
       ['media_hash', contentHash],
-      ['app', 'spot'],
     ];
 
     final placeholder = NostrEvent(
@@ -344,7 +361,10 @@ class NostrService {
 
   /// Subscribes to events matching [filters] and delivers them to [onEvent].
   /// Returns the subscription ID (use with [unsubscribe]).
-  String subscribe(List<NostrFilter> filters, void Function(NostrEvent) onEvent) {
+  String subscribe(
+    List<NostrFilter> filters,
+    void Function(NostrEvent) onEvent,
+  ) {
     final id = _uuid.v4();
     _subscriptions[id] = _SubscriptionState(
       id: id,
@@ -397,7 +417,10 @@ class NostrService {
   // ── Internal ──────────────────────────────────────────────────────────────
 
   void _sendReq(
-      WebSocketChannel channel, String id, List<NostrFilter> filters) {
+    WebSocketChannel channel,
+    String id,
+    List<NostrFilter> filters,
+  ) {
     final msg = jsonEncode(['REQ', id, ...filters.map((f) => f.toJson())]);
     channel.sink.add(msg);
   }
