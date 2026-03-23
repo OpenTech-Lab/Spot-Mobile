@@ -484,155 +484,181 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
           const _SheetHandle(),
           const SizedBox(height: SpotSpacing.sm),
 
-          // ── Caption + avatar (fills remaining space) ─────────────────────
+          // ── Scrollable content area ─────────────────────────────────────
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
-              child: Row(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  PubkeyAvatar(pubkey: widget.wallet.publicKeyHex),
-                  const SizedBox(width: SpotSpacing.sm),
-                  Expanded(
-                    child: Column(
+                  // ── Caption + avatar ────────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpotSpacing.lg,
+                    ),
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (widget.replyToPost != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  CupertinoIcons.arrow_turn_up_left,
-                                  size: 11,
-                                  color: SpotColors.textTertiary,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Reply to ${_shortKey(widget.replyToPost!.nostrEventId)}',
-                                  style: SpotType.caption.copyWith(
-                                    color: SpotColors.textTertiary,
+                        PubkeyAvatar(pubkey: widget.wallet.publicKeyHex),
+                        const SizedBox(width: SpotSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (widget.replyToPost != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        CupertinoIcons.arrow_turn_up_left,
+                                        size: 11,
+                                        color: SpotColors.textTertiary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Reply to ${_shortKey(widget.replyToPost!.nostrEventId)}',
+                                        style: SpotType.caption.copyWith(
+                                          color: SpotColors.textTertiary,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.all(SpotSpacing.sm),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(SpotRadius.sm),
-                            border: Border.all(
-                              color: _captionFocus.hasFocus
-                                  ? SpotColors.accent.withValues(alpha: 0.45)
-                                  : SpotColors.border,
-                              width: 0.5,
-                            ),
-                          ),
-                          child: TextField(
-                            controller: _captionCtrl,
-                            focusNode: _captionFocus,
-                            minLines: 4,
-                            maxLines: null,
-                            style: SpotType.body,
-                            decoration: InputDecoration(
-                              filled: false,
-                              fillColor: Colors.transparent,
-                              hintText: widget.replyToPost != null
-                                  ? 'Write a reply…'
-                                  : 'What\'s happening?',
-                              hintStyle: SpotType.body.copyWith(
-                                color: SpotColors.textTertiary,
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                padding: const EdgeInsets.all(SpotSpacing.sm),
+                                decoration: BoxDecoration(
+                                  borderRadius:
+                                      BorderRadius.circular(SpotRadius.sm),
+                                  border: Border.all(
+                                    color: _captionFocus.hasFocus
+                                        ? SpotColors.accent
+                                            .withValues(alpha: 0.45)
+                                        : SpotColors.border,
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child: TextField(
+                                  controller: _captionCtrl,
+                                  focusNode: _captionFocus,
+                                  minLines: 4,
+                                  maxLines: null,
+                                  style: SpotType.body,
+                                  decoration: InputDecoration(
+                                    filled: false,
+                                    fillColor: Colors.transparent,
+                                    hintText: widget.replyToPost != null
+                                        ? 'Write a reply…'
+                                        : 'What\'s happening?',
+                                    hintStyle: SpotType.body.copyWith(
+                                      color: SpotColors.textTertiary,
+                                    ),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    disabledBorder: InputBorder.none,
+                                    errorBorder: InputBorder.none,
+                                    focusedErrorBorder: InputBorder.none,
+                                    contentPadding: EdgeInsets.zero,
+                                    isDense: true,
+                                  ),
+                                  onChanged: (_) => setState(() {}),
+                                ),
                               ),
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              disabledBorder: InputBorder.none,
-                              errorBorder: InputBorder.none,
-                              focusedErrorBorder: InputBorder.none,
-                              contentPadding: EdgeInsets.zero,
-                              isDense: true,
-                            ),
-                            onChanged: (_) => setState(() {}),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
+
+                  // ── Media strip ─────────────────────────────────────────────
+                  if (_mediaFiles.isNotEmpty) ...[
+                    const SizedBox(height: SpotSpacing.sm),
+                    _MediaStrip(files: _mediaFiles, onRemove: _removeMedia),
+                  ],
+
+                  const SizedBox(height: SpotSpacing.sm),
+
+                  // ── Tag card ────────────────────────────────────────────────
+                  _buildTagSection(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      SpotSpacing.lg + SpotSpacing.md + 14 + SpotSpacing.sm,
+                      3,
+                      SpotSpacing.lg,
+                      0,
+                    ),
+                    child: Text(
+                      'First tag is the event category · press Space or , to add more',
+                      style: SpotType.caption.copyWith(
+                        color: SpotColors.textTertiary,
+                      ),
+                    ),
+                  ),
+
+                  // ── Location row ────────────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpotSpacing.lg,
+                    ),
+                    child: _LocationRow(
+                      gpsLock: _gpsLock,
+                      isVirtual: _isVirtual,
+                      isDangerMode: _isDangerMode,
+                      spotName: _spotName,
+                    ),
+                  ),
+
+                  const SizedBox(height: SpotSpacing.sm),
+                  const Divider(
+                    color: SpotColors.border,
+                    height: 1,
+                    thickness: 0.5,
+                  ),
+                  const SizedBox(height: SpotSpacing.sm),
+
+                  // ── Expandable options ──────────────────────────────────────
+                  if (_showOptions) ...[
+                    _ComposerOptions(
+                      isDangerMode: _isDangerMode,
+                      isVirtual: _isVirtual,
+                      isAiGenerated: _isAiGenerated,
+                      sourceType: _sourceType,
+                      spotName: _spotName,
+                      spotNameCtrl: _spotNameCtrl,
+                      onDangerChanged: (v) => setState(() {
+                        _isDangerMode = v;
+                        if (v) _isVirtual = false;
+                      }),
+                      onVirtualChanged: (v) => setState(() {
+                        _isVirtual = v;
+                        if (v) {
+                          _isDangerMode = false;
+                          _spotName = null;
+                          _spotNameCtrl.clear();
+                        }
+                      }),
+                      onAiChanged: (v) => setState(() => _isAiGenerated = v),
+                      onSourceChanged: (v) => setState(() => _sourceType = v),
+                      onSpotNameChanged: (v) =>
+                          setState(() => _spotName = v),
+                    ),
+                    const SizedBox(height: SpotSpacing.sm),
+                    const Divider(
+                      color: SpotColors.border,
+                      height: 1,
+                      thickness: 0.5,
+                    ),
+                    const SizedBox(height: SpotSpacing.sm),
+                  ],
                 ],
               ),
             ),
           ),
 
-          // ── Media strip ─────────────────────────────────────────────────────
-          if (_mediaFiles.isNotEmpty) ...[
-            const SizedBox(height: SpotSpacing.sm),
-            _MediaStrip(files: _mediaFiles, onRemove: _removeMedia),
-          ],
-
-          const SizedBox(height: SpotSpacing.sm),
-
-          // ── Tag card ────────────────────────────────────────────────────
-          _buildTagSection(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              SpotSpacing.lg + SpotSpacing.md + 14 + SpotSpacing.sm,
-              3,
-              SpotSpacing.lg,
-              0,
-            ),
-            child: Text(
-              'First tag is the event category · press Space or , to add more',
-              style: SpotType.caption.copyWith(color: SpotColors.textTertiary),
-            ),
-          ),
-
-          // ── Location row ────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
-            child: _LocationRow(
-              gpsLock: _gpsLock,
-              isVirtual: _isVirtual,
-              isDangerMode: _isDangerMode,
-              spotName: _spotName,
-            ),
-          ),
-
-          const SizedBox(height: SpotSpacing.sm),
+          // ── Bottom toolbar (pinned above keyboard) ──────────────────────────
           const Divider(color: SpotColors.border, height: 1, thickness: 0.5),
-          const SizedBox(height: SpotSpacing.sm),
-
-          // ── Expandable options ──────────────────────────────────────────────
-          if (_showOptions) ...[
-            _ComposerOptions(
-              isDangerMode: _isDangerMode,
-              isVirtual: _isVirtual,
-              isAiGenerated: _isAiGenerated,
-              sourceType: _sourceType,
-              spotName: _spotName,
-              spotNameCtrl: _spotNameCtrl,
-              onDangerChanged: (v) => setState(() {
-                _isDangerMode = v;
-                if (v) _isVirtual = false;
-              }),
-              onVirtualChanged: (v) => setState(() {
-                _isVirtual = v;
-                if (v) {
-                  _isDangerMode = false;
-                  _spotName = null;
-                  _spotNameCtrl.clear();
-                }
-              }),
-              onAiChanged: (v) => setState(() => _isAiGenerated = v),
-              onSourceChanged: (v) => setState(() => _sourceType = v),
-              onSpotNameChanged: (v) => setState(() => _spotName = v),
-            ),
-            const SizedBox(height: SpotSpacing.sm),
-            const Divider(color: SpotColors.border, height: 1, thickness: 0.5),
-            const SizedBox(height: SpotSpacing.sm),
-          ],
-
-          // ── Bottom toolbar ──────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
             child: Row(
