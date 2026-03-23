@@ -10,6 +10,13 @@ import 'package:mobile/models/media_post.dart';
 import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
+List<String> visibleThreadTagsForPost(MediaPost post) {
+  if (post.eventTags.isEmpty) return const [];
+  if (post.replyToId == null) return [post.eventTags.first];
+  if (post.eventTags.length == 1) return const [];
+  return post.eventTags.sublist(1);
+}
+
 /// Twitter/Threads-style thread row for a single [MediaPost].
 ///
 /// Set [isLast] to true on the final row to suppress the connector line.
@@ -118,6 +125,7 @@ class PostThreadRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleTags = visibleThreadTagsForPost(post);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         SpotSpacing.lg,
@@ -239,12 +247,12 @@ class PostThreadRow extends StatelessWidget {
                       ),
                     ],
                     // Event hashtags
-                    if (post.eventTags.isNotEmpty) ...[
+                    if (visibleTags.isNotEmpty) ...[
                       const SizedBox(height: 3),
                       Wrap(
                         spacing: SpotSpacing.sm,
                         children: [
-                          for (final t in post.eventTags)
+                          for (final t in visibleTags)
                             Text(
                               '#$t',
                               style: SpotType.body.copyWith(
