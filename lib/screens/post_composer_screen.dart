@@ -86,6 +86,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
     if (widget.replyToPost?.eventTag != null) {
       _tags.add(widget.replyToPost!.eventTag!);
     }
+    _captionFocus.addListener(() { if (mounted) setState(() {}); });
     _fetchGps();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _captionFocus.requestFocus();
@@ -326,7 +327,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                   hasCategory
                       ? CupertinoIcons.tag_fill
                       : CupertinoIcons.tag,
-                  size: 14,
+                  size: 18,
                   color: hasCategory
                       ? SpotColors.accent
                       : SpotColors.textTertiary,
@@ -374,15 +375,15 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: SpotSpacing.md,
-                vertical: SpotSpacing.xs,
+                vertical: SpotSpacing.sm,
               ),
               child: Wrap(
-                spacing: SpotSpacing.xs,
-                runSpacing: SpotSpacing.xs,
+                spacing: SpotSpacing.sm,
+                runSpacing: SpotSpacing.sm,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   const Icon(CupertinoIcons.number,
-                      size: 11, color: SpotColors.textTertiary),
+                      size: 14, color: SpotColors.textTertiary),
                   for (int i = 0; i < extraTags.length; i++)
                     _TagChip(
                       tag: extraTags[i],
@@ -394,11 +395,11 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                     child: TextField(
                       controller: _tagInputCtrl,
                       focusNode: _tagFocus,
-                      style: SpotType.caption
+                      style: SpotType.bodySecondary
                           .copyWith(color: SpotColors.textSecondary),
                       decoration: InputDecoration(
                         hintText: 'Add more tags…',
-                        hintStyle: SpotType.caption
+                        hintStyle: SpotType.bodySecondary
                             .copyWith(color: SpotColors.textTertiary),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.zero,
@@ -432,10 +433,22 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
           // ── Caption + avatar (fills remaining space) ─────────────────────
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              margin: const EdgeInsets.symmetric(horizontal: SpotSpacing.lg),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(SpotRadius.md),
+                border: Border.all(
+                  color: _captionFocus.hasFocus
+                      ? SpotColors.accent.withValues(alpha: 0.45)
+                      : SpotColors.border,
+                  width: 0.5,
+                ),
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(SpotSpacing.md),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   PubkeyAvatar(pubkey: widget.wallet.publicKeyHex),
                   const SizedBox(width: SpotSpacing.sm),
@@ -484,6 +497,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                 ],
               ),
             ),
+          ),
           ),
 
           // ── Media strip ─────────────────────────────────────────────────────
@@ -1143,7 +1157,7 @@ class _TagChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(
-          horizontal: SpotSpacing.sm, vertical: 2),
+          horizontal: SpotSpacing.md, vertical: SpotSpacing.xs),
       decoration: BoxDecoration(
         color: isCategory
             ? SpotColors.accent.withValues(alpha: 0.18)
@@ -1161,23 +1175,23 @@ class _TagChip extends StatelessWidget {
         children: [
           if (isCategory) ...[
             const Icon(CupertinoIcons.tag_fill,
-                size: 9, color: SpotColors.accent),
-            const SizedBox(width: 3),
+                size: 11, color: SpotColors.accent),
+            const SizedBox(width: 4),
           ],
           Text(
             '#$tag',
-            style: SpotType.label.copyWith(
+            style: SpotType.bodySecondary.copyWith(
               color: SpotColors.accent,
               fontWeight:
-                  isCategory ? FontWeight.w600 : FontWeight.normal,
+                  isCategory ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
           if (canRemove) ...[
-            const SizedBox(width: 4),
+            const SizedBox(width: 6),
             GestureDetector(
               onTap: onRemove,
-              child: const Icon(CupertinoIcons.xmark,
-                  size: 10, color: SpotColors.accent),
+              child: const Icon(CupertinoIcons.xmark_circle_fill,
+                  size: 14, color: SpotColors.accent),
             ),
           ],
         ],
