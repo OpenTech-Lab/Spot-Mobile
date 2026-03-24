@@ -186,6 +186,11 @@ class FeedScreenState extends State<FeedScreen>
     unawaited(LocalPostStore.instance.setLikedByMe(post, updated.isLikedByMe));
   }
 
+  void _updateMediaPost(MediaPost post) {
+    setState(() => _posts = replacePostsById(_posts, [post]));
+    unawaited(LocalPostStore.instance.savePost(post));
+  }
+
   Future<void> _reportPost(MediaPost post) async {
     try {
       await widget.nostrService.reportContent(
@@ -264,6 +269,7 @@ class FeedScreenState extends State<FeedScreen>
                 onLoadMore: _loadMorePosts,
                 onReport: _reportPost,
                 onLike: _toggleLike,
+                onMediaUpdated: _updateMediaPost,
                 onAvatarTap: _openUserProfile,
                 wallet: widget.wallet,
                 nostrService: widget.nostrService,
@@ -276,6 +282,7 @@ class FeedScreenState extends State<FeedScreen>
                 onRefresh: _refresh,
                 onReport: _reportPost,
                 onLike: _toggleLike,
+                onMediaUpdated: _updateMediaPost,
                 onAvatarTap: _openUserProfile,
                 wallet: widget.wallet,
                 nostrService: widget.nostrService,
@@ -318,6 +325,7 @@ class _LatestTab extends StatefulWidget {
     required this.onLoadMore,
     required this.onReport,
     required this.onLike,
+    required this.onMediaUpdated,
     required this.onAvatarTap,
     required this.wallet,
     required this.nostrService,
@@ -333,6 +341,7 @@ class _LatestTab extends StatefulWidget {
   final Future<void> Function() onLoadMore;
   final void Function(MediaPost) onReport;
   final void Function(MediaPost) onLike;
+  final void Function(MediaPost) onMediaUpdated;
   final void Function(BuildContext, String) onAvatarTap;
   final WalletModel wallet;
   final NostrService nostrService;
@@ -429,6 +438,7 @@ class _LatestTabState extends State<_LatestTab> {
                   onAvatarTap: () => widget.onAvatarTap(ctx, post.pubkey),
                   onReport: () => widget.onReport(post),
                   onLike: () => widget.onLike(post),
+                  onMediaUpdated: widget.onMediaUpdated,
                   onReply: () => showPostComposer(
                     ctx,
                     wallet: widget.wallet,
@@ -567,6 +577,7 @@ class _FollowingTab extends StatelessWidget {
     required this.onRefresh,
     required this.onReport,
     required this.onLike,
+    required this.onMediaUpdated,
     required this.onAvatarTap,
     required this.wallet,
     required this.nostrService,
@@ -579,6 +590,7 @@ class _FollowingTab extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final void Function(MediaPost) onReport;
   final void Function(MediaPost) onLike;
+  final void Function(MediaPost) onMediaUpdated;
   final void Function(BuildContext, String) onAvatarTap;
   final WalletModel wallet;
   final NostrService nostrService;
@@ -686,6 +698,7 @@ class _FollowingTab extends StatelessWidget {
                   onAvatarTap: () => onAvatarTap(ctx, post.pubkey),
                   onReport: () => onReport(post),
                   onLike: () => onLike(post),
+                  onMediaUpdated: onMediaUpdated,
                   onReply: () => showPostComposer(
                     ctx,
                     wallet: wallet,

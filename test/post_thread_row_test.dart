@@ -221,6 +221,33 @@ void main() {
     expect(icon.color, SpotColors.danger);
     expect(count.style?.color, SpotColors.danger);
   });
+
+  testWidgets('PostThreadRow shows loading hint while preview media hydrates', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ListView(
+            children: [
+              PostThreadRow(
+                post: _post(
+                  eventTags: const ['tokyo'],
+                  previewBase64: _tinyPngBase64,
+                  previewMimeType: 'image/png',
+                ),
+                isLast: true,
+                isMediaLoading: true,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Loading full image…'), findsOneWidget);
+    expect(find.text('Preview'), findsOneWidget);
+  });
 }
 
 MediaPost _post({
@@ -233,6 +260,8 @@ MediaPost _post({
   int replyCount = 0,
   int likeCount = 0,
   bool isLikedByMe = false,
+  String? previewBase64,
+  String? previewMimeType,
 }) => MediaPost(
   id: 'post-id',
   pubkey: 'pubkey',
@@ -247,8 +276,13 @@ MediaPost _post({
   replyCount: replyCount,
   likeCount: likeCount,
   isLikedByMe: isLikedByMe,
+  previewBase64: previewBase64,
+  previewMimeType: previewMimeType,
   nostrEventId: 'post-id',
 );
+
+const _tinyPngBase64 =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a8Z0AAAAASUVORK5CYII=';
 
 class _LikeHarness extends StatefulWidget {
   const _LikeHarness({required this.post});

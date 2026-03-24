@@ -14,7 +14,7 @@ class MediaSyncService {
     final updatedPosts = <MediaPost>[];
 
     for (final post in posts) {
-      final hydrated = await _hydratePost(post);
+      final hydrated = await hydratePost(post);
       if (_pathsDiffer(post.mediaPaths, hydrated.mediaPaths)) {
         updatedPosts.add(hydrated);
       }
@@ -23,7 +23,7 @@ class MediaSyncService {
     return updatedPosts;
   }
 
-  Future<MediaPost> _hydratePost(MediaPost post) async {
+  Future<MediaPost> hydratePost(MediaPost post) async {
     if (post.isTextOnly || post.contentHashes.isEmpty) return post;
 
     final resolvedPaths = <String>[];

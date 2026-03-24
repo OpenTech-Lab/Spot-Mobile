@@ -117,6 +117,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     unawaited(LocalPostStore.instance.setLikedByMe(post, updated.isLikedByMe));
   }
 
+  void _updateMediaPost(MediaPost post) {
+    setState(() => _posts = replacePostsById(_posts, [post]));
+    unawaited(LocalPostStore.instance.savePost(post));
+  }
+
   Future<void> _deletePost(MediaPost post) async {
     // Optimistic removal from UI
     setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
@@ -273,6 +278,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   return PostThreadRow(
                     post: post,
                     isLast: isLastInThread(threadedPosts, i),
+                    onMediaUpdated: _updateMediaPost,
                     onReply: () => showPostComposer(
                       ctx,
                       wallet: widget.wallet,

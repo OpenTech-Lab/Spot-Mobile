@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:mobile/models/media_post.dart';
+import 'package:mobile/screens/media_detail_screen.dart';
 import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
@@ -55,6 +56,8 @@ class PostThreadRow extends StatelessWidget {
     this.onLike,
     this.onDelete,
     this.onReport,
+    this.isMediaLoading = false,
+    this.onMediaUpdated,
   });
 
   final MediaPost post;
@@ -64,6 +67,8 @@ class PostThreadRow extends StatelessWidget {
   final VoidCallback? onLike;
   final VoidCallback? onDelete;
   final VoidCallback? onReport;
+  final bool isMediaLoading;
+  final ValueChanged<MediaPost>? onMediaUpdated;
 
   void _showPostMenu(BuildContext context) {
     showModalBottomSheet<void>(
@@ -317,7 +322,11 @@ class PostThreadRow extends StatelessWidget {
                     ],
                     const SizedBox(height: SpotSpacing.sm),
                     // Media
-                    _PostMedia(post: post),
+                    _PostMedia(
+                      post: post,
+                      isMediaLoading: isMediaLoading,
+                      onPostUpdated: onMediaUpdated,
+                    ),
                     const SizedBox(height: SpotSpacing.sm),
                     _PostLocationRow(post: post),
                     // ── Control panel: reply · like · indicators ──
@@ -371,8 +380,15 @@ class PostThreadRow extends StatelessWidget {
 // ── Post media ────────────────────────────────────────────────────────────────
 
 class _PostMedia extends StatelessWidget {
-  const _PostMedia({required this.post});
+  const _PostMedia({
+    required this.post,
+    required this.isMediaLoading,
+    this.onPostUpdated,
+  });
+
   final MediaPost post;
+  final bool isMediaLoading;
+  final ValueChanged<MediaPost>? onPostUpdated;
 
   // Max height for a single image — keeps tall portraits from dominating the feed.
   static const double _maxImageHeight = 200;
@@ -381,40 +397,46 @@ class _PostMedia extends StatelessWidget {
   Widget build(BuildContext context) {
     if (post.isTextOnly) return const SizedBox.shrink();
 
-    // Collect all locally available paths (danger-mode images show blurred)
-    final availablePaths = post.mediaPaths
-        .where((p) => File(p).existsSync())
-        .toList();
+    final availableMedia = <({int index, String path})>[];
+    for (var i = 0; i < post.mediaPaths.length; i++) {
+      final path = post.mediaPaths[i];
+      if (File(path).existsSync()) {
+        availableMedia.add((index: i, path: path));
+      }
+    }
 
-    // Multiple files: horizontal scrollable strip
-    if (availablePaths.length > 1) {
+    if (availableMedia.length > 1) {
       return SizedBox(
         height: _maxImageHeight,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
-          itemCount: availablePaths.length,
+          itemCount: availableMedia.length,
           separatorBuilder: (ctx, i) => const SizedBox(width: 6),
           itemBuilder: (ctx, i) {
-            final path = availablePaths[i];
-            final w = availablePaths.length == 2 ? 200.0 : 160.0;
-            return SizedBox(
-              width: w,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(SpotRadius.sm),
-                child: _isVideo(path)
-                    ? _VideoThumb(path: path, compact: true)
-                    : Image.file(
-                        File(path),
-                        fit: BoxFit.cover,
-                        errorBuilder: (ctx, err, stack) => Container(
-                          color: SpotColors.surface,
-                          child: const Icon(
-                            CupertinoIcons.photo,
-                            color: SpotColors.overlay,
-                            size: 22,
+            final media = availableMedia[i];
+            final width = availableMedia.length == 2 ? 200.0 : 160.0;
+            return GestureDetector(
+              onTap: () => _openDetail(context, initialIndex: media.index),
+              behavior: HitTestBehavior.opaque,
+              child: SizedBox(
+                width: width,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(SpotRadius.sm),
+                  child: _isVideo(media.path)
+                      ? _VideoThumb(path: media.path, compact: true)
+                      : Image.file(
+                          File(media.path),
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, stack) => Container(
+                            color: SpotColors.surface,
+                            child: const Icon(
+                              CupertinoIcons.photo,
+                              color: SpotColors.overlay,
+                              size: 22,
+                            ),
                           ),
                         ),
-                      ),
+                ),
               ),
             );
           },
@@ -422,92 +444,141 @@ class _PostMedia extends StatelessWidget {
       );
     }
 
-    // Single file
-    final path = availablePaths.isEmpty ? null : availablePaths.first;
-    if (path != null) {
-      if (_isVideo(path)) {
-        return _VideoThumb(path: path);
-      }
-      return ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: _maxImageHeight),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(SpotRadius.md),
-          child: Image.file(
-            File(path),
-            width: double.infinity,
-            fit: BoxFit.cover,
-            errorBuilder: (ctx, err, stack) => _mediaShell(
-              child: const Icon(
-                CupertinoIcons.photo,
-                color: SpotColors.overlay,
-                size: 26,
+    final media = availableMedia.isEmpty ? null : availableMedia.first;
+    if (media != null) {
+      final child = _isVideo(media.path)
+          ? _VideoThumb(path: media.path)
+          : SizedBox(
+              height: _maxImageHeight,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(SpotRadius.md),
+                child: Image.file(
+                  File(media.path),
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (ctx, err, stack) => _mediaShell(
+                    child: const Icon(
+                      CupertinoIcons.photo,
+                      color: SpotColors.overlay,
+                      size: 26,
+                    ),
+                  ),
+                ),
               ),
+            );
+
+      return GestureDetector(
+        onTap: () => _openDetail(context, initialIndex: media.index),
+        behavior: HitTestBehavior.opaque,
+        child: child,
+      );
+    }
+
+    final previewBytes = _decodePreviewBytes();
+    if (previewBytes != null) {
+      return GestureDetector(
+        onTap: () => _openDetail(context),
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          height: _maxImageHeight,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(SpotRadius.md),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.memory(
+                  previewBytes,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (ctx, err, stack) => _mediaShell(
+                    child: const Icon(
+                      CupertinoIcons.photo,
+                      color: SpotColors.overlay,
+                      size: 26,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: SpotSpacing.sm,
+                  bottom: SpotSpacing.sm,
+                  child: _TransportStatusChip(
+                    label: isMediaLoading
+                        ? 'Loading full image…'
+                        : 'Tap to load full',
+                    showSpinner: isMediaLoading,
+                  ),
+                ),
+                Positioned(
+                  right: SpotSpacing.sm,
+                  bottom: SpotSpacing.sm,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpotSpacing.sm,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xB3000000),
+                      borderRadius: BorderRadius.circular(SpotRadius.full),
+                    ),
+                    child: Text(
+                      'Preview',
+                      style: SpotType.caption.copyWith(
+                        color: Colors.white,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
       );
     }
 
-    final previewBytes = _decodePreviewBytes();
-    if (previewBytes != null) {
-      return ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: _maxImageHeight),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(SpotRadius.md),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.memory(
-                previewBytes,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (ctx, err, stack) => _mediaShell(
-                  child: const Icon(
-                    CupertinoIcons.photo,
-                    color: SpotColors.overlay,
-                    size: 26,
-                  ),
-                ),
+    return GestureDetector(
+      onTap: () => _openDetail(context),
+      behavior: HitTestBehavior.opaque,
+      child: _mediaShell(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isMediaLoading)
+              const Padding(
+                padding: EdgeInsets.only(bottom: SpotSpacing.sm),
+                child: CupertinoActivityIndicator(radius: 10),
+              )
+            else
+              const Icon(
+                CupertinoIcons.photo,
+                color: SpotColors.overlay,
+                size: 26,
               ),
-              Positioned(
-                right: SpotSpacing.sm,
-                bottom: SpotSpacing.sm,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: SpotSpacing.sm,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xB3000000),
-                    borderRadius: BorderRadius.circular(SpotRadius.full),
-                  ),
-                  child: Text(
-                    'Preview',
-                    style: SpotType.caption.copyWith(
-                      color: Colors.white,
-                      fontSize: 11,
-                    ),
-                  ),
-                ),
+            Text(
+              isMediaLoading ? 'Loading full media…' : 'Tap to load media',
+              style: SpotType.caption.copyWith(color: SpotColors.textTertiary),
+            ),
+            const SizedBox(height: SpotSpacing.xs),
+            Text(
+              'Opens full-screen viewer',
+              style: SpotType.caption.copyWith(
+                color: SpotColors.textTertiary.withAlpha(150),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    // No local file (remote post, P2P not yet fetched)
-    return _mediaShell(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(CupertinoIcons.photo, color: SpotColors.overlay, size: 26),
-          const SizedBox(height: SpotSpacing.xs),
-          Text(
-            'Media not synced yet',
-            style: SpotType.caption.copyWith(color: SpotColors.textTertiary),
-          ),
-        ],
+  Future<void> _openDetail(BuildContext context, {int initialIndex = 0}) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => MediaDetailScreen(
+          post: post,
+          initialIndex: initialIndex,
+          onPostUpdated: onPostUpdated,
+        ),
       ),
     );
   }
@@ -543,6 +614,40 @@ class _PostMedia extends StatelessWidget {
         p.endsWith('.mov') ||
         p.endsWith('.avi') ||
         p.endsWith('.mkv');
+  }
+}
+
+class _TransportStatusChip extends StatelessWidget {
+  const _TransportStatusChip({required this.label, required this.showSpinner});
+
+  final String label;
+  final bool showSpinner;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpotSpacing.sm,
+        vertical: 4,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xB3000000),
+        borderRadius: BorderRadius.circular(SpotRadius.full),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showSpinner) ...[
+            const CupertinoActivityIndicator(radius: 6),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            label,
+            style: SpotType.caption.copyWith(color: Colors.white, fontSize: 11),
+          ),
+        ],
+      ),
+    );
   }
 }
 

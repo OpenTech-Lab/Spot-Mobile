@@ -111,6 +111,11 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
     unawaited(LocalPostStore.instance.setLikedByMe(post, updated.isLikedByMe));
   }
 
+  void _updateMediaPost(MediaPost post) {
+    setState(() => _posts = replacePostsById(_posts, [post]));
+    unawaited(LocalPostStore.instance.savePost(post));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -229,6 +234,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
               post: entries[i].post,
               isLast: isLastInThread(entries, i),
               onLike: () => _toggleLike(entries[i].post),
+              onMediaUpdated: _updateMediaPost,
             ),
           );
         },

@@ -7,6 +7,30 @@ import 'package:mobile/services/media_sync_service.dart';
 
 void main() {
   test(
+    'hydratePost upgrades a single remote post with fetched media paths',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp('spot-media-one-');
+      addTearDown(() => tempDir.delete(recursive: true));
+
+      final fetchedFile = File('${tempDir.path}/media.jpg');
+      await fetchedFile.writeAsBytes(const [1, 2, 3]);
+
+      final service = MediaSyncService(
+        fetchMedia: (contentHash, {authorPubkey}) async {
+          if (contentHash == 'hash-a') return fetchedFile;
+          return null;
+        },
+      );
+
+      final updated = await service.hydratePost(
+        _post(contentHashes: const ['hash-a']),
+      );
+
+      expect(updated.mediaPaths, [fetchedFile.path]);
+    },
+  );
+
+  test(
     'hydratePosts upgrades a remote post with fetched media paths',
     () async {
       final tempDir = await Directory.systemTemp.createTemp('spot-media-sync-');

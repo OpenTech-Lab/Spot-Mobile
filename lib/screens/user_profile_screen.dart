@@ -108,6 +108,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     unawaited(LocalPostStore.instance.setLikedByMe(post, updated.isLikedByMe));
   }
 
+  void _updateMediaPost(MediaPost post) {
+    setState(() => _posts = replacePostsById(_posts, [post]));
+    unawaited(LocalPostStore.instance.savePost(post));
+  }
+
   // ── Follow ────────────────────────────────────────────────────────────────
 
   Future<void> _toggleFollow() async {
@@ -338,6 +343,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     isLast: isLastInThread(threadedPosts, i),
                     onReport: () => _reportPost(post),
                     onLike: () => _toggleLike(post),
+                    onMediaUpdated: _updateMediaPost,
                     onReply: () => showPostComposer(
                       ctx,
                       wallet: widget.wallet,

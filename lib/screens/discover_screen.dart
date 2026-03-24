@@ -135,6 +135,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     unawaited(LocalPostStore.instance.setLikedByMe(post, updated.isLikedByMe));
   }
 
+  void _updateMediaPost(MediaPost post) {
+    setState(() => _posts = replacePostsById(_posts, [post]));
+    unawaited(LocalPostStore.instance.savePost(post));
+  }
+
   // ── Post actions ──────────────────────────────────────────────────────────
 
   Future<void> _reportPost(MediaPost post) async {
@@ -333,6 +338,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 onAvatarTap: () => _openUserProfile(ctx, post.pubkey),
                 onReport: () => _reportPost(post),
                 onLike: () => _toggleLike(post),
+                onMediaUpdated: _updateMediaPost,
                 onReply: () => showPostComposer(
                   ctx,
                   wallet: widget.wallet,

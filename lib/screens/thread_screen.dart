@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
@@ -40,6 +41,7 @@ class ThreadScreen extends StatefulWidget {
 
 class _ThreadScreenState extends State<ThreadScreen> {
   late List<MediaPost> _posts;
+  final Set<String> _loadingMediaPostIds = {};
 
   @override
   void initState() {
@@ -99,18 +101,59 @@ class _ThreadScreenState extends State<ThreadScreen> {
     unawaited(LocalPostStore.instance.setLikedByMe(post, updated.isLikedByMe));
   }
 
+  void _updateMediaPost(MediaPost post) {
+    setState(() {
+      _posts = replacePostsById(_posts, [post]);
+      _loadingMediaPostIds.remove(post.id);
+    });
+    unawaited(LocalPostStore.instance.savePost(post));
+  }
+
+  bool _needsMediaHydration(MediaPost post) {
+    if (post.isTextOnly || post.contentHashes.isEmpty) return false;
+    for (var i = 0; i < post.contentHashes.length; i++) {
+      if (i >= post.mediaPaths.length ||
+          !File(post.mediaPaths[i]).existsSync()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   Future<void> _syncThreadMedia() async {
     await P2PService.instance.startSwarm();
     final sync = MediaSyncService(
       fetchMedia: widget.mediaFetcher ?? P2PService.instance.requestMedia,
     );
-    final updatedPosts = await sync.hydratePosts(
-      _entries.map((entry) => entry.post),
-    );
-    if (!mounted || updatedPosts.isEmpty) return;
+    final candidates = _entries
+        .map((entry) => entry.post)
+        .where(_needsMediaHydration)
+        .toList(growable: false);
+    if (!mounted || candidates.isEmpty) return;
 
-    setState(() => _posts = replacePostsById(_posts, updatedPosts));
-    await LocalPostStore.instance.savePosts(updatedPosts);
+    setState(() {
+      _loadingMediaPostIds.addAll(candidates.map((post) => post.id));
+    });
+
+    for (final post in candidates) {
+      final hydrated = await sync.hydratePost(post);
+      if (!mounted) return;
+
+      if (hydrated.mediaPaths.length != post.mediaPaths.length ||
+          !_samePaths(hydrated.mediaPaths, post.mediaPaths)) {
+        _updateMediaPost(hydrated);
+      } else {
+        setState(() => _loadingMediaPostIds.remove(post.id));
+      }
+    }
+  }
+
+  bool _samePaths(List<String> left, List<String> right) {
+    if (left.length != right.length) return false;
+    for (var i = 0; i < left.length; i++) {
+      if (left[i] != right[i]) return false;
+    }
+    return true;
   }
 
   @override
@@ -146,9 +189,11 @@ class _ThreadScreenState extends State<ThreadScreen> {
                 return PostThreadRow(
                   post: post,
                   isLast: i == entries.length - 1,
+                  isMediaLoading: _loadingMediaPostIds.contains(post.id),
                   onAvatarTap: () => _openUserProfile(ctx, post.pubkey),
                   onReport: () => _reportPost(post),
                   onLike: () => _toggleLike(post),
+                  onMediaUpdated: _updateMediaPost,
                   onReply: () => showPostComposer(
                     ctx,
                     wallet: widget.wallet,
