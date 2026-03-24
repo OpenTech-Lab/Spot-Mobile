@@ -11,6 +11,7 @@ import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/settings_screen.dart';
+import 'package:mobile/screens/thread_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/post_merge.dart';
@@ -187,7 +188,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final threadedPosts = buildThreadedPostEntries(_posts);
+    final roots = topLevelThreadPosts(_posts);
     return Scaffold(
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
@@ -273,24 +274,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
             else
               SliverList(
                 delegate: SliverChildBuilderDelegate((ctx, i) {
-                  final entry = threadedPosts[i];
-                  final post = entry.post;
-                  return PostThreadRow(
-                    post: post,
-                    isLast: isLastInThread(threadedPosts, i),
-                    onMediaUpdated: _updateMediaPost,
-                    onReply: () => showPostComposer(
-                      ctx,
-                      wallet: widget.wallet,
-                      nostrService: widget.nostrService,
-                      eventRepo: _repo,
-                      replyToPost: post,
+                  final post = roots[i];
+                  return InkWell(
+                    onTap: () => Navigator.of(ctx).push(
+                      buildThreadScreenRoute(
+                        rootPostId: post.nostrEventId,
+                        initialPosts: _posts,
+                        wallet: widget.wallet,
+                        nostrService: widget.nostrService,
+                        eventRepo: _repo,
+                      ),
                     ),
-                    onDelete: () => _deletePost(post),
-                    onReport: () => _reportPost(post),
-                    onLike: () => _toggleLike(post),
+                    child: PostThreadRow(
+                      post: post,
+                      isLast: true,
+                      onMediaUpdated: _updateMediaPost,
+                      onReply: () => showPostComposer(
+                        ctx,
+                        wallet: widget.wallet,
+                        nostrService: widget.nostrService,
+                        eventRepo: _repo,
+                        replyToPost: post,
+                      ),
+                      onDelete: () => _deletePost(post),
+                      onReport: () => _reportPost(post),
+                      onLike: () => _toggleLike(post),
+                    ),
                   );
-                }, childCount: threadedPosts.length),
+                }, childCount: roots.length),
               ),
           ],
         ),

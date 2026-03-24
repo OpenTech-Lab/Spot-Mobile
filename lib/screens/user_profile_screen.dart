@@ -9,6 +9,7 @@ import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
+import 'package:mobile/screens/thread_screen.dart';
 import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/post_merge.dart';
@@ -272,7 +273,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final threadedPosts = buildThreadedPostEntries(_posts);
+    final roots = topLevelThreadPosts(_posts);
     return Scaffold(
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
@@ -336,26 +337,35 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             else
               SliverList(
                 delegate: SliverChildBuilderDelegate((ctx, i) {
-                  final entry = threadedPosts[i];
-                  final post = entry.post;
-                  return PostThreadRow(
-                    post: post,
-                    isLast: isLastInThread(threadedPosts, i),
-                    onReport: () => _reportPost(post),
-                    onLike: () => _toggleLike(post),
-                    onMediaUpdated: _updateMediaPost,
-                    onReply: () => showPostComposer(
-                      ctx,
-                      wallet: widget.wallet,
-                      nostrService: widget.nostrService,
-                      replyToPost: post,
-                      onPublished: (reply) {
-                        if (!mounted) return;
-                        setState(() => _posts = _mergePosts(_posts, [reply]));
-                      },
+                  final post = roots[i];
+                  return InkWell(
+                    onTap: () => Navigator.of(ctx).push(
+                      buildThreadScreenRoute(
+                        rootPostId: post.nostrEventId,
+                        initialPosts: _posts,
+                        wallet: widget.wallet,
+                        nostrService: widget.nostrService,
+                      ),
+                    ),
+                    child: PostThreadRow(
+                      post: post,
+                      isLast: true,
+                      onReport: () => _reportPost(post),
+                      onLike: () => _toggleLike(post),
+                      onMediaUpdated: _updateMediaPost,
+                      onReply: () => showPostComposer(
+                        ctx,
+                        wallet: widget.wallet,
+                        nostrService: widget.nostrService,
+                        replyToPost: post,
+                        onPublished: (reply) {
+                          if (!mounted) return;
+                          setState(() => _posts = _mergePosts(_posts, [reply]));
+                        },
+                      ),
                     ),
                   );
-                }, childCount: threadedPosts.length),
+                }, childCount: roots.length),
               ),
           ],
         ),

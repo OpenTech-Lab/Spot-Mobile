@@ -9,6 +9,7 @@ import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
+import 'package:mobile/screens/thread_screen.dart';
 import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/feed_scoring_service.dart';
 import 'package:mobile/services/location_service.dart';
@@ -322,29 +323,39 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       onRefresh: _refresh,
       child: Builder(
         builder: (ctx) {
-          final entries = buildThreadedPostEntries(posts);
+          final roots = topLevelThreadPosts(posts);
           return ListView.builder(
             padding: const EdgeInsets.only(
               top: SpotSpacing.sm,
               bottom: SpotSpacing.xl,
             ),
-            itemCount: entries.length,
+            itemCount: roots.length,
             itemBuilder: (ctx, i) {
-              final entry = entries[i];
-              final post = entry.post;
-              return PostThreadRow(
-                post: post,
-                isLast: isLastInThread(entries, i),
-                onAvatarTap: () => _openUserProfile(ctx, post.pubkey),
-                onReport: () => _reportPost(post),
-                onLike: () => _toggleLike(post),
-                onMediaUpdated: _updateMediaPost,
-                onReply: () => showPostComposer(
-                  ctx,
-                  wallet: widget.wallet,
-                  nostrService: widget.nostrService,
-                  eventRepo: _repo,
-                  replyToPost: post,
+              final post = roots[i];
+              return InkWell(
+                onTap: () => Navigator.of(ctx).push(
+                  buildThreadScreenRoute(
+                    rootPostId: post.nostrEventId,
+                    initialPosts: _posts,
+                    wallet: widget.wallet,
+                    nostrService: widget.nostrService,
+                    eventRepo: _repo,
+                  ),
+                ),
+                child: PostThreadRow(
+                  post: post,
+                  isLast: true,
+                  onAvatarTap: () => _openUserProfile(ctx, post.pubkey),
+                  onReport: () => _reportPost(post),
+                  onLike: () => _toggleLike(post),
+                  onMediaUpdated: _updateMediaPost,
+                  onReply: () => showPostComposer(
+                    ctx,
+                    wallet: widget.wallet,
+                    nostrService: widget.nostrService,
+                    eventRepo: _repo,
+                    replyToPost: post,
+                  ),
                 ),
               );
             },
