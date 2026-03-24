@@ -2,12 +2,15 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/nostr/nostr_service.dart';
+import 'package:mobile/models/asset_transport_policy.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/screens/asset_transport_settings_screen.dart';
 import 'package:mobile/screens/relay_list_screen.dart';
 import 'package:mobile/screens/wallet_screen.dart';
+import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     super.key,
     required this.wallet,
@@ -16,6 +19,23 @@ class SettingsScreen extends StatelessWidget {
 
   final WalletModel wallet;
   final NostrService nostrService;
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  AssetTransportPolicy get _assetTransportPolicy =>
+      UserPrefsService.instance.assetTransportPolicy;
+
+  Future<void> _openAssetTransportSettings() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AssetTransportSettingsScreen()),
+    );
+    if (mounted) {
+      setState(() {});
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,9 +56,17 @@ class SettingsScreen extends StatelessWidget {
             label: 'Relay List',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => RelayListScreen(nostrService: nostrService),
+                builder: (_) =>
+                    RelayListScreen(nostrService: widget.nostrService),
               ),
             ),
+          ),
+          const SizedBox(height: SpotSpacing.sm),
+          _SettingsRow(
+            icon: CupertinoIcons.wifi,
+            label: 'Asset Transport',
+            value: _assetTransportPolicy.label,
+            onTap: _openAssetTransportSettings,
           ),
           const SizedBox(height: SpotSpacing.sm),
           _SettingsRow(
@@ -46,7 +74,7 @@ class SettingsScreen extends StatelessWidget {
             label: 'Identity',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => WalletScreen(wallet: wallet),
+                builder: (_) => WalletScreen(wallet: widget.wallet),
               ),
             ),
           ),
@@ -61,11 +89,13 @@ class _SettingsRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.value,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final String? value;
 
   @override
   Widget build(BuildContext context) {
@@ -82,9 +112,17 @@ class _SettingsRow extends StatelessWidget {
           children: [
             Icon(icon, size: 20, color: SpotColors.textSecondary),
             const SizedBox(width: SpotSpacing.md),
-            Expanded(
-              child: Text(label, style: SpotType.body),
-            ),
+            Expanded(child: Text(label, style: SpotType.body)),
+            if (value != null) ...[
+              const SizedBox(width: SpotSpacing.sm),
+              Text(
+                value!,
+                style: SpotType.caption.copyWith(
+                  color: SpotColors.textTertiary,
+                ),
+              ),
+              const SizedBox(width: SpotSpacing.xs),
+            ],
             const Icon(
               CupertinoIcons.chevron_right,
               size: 14,

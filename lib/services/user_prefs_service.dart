@@ -3,12 +3,15 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import 'package:mobile/models/asset_transport_policy.dart';
+
 /// Stores user preferences for the Feed Discovery system on-device (JSON file).
 ///
 /// Persisted data:
 /// - `interests`: list of hashtag strings the user cares about.
 /// - `interests_set`: bool, true once the user has completed interest onboarding.
 /// - `viewed_hashtags`: map of hashtag → view count (for Scheme B bonus).
+/// - `asset_transport_policy`: peer media transport policy.
 ///
 /// No data ever leaves the device.
 class UserPrefsService {
@@ -48,11 +51,7 @@ class UserPrefsService {
 
   /// Saves the user's chosen interest hashtags and marks onboarding complete.
   Future<void> saveInterests(List<String> tags) async {
-    _data = {
-      ..._data,
-      'interests': tags,
-      'interests_set': true,
-    };
+    _data = {..._data, 'interests': tags, 'interests_set': true};
     await _save();
   }
 
@@ -67,6 +66,16 @@ class UserPrefsService {
     final views = viewedHashtags;
     views[hashtag] = (views[hashtag] ?? 0) + 1;
     _data = {..._data, 'viewed_hashtags': views};
+    await _save();
+  }
+
+  // ── Asset transport ─────────────────────────────────────────────────────
+
+  AssetTransportPolicy get assetTransportPolicy =>
+      parseAssetTransportPolicy(_data['asset_transport_policy'] as String?);
+
+  Future<void> saveAssetTransportPolicy(AssetTransportPolicy policy) async {
+    _data = {..._data, 'asset_transport_policy': policy.storageValue};
     await _save();
   }
 

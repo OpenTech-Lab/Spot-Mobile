@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -11,8 +12,10 @@ import 'package:mobile/core/wallet.dart';
 import 'package:mobile/features/nostr/nostr_models.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/event_model.dart';
+import 'package:mobile/models/asset_transport_policy.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/cache_manager.dart';
+import 'package:mobile/services/user_prefs_service.dart';
 
 const _peerAnnouncementKind = 30315;
 const _peerAnnouncementDTagPrefix = 'spot-p2p-endpoint';
@@ -35,10 +38,20 @@ class P2PService {
     Future<List<Uri>> Function(String pubkey)? peerEndpointResolver,
     Future<List<Uri>> Function(int port)? localEndpointResolver,
     Future<Directory> Function()? tempDirLoader,
+    AssetTransportPolicy Function()? transportPolicyGetter,
+    Future<bool> Function()? wifiChecker,
+    Stream<void>? connectivityChanges,
   }) : _httpClient = httpClient ?? HttpClient(),
        _peerEndpointResolver = peerEndpointResolver,
        _localEndpointResolver = localEndpointResolver,
-       _tempDirLoader = tempDirLoader ?? getTemporaryDirectory;
+       _tempDirLoader = tempDirLoader ?? getTemporaryDirectory,
+       _transportPolicyGetter =
+           transportPolicyGetter ??
+           (() => UserPrefsService.instance.assetTransportPolicy),
+       _wifiChecker = wifiChecker ?? _defaultWifiChecker,
+       _connectivityChanges =
+           connectivityChanges ??
+           Connectivity().onConnectivityChanged.map((_) {});
 
   static final P2PService instance = P2PService._();
 
@@ -47,17 +60,26 @@ class P2PService {
     Future<List<Uri>> Function(String pubkey)? peerEndpointResolver,
     Future<List<Uri>> Function(int port)? localEndpointResolver,
     Future<Directory> Function()? tempDirLoader,
+    AssetTransportPolicy Function()? transportPolicyGetter,
+    Future<bool> Function()? wifiChecker,
+    Stream<void>? connectivityChanges,
   }) => P2PService._(
     httpClient: httpClient,
     peerEndpointResolver: peerEndpointResolver,
     localEndpointResolver: localEndpointResolver,
     tempDirLoader: tempDirLoader,
+    transportPolicyGetter: transportPolicyGetter,
+    wifiChecker: wifiChecker,
+    connectivityChanges: connectivityChanges,
   );
 
   final HttpClient _httpClient;
   final Future<List<Uri>> Function(String pubkey)? _peerEndpointResolver;
   final Future<List<Uri>> Function(int port)? _localEndpointResolver;
   final Future<Directory> Function() _tempDirLoader;
+  final AssetTransportPolicy Function() _transportPolicyGetter;
+  final Future<bool> Function() _wifiChecker;
+  final Stream<void> _connectivityChanges;
 
   bool _started = false;
   int _seedingCount = 0;
@@ -65,6 +87,7 @@ class P2PService {
   NostrService? _nostrService;
   WalletModel? _wallet;
   List<Uri> _localEndpoints = const [];
+  StreamSubscription<void>? _connectivitySubscription;
   final Map<String, ({DateTime fetchedAt, List<Uri> endpoints})>
   _peerEndpointCache = {};
 
@@ -74,11 +97,30 @@ class P2PService {
   }) {
     _nostrService = nostrService;
     _wallet = wallet;
+    _connectivitySubscription ??= _connectivityChanges.listen((_) {
+      unawaited(refreshTransportAvailability());
+    });
   }
 
   // ── Swarm lifecycle ───────────────────────────────────────────────────────
 
   Future<void> startSwarm() async {
+    if (!await isTransportAllowedNow()) {
+      await stopSwarm();
+      return;
+    }
+    await _startSwarmInternal();
+  }
+
+  Future<void> refreshTransportAvailability() async {
+    if (await isTransportAllowedNow()) {
+      await _startSwarmInternal();
+    } else {
+      await stopSwarm();
+    }
+  }
+
+  Future<void> _startSwarmInternal() async {
     if (_started) return;
     final server = await HttpServer.bind(InternetAddress.anyIPv4, 0);
     _server = server;
@@ -107,6 +149,12 @@ class P2PService {
     }
   }
 
+  Future<void> shutdown() async {
+    await stopSwarm();
+    await _connectivitySubscription?.cancel();
+    _connectivitySubscription = null;
+  }
+
   // ── Seeding ───────────────────────────────────────────────────────────────
 
   Future<void> seedMedia(String filePath, String contentHash) async {
@@ -129,6 +177,7 @@ class P2PService {
   Future<File?> requestMedia(String contentHash, {String? authorPubkey}) async {
     final cached = CacheManager.instance.getCached(contentHash);
     if (cached != null) return cached;
+    if (!await isTransportAllowedNow()) return null;
     if (authorPubkey == null || authorPubkey.isEmpty) return null;
 
     final endpoints = await _resolvePeerEndpoints(authorPubkey);
@@ -154,6 +203,15 @@ class P2PService {
   bool get isSeeding => _seedingCount > 0;
   int get cacheSizeBytes => CacheManager.instance.totalCacheBytes;
   List<Uri> get localEndpoints => List.unmodifiable(_localEndpoints);
+  AssetTransportPolicy get transportPolicy => _transportPolicyGetter();
+
+  Future<bool> isTransportAllowedNow() async {
+    return switch (transportPolicy) {
+      AssetTransportPolicy.off => false,
+      AssetTransportPolicy.always => true,
+      AssetTransportPolicy.wifiOnly => _wifiChecker(),
+    };
+  }
 
   // ── Private: endpoint publication/discovery ──────────────────────────────
 
@@ -320,6 +378,12 @@ class P2PService {
 
   Future<void> _handleHttpRequest(HttpRequest request) async {
     try {
+      if (!await isTransportAllowedNow()) {
+        request.response.statusCode = HttpStatus.forbidden;
+        await request.response.close();
+        return;
+      }
+
       if (request.method != 'GET') {
         request.response.statusCode = HttpStatus.methodNotAllowed;
         await request.response.close();
@@ -440,6 +504,19 @@ class P2PService {
   // ── Private helpers ───────────────────────────────────────────────────────
 
   Future<bool> _isOnWifi() async {
-    return true;
+    return _wifiChecker();
+  }
+
+  static Future<bool> _defaultWifiChecker() async {
+    final Object status = await Connectivity().checkConnectivity();
+    if (status is List<ConnectivityResult>) {
+      return status.contains(ConnectivityResult.wifi) ||
+          status.contains(ConnectivityResult.ethernet);
+    }
+    if (status is ConnectivityResult) {
+      return status == ConnectivityResult.wifi ||
+          status == ConnectivityResult.ethernet;
+    }
+    return false;
   }
 }

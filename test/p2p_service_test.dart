@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mobile/core/encryption.dart';
+import 'package:mobile/models/asset_transport_policy.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/services/cache_manager.dart';
 
@@ -16,6 +17,8 @@ void main() {
         Uri.parse('http://127.0.0.1:$port'),
       ],
       tempDirLoader: () async => tempDir,
+      transportPolicyGetter: () => AssetTransportPolicy.always,
+      wifiChecker: () async => true,
     );
     addTearDown(() async {
       await service.stopSwarm();
@@ -78,6 +81,8 @@ void main() {
         Uri.parse('http://127.0.0.1:${server.port}'),
       ],
       tempDirLoader: () async => tempDir,
+      transportPolicyGetter: () => AssetTransportPolicy.always,
+      wifiChecker: () async => true,
     );
 
     final fetched = await service.requestMedia(
@@ -89,4 +94,66 @@ void main() {
     expect(await fetched!.readAsBytes(), bytes);
     expect(CacheManager.instance.getCached(contentHash)?.path, fetched.path);
   });
+
+  test(
+    'P2PService does not start transport on Wi-Fi only policy off Wi-Fi',
+    () async {
+      final service = P2PService.forTesting(
+        localEndpointResolver: (port) async => [
+          Uri.parse('http://127.0.0.1:$port'),
+        ],
+        transportPolicyGetter: () => AssetTransportPolicy.wifiOnly,
+        wifiChecker: () async => false,
+      );
+      addTearDown(() => service.shutdown());
+
+      await service.startSwarm();
+
+      expect(service.isRunning, isFalse);
+      expect(service.localEndpoints, isEmpty);
+    },
+  );
+
+  test('P2PService requestMedia respects disabled transport policy', () async {
+    var endpointLookups = 0;
+    final service = P2PService.forTesting(
+      peerEndpointResolver: (_) async {
+        endpointLookups++;
+        return [Uri.parse('http://127.0.0.1:1')];
+      },
+      transportPolicyGetter: () => AssetTransportPolicy.off,
+    );
+
+    final fetched = await service.requestMedia(
+      'missing-hash',
+      authorPubkey: 'peer-pubkey',
+    );
+
+    expect(fetched, isNull);
+    expect(endpointLookups, 0);
+  });
+
+  test(
+    'P2PService refreshTransportAvailability starts once Wi-Fi is available',
+    () async {
+      var onWifi = false;
+      final service = P2PService.forTesting(
+        localEndpointResolver: (port) async => [
+          Uri.parse('http://127.0.0.1:$port'),
+        ],
+        transportPolicyGetter: () => AssetTransportPolicy.wifiOnly,
+        wifiChecker: () async => onWifi,
+      );
+      addTearDown(() => service.shutdown());
+
+      await service.refreshTransportAvailability();
+      expect(service.isRunning, isFalse);
+
+      onWifi = true;
+      await service.refreshTransportAvailability();
+
+      expect(service.isRunning, isTrue);
+      expect(service.localEndpoints, isNotEmpty);
+    },
+  );
 }

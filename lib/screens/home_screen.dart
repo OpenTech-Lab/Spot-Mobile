@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -38,13 +40,13 @@ class _HomeScreenState extends State<HomeScreen> {
       wallet: widget.wallet,
     );
     _nostrService.connect();
-    P2PService.instance.startSwarm();
+    unawaited(P2PService.instance.refreshTransportAvailability());
   }
 
   @override
   void dispose() {
     _eventRepo.dispose();
-    P2PService.instance.stopSwarm();
+    unawaited(P2PService.instance.shutdown());
     _nostrService.disconnect();
     super.dispose();
   }
@@ -124,10 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: SpotColors.bg,
-                  border: Border.all(
-                    color: SpotColors.border,
-                    width: 0.5,
-                  ),
+                  border: Border.all(color: SpotColors.border, width: 0.5),
                 ),
                 child: const Icon(
                   CupertinoIcons.plus,
