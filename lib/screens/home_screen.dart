@@ -57,6 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
       key: _feedKey,
       nostrService: _nostrService,
       wallet: widget.wallet,
+      eventRepo: _eventRepo,
     ),
     DiscoverScreen(nostrService: _nostrService, wallet: widget.wallet),
     _EventsListTab(
@@ -64,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
       nostrService: _nostrService,
       wallet: widget.wallet,
     ),
-    ProfileScreen(wallet: widget.wallet, nostrService: _nostrService),
+    ProfileScreen(wallet: widget.wallet, nostrService: _nostrService, eventRepo: _eventRepo),
   ];
 
   void _openComposer() {

@@ -27,10 +27,12 @@ class FeedScreen extends StatefulWidget {
     super.key,
     required this.nostrService,
     required this.wallet,
+    required this.eventRepo,
   });
 
   final NostrService nostrService;
   final WalletModel wallet;
+  final EventRepository eventRepo;
 
   @override
   State<FeedScreen> createState() => FeedScreenState();
@@ -39,7 +41,7 @@ class FeedScreen extends StatefulWidget {
 class FeedScreenState extends State<FeedScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  late final EventRepository _repo;
+  EventRepository get _repo => widget.eventRepo;
   StreamSubscription<CivicEvent>? _sub;
 
   List<MediaPost> _posts = [];
@@ -54,7 +56,6 @@ class FeedScreenState extends State<FeedScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _repo = EventRepository(nostrService: widget.nostrService);
     FollowService.instance.init();
     _initFeed();
     _showInterestsIfNeeded();
@@ -64,7 +65,6 @@ class FeedScreenState extends State<FeedScreen>
   void dispose() {
     _tabController.dispose();
     _sub?.cancel();
-    _repo.dispose();
     super.dispose();
   }
 

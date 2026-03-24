@@ -198,7 +198,7 @@ jobs:
         run: |
           TAG="${{ github.ref_name }}"
           NOTES_FILE="scripts/version/${TAG#v}.md"
-          TITLE="NomadTerm Mobile ${TAG}"
+          TITLE="Spot Mobile ${TAG}"
 
           if gh release view "${TAG}" >/dev/null 2>&1; then
             # Release already exists (re-run) — update notes if the file is present

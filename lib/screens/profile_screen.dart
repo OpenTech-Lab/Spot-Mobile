@@ -25,17 +25,19 @@ class ProfileScreen extends StatefulWidget {
     super.key,
     required this.wallet,
     required this.nostrService,
+    required this.eventRepo,
   });
 
   final WalletModel wallet;
   final NostrService nostrService;
+  final EventRepository eventRepo;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  late final EventRepository _repo;
+  EventRepository get _repo => widget.eventRepo;
   StreamSubscription<CivicEvent>? _sub;
 
   List<MediaPost> _posts = [];
@@ -45,14 +47,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _repo = EventRepository(nostrService: widget.nostrService);
     _initFeed();
   }
 
   @override
   void dispose() {
     _sub?.cancel();
-    _repo.dispose();
     super.dispose();
   }
 

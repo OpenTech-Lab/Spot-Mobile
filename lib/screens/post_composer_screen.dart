@@ -225,6 +225,27 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
   Future<void> _publish() async {
     setState(() => _isPublishing = true);
+
+    // Push a full-screen black overlay that blocks all interaction.
+    final overlay = PageRouteBuilder<void>(
+      opaque: true,
+      barrierDismissible: false,
+      pageBuilder: (_, __, ___) => const ColoredBox(
+        color: Color(0xFF000000),
+        child: Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: SpotColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+    Navigator.of(context).push(overlay);
+
     try {
       final hashes = <String>[];
       final paths = <String>[];
@@ -346,8 +367,14 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
         }
       }
 
-      if (mounted) Navigator.of(context).pop();
+      // Pop both the overlay and the composer sheet.
+      if (mounted) {
+        Navigator.of(context).pop(); // overlay
+        Navigator.of(context).pop(); // composer
+      }
     } catch (e) {
+      // Pop the overlay so the user sees the composer + error snackbar.
+      if (mounted) Navigator.of(context).pop();
       _showSnack('Publish failed: $e');
     } finally {
       if (mounted) setState(() => _isPublishing = false);
