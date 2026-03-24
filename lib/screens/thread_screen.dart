@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
@@ -27,7 +28,7 @@ Route<void> buildThreadScreenRoute({
   MediaFetcher? mediaFetcher,
   Future<List<MediaPost>> Function()? persistedPostsLoader,
 }) {
-  return MaterialPageRoute<void>(
+  return CupertinoPageRoute<void>(
     builder: (_) => ThreadScreen(
       rootPostId: rootPostId,
       initialPosts: initialPosts,
