@@ -246,8 +246,32 @@ class MediaPost {
     isLikedByMe: isLikedByMe ?? this.isLikedByMe,
   );
 
-  MediaPost mergeLocalStateFrom(MediaPost existing) =>
-      copyWith(isLikedByMe: existing.isLikedByMe);
+  MediaPost mergeLocalStateFrom(MediaPost existing) => copyWith(
+    isLikedByMe: existing.isLikedByMe,
+    mediaPaths: _mergeMediaPaths(existing.mediaPaths),
+  );
+
+  List<String> _mergeMediaPaths(List<String> existingMediaPaths) {
+    if (mediaPaths.isEmpty) return existingMediaPaths;
+    if (existingMediaPaths.isEmpty) return mediaPaths;
+
+    final merged = <String>[];
+    final maxLength = mediaPaths.length > existingMediaPaths.length
+        ? mediaPaths.length
+        : existingMediaPaths.length;
+
+    for (var i = 0; i < maxLength; i++) {
+      if (i < mediaPaths.length && mediaPaths[i].isNotEmpty) {
+        merged.add(mediaPaths[i]);
+        continue;
+      }
+      if (i < existingMediaPaths.length && existingMediaPaths[i].isNotEmpty) {
+        merged.add(existingMediaPaths[i]);
+      }
+    }
+
+    return merged;
+  }
 
   static PostSourceType _parseSourceType(String? value) => switch (value) {
     'secondhand' => PostSourceType.secondhand,

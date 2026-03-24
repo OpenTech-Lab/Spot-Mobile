@@ -25,6 +25,7 @@ Route<void> buildThreadScreenRoute({
   required NostrService nostrService,
   EventRepository? eventRepo,
   MediaFetcher? mediaFetcher,
+  Future<List<MediaPost>> Function()? persistedPostsLoader,
 }) {
   return CupertinoPageRoute<void>(
     builder: (_) => ThreadScreen(
@@ -34,8 +35,28 @@ Route<void> buildThreadScreenRoute({
       nostrService: nostrService,
       eventRepo: eventRepo,
       mediaFetcher: mediaFetcher,
+      persistedPostsLoader: persistedPostsLoader,
     ),
   );
+}
+
+Future<List<MediaPost>> mergeThreadPostsWithPersistedState({
+  required List<MediaPost> initialPosts,
+  required Future<List<MediaPost>> Function() loadPersistedPosts,
+}) async {
+  final persisted = await loadPersistedPosts();
+  if (persisted.isEmpty) return List<MediaPost>.from(initialPosts);
+  return mergePostsPreservingLocalState(initialPosts, persisted);
+}
+
+bool postNeedsMediaHydration(MediaPost post) {
+  if (post.isTextOnly || post.contentHashes.isEmpty) return false;
+  for (var i = 0; i < post.contentHashes.length; i++) {
+    if (i >= post.mediaPaths.length || !File(post.mediaPaths[i]).existsSync()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 class ThreadScreen extends StatefulWidget {
@@ -47,6 +68,7 @@ class ThreadScreen extends StatefulWidget {
     required this.nostrService,
     this.eventRepo,
     this.mediaFetcher,
+    this.persistedPostsLoader,
   });
 
   final String rootPostId;
@@ -55,6 +77,7 @@ class ThreadScreen extends StatefulWidget {
   final NostrService nostrService;
   final EventRepository? eventRepo;
   final MediaFetcher? mediaFetcher;
+  final Future<List<MediaPost>> Function()? persistedPostsLoader;
 
   @override
   State<ThreadScreen> createState() => _ThreadScreenState();
@@ -68,7 +91,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
   void initState() {
     super.initState();
     _posts = List<MediaPost>.from(widget.initialPosts);
-    unawaited(_syncThreadMedia());
+    unawaited(_primeThreadPosts());
   }
 
   List<ThreadedPostEntry> get _entries =>
@@ -130,27 +153,32 @@ class _ThreadScreenState extends State<ThreadScreen> {
     unawaited(LocalPostStore.instance.savePost(post));
   }
 
-  bool _needsMediaHydration(MediaPost post) {
-    if (post.isTextOnly || post.contentHashes.isEmpty) return false;
-    for (var i = 0; i < post.contentHashes.length; i++) {
-      if (i >= post.mediaPaths.length ||
-          !File(post.mediaPaths[i]).existsSync()) {
-        return true;
-      }
-    }
-    return false;
+  Future<void> _primeThreadPosts() async {
+    await _restorePersistedPosts();
+    await _syncThreadMedia();
+  }
+
+  Future<void> _restorePersistedPosts() async {
+    final restored = await mergeThreadPostsWithPersistedState(
+      initialPosts: _posts,
+      loadPersistedPosts:
+          widget.persistedPostsLoader ?? LocalPostStore.instance.loadPosts,
+    );
+    if (!mounted) return;
+    setState(() => _posts = restored);
   }
 
   Future<void> _syncThreadMedia() async {
+    final candidates = _entries
+        .map((entry) => entry.post)
+        .where(postNeedsMediaHydration)
+        .toList(growable: false);
+    if (!mounted || candidates.isEmpty) return;
+
     await P2PService.instance.startSwarm();
     final sync = MediaSyncService(
       fetchMedia: widget.mediaFetcher ?? P2PService.instance.requestMedia,
     );
-    final candidates = _entries
-        .map((entry) => entry.post)
-        .where(_needsMediaHydration)
-        .toList(growable: false);
-    if (!mounted || candidates.isEmpty) return;
 
     setState(() {
       _loadingMediaPostIds.addAll(candidates.map((post) => post.id));
