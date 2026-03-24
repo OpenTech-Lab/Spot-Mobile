@@ -228,17 +228,17 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
     // Push a full-screen black overlay that blocks all interaction.
     final overlay = PageRouteBuilder<void>(
-      opaque: true,
+      opaque: false,
       barrierDismissible: false,
       pageBuilder: (_, __, ___) => const ColoredBox(
-        color: Color(0xFF000000),
+        color: Color(0xBB000000),
         child: Center(
           child: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
+            width: 120,
+            child: LinearProgressIndicator(
+              minHeight: 2,
               color: SpotColors.textSecondary,
+              backgroundColor: SpotColors.surfaceHigh,
             ),
           ),
         ),

@@ -408,11 +408,11 @@ class _LatestTabState extends State<_LatestTab> {
                         padding: EdgeInsets.all(SpotSpacing.xl),
                         child: Center(
                           child: SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 1,
+                            width: 120,
+                            child: LinearProgressIndicator(
+                              minHeight: 2,
                               color: SpotColors.textTertiary,
+                              backgroundColor: SpotColors.surfaceHigh,
                             ),
                           ),
                         ),
@@ -464,11 +464,11 @@ class _LatestTabState extends State<_LatestTab> {
         ),
         const SizedBox(height: SpotSpacing.xl),
         const SizedBox(
-          width: 16,
-          height: 16,
-          child: CircularProgressIndicator(
+          width: 120,
+          child: LinearProgressIndicator(
+            minHeight: 2,
             color: SpotColors.accent,
-            strokeWidth: 1,
+            backgroundColor: SpotColors.surfaceHigh,
           ),
         ),
       ],
@@ -608,11 +608,11 @@ class _FollowingTab extends StatelessWidget {
             ),
             const SizedBox(height: SpotSpacing.xl),
             const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
+              width: 120,
+              child: LinearProgressIndicator(
+                minHeight: 2,
                 color: SpotColors.accent,
-                strokeWidth: 1,
+                backgroundColor: SpotColors.surfaceHigh,
               ),
             ),
           ],
