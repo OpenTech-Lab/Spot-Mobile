@@ -11,6 +11,7 @@ import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/media_resolver.dart';
 import 'package:mobile/services/media_sync_service.dart';
 import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
@@ -176,7 +177,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
 
     await P2PService.instance.startSwarm();
     final sync = MediaSyncService(
-      fetchMedia: widget.mediaFetcher ?? P2PService.instance.requestMedia,
+      fetchMedia: widget.mediaFetcher ?? MediaResolver.instance.resolve,
     );
 
     setState(() {

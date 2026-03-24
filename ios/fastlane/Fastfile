@@ -74,7 +74,27 @@ platform :ios do
     Dir.chdir(project_root) do
       sh("flutter pub get")
       sh("flutter precache --ios")
-      sh("flutter build ios --release --no-codesign --config-only --build-name #{release_version_name} --build-number #{release_build_number}")
+
+      # Build command with optional CDN dart-define flags.
+      # When CDN_BASE_URL / CDN_PRESIGN_URL are set (via GitHub secrets),
+      # the app ships with CDN support. When unset, CDN is disabled at
+      # compile time and the app uses P2P-only transport.
+      build_cmd = [
+        "flutter build ios",
+        "--release",
+        "--no-codesign",
+        "--config-only",
+        "--build-name #{release_version_name}",
+        "--build-number #{release_build_number}",
+      ]
+
+      cdn_base_url = ENV["CDN_BASE_URL"].to_s.strip
+      cdn_presign_url = ENV["CDN_PRESIGN_URL"].to_s.strip
+
+      build_cmd << "--dart-define=CDN_BASE_URL=#{cdn_base_url}" unless cdn_base_url.empty?
+      build_cmd << "--dart-define=CDN_PRESIGN_URL=#{cdn_presign_url}" unless cdn_presign_url.empty?
+
+      sh(build_cmd.join(" "))
     end
 
     # --- Archive & export (manual signing; profile already installed by CI) ---

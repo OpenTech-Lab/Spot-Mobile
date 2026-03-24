@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -6,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:mobile/core/encryption.dart';
+import 'package:mobile/core/wallet.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
@@ -13,6 +15,7 @@ import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/camera_service.dart';
+import 'package:mobile/services/cdn_media_service.dart';
 import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/media_processing_service.dart';
@@ -318,6 +321,28 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
       for (var i = 0; i < hashes.length; i++) {
         if (i < paths.length) {
           await P2PService.instance.seedMedia(paths[i], hashes[i]);
+        }
+      }
+
+      // Fire-and-forget CDN upload (non-blocking).
+      // Danger Mode posts stay P2P-only for maximum privacy.
+      if (!_isDangerMode) {
+        for (var i = 0; i < hashes.length; i++) {
+          if (i < paths.length) {
+            unawaited(
+              CdnMediaService.instance.uploadToCdn(
+                contentHash: hashes[i],
+                filePath: paths[i],
+                signPayload: (message) async => PresignAuth(
+                  pubkey: widget.wallet.publicKeyHex,
+                  signature: WalletService.signMessage(
+                    message,
+                    widget.wallet.privateKeyHex,
+                  ),
+                ),
+              ),
+            );
+          }
         }
       }
 

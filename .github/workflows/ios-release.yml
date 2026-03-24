@@ -155,6 +155,9 @@ jobs:
           # Set by the signing step via $GITHUB_ENV; listed here for clarity.
           IOS_PROVISIONING_PROFILE_NAME: ${{ env.IOS_PROVISIONING_PROFILE_NAME }}
           IOS_PROVISIONING_PROFILE_UUID: ${{ env.IOS_PROVISIONING_PROFILE_UUID }}
+          # CDN acceleration (optional — omit to build with P2P-only transport)
+          CDN_BASE_URL: ${{ secrets.CDN_BASE_URL }}
+          CDN_PRESIGN_URL: ${{ secrets.CDN_PRESIGN_URL }}
         run: bundle exec fastlane release
 
       - name: Print gym log tail on failure

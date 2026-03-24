@@ -10,6 +10,7 @@ import 'package:video_player/video_player.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/media_resolver.dart';
 import 'package:mobile/services/media_sync_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
@@ -81,7 +82,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
       }
 
       final sync = MediaSyncService(
-        fetchMedia: widget.mediaFetcher ?? P2PService.instance.requestMedia,
+        fetchMedia: widget.mediaFetcher ?? MediaResolver.instance.resolve,
       );
       final hydrated = await sync.hydratePost(_post);
       final changed = _mediaPathsChanged(_post, hydrated);

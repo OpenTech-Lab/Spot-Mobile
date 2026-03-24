@@ -153,6 +153,18 @@ class WalletService {
         .process(Uint8List.fromList([...tagHash, ...tagHash, ...data]));
   }
 
+  /// Signs an arbitrary message string using BIP340 Schnorr.
+  ///
+  /// Returns the 64-byte hex signature. The message is first hashed with
+  /// SHA-256 to produce the 32-byte input that BIP340 expects.
+  static String signMessage(String message, String privKeyHex) {
+    final msgHash = EncryptionUtils.sha256(
+      Uint8List.fromList(utf8.encode(message)),
+    );
+    final privBytes = EncryptionUtils.hexToBytes(privKeyHex);
+    return _schnorrSign(msgHash, privBytes);
+  }
+
   // ── Wallet persistence ────────────────────────────────────────────────────
 
   /// Persists [wallet] via [StorageService].
