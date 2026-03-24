@@ -5,19 +5,19 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 class MediaProcessingService {
-  MediaProcessingService._({Future<Directory> Function()? tempDirLoader})
-    : _tempDirLoader = tempDirLoader ?? getTemporaryDirectory;
+  MediaProcessingService._({Future<Directory> Function()? mediaDirLoader})
+    : _mediaDirLoader = mediaDirLoader ?? getApplicationSupportDirectory;
 
   static final MediaProcessingService instance = MediaProcessingService._();
 
   factory MediaProcessingService.forTesting({
     required Future<Directory> Function() tempDirLoader,
-  }) => MediaProcessingService._(tempDirLoader: tempDirLoader);
+  }) => MediaProcessingService._(mediaDirLoader: tempDirLoader);
 
   static const uploadImageMaxDimension = 1600;
   static const uploadImageQualityCandidates = [82, 72, 62];
 
-  final Future<Directory> Function() _tempDirLoader;
+  final Future<Directory> Function() _mediaDirLoader;
 
   Future<File> optimizeForUpload(File file, {required bool isVideo}) async {
     if (isVideo) return file;
@@ -56,8 +56,8 @@ class MediaProcessingService {
         return file;
       }
 
-      final tempDir = await _tempDirLoader();
-      final uploadDir = Directory(p.join(tempDir.path, 'spot_upload_media'));
+      final baseDir = await _mediaDirLoader();
+      final uploadDir = Directory(p.join(baseDir.path, 'spot_upload_media'));
       if (!uploadDir.existsSync()) {
         await uploadDir.create(recursive: true);
       }

@@ -51,10 +51,7 @@ class CacheManager {
     final entry = _entries[contentHash];
     if (entry == null) return null;
     final file = File(entry.path);
-    if (!file.existsSync()) {
-      _entries.remove(contentHash);
-      return null;
-    }
+    if (!file.existsSync()) return null;
     _entries[contentHash] = entry._withAccess(DateTime.now());
     _saveManifest(); // fire-and-forget
     return file;
