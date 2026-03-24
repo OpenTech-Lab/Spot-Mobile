@@ -422,14 +422,12 @@ class _LatestTabState extends State<_LatestTab> {
               final post = roots[i];
               return InkWell(
                 onTap: () => Navigator.of(ctx).push(
-                  MaterialPageRoute(
-                    builder: (_) => ThreadScreen(
-                      rootPostId: post.nostrEventId,
-                      initialPosts: widget.allPosts,
-                      wallet: widget.wallet,
-                      nostrService: widget.nostrService,
-                      eventRepo: widget.eventRepo,
-                    ),
+                  buildThreadScreenRoute(
+                    rootPostId: post.nostrEventId,
+                    initialPosts: widget.allPosts,
+                    wallet: widget.wallet,
+                    nostrService: widget.nostrService,
+                    eventRepo: widget.eventRepo,
                   ),
                 ),
                 child: PostThreadRow(
@@ -682,14 +680,12 @@ class _FollowingTab extends StatelessWidget {
               final post = roots[i];
               return InkWell(
                 onTap: () => Navigator.of(ctx).push(
-                  MaterialPageRoute(
-                    builder: (_) => ThreadScreen(
-                      rootPostId: post.nostrEventId,
-                      initialPosts: allPosts,
-                      wallet: wallet,
-                      nostrService: nostrService,
-                      eventRepo: eventRepo,
-                    ),
+                  buildThreadScreenRoute(
+                    rootPostId: post.nostrEventId,
+                    initialPosts: allPosts,
+                    wallet: wallet,
+                    nostrService: nostrService,
+                    eventRepo: eventRepo,
                   ),
                 ),
                 child: PostThreadRow(

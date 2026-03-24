@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
@@ -16,6 +17,26 @@ import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
+
+Route<void> buildThreadScreenRoute({
+  required String rootPostId,
+  required List<MediaPost> initialPosts,
+  required WalletModel wallet,
+  required NostrService nostrService,
+  EventRepository? eventRepo,
+  MediaFetcher? mediaFetcher,
+}) {
+  return CupertinoPageRoute<void>(
+    builder: (_) => ThreadScreen(
+      rootPostId: rootPostId,
+      initialPosts: initialPosts,
+      wallet: wallet,
+      nostrService: nostrService,
+      eventRepo: eventRepo,
+      mediaFetcher: mediaFetcher,
+    ),
+  );
+}
 
 class ThreadScreen extends StatefulWidget {
   const ThreadScreen({

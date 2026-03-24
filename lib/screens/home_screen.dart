@@ -114,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
-      floatingActionButton: _selectedTab != 0 && _selectedTab != 1
+      floatingActionButton: _selectedTab != 0
           ? null
           : GestureDetector(
               onTap: _openComposer,
@@ -124,6 +124,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: SpotColors.bg,
+                  border: Border.all(
+                    color: SpotColors.border,
+                    width: 0.5,
+                  ),
                 ),
                 child: const Icon(
                   CupertinoIcons.plus,
@@ -132,7 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-      floatingActionButtonLocation: _selectedTab != 0 && _selectedTab != 1
+      floatingActionButtonLocation: _selectedTab != 0
           ? null
           : FloatingActionButtonLocation.endFloat,
     );
