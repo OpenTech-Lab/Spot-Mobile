@@ -199,6 +199,12 @@ abstract final class SpotTheme {
         useMaterial3: true,
         brightness: Brightness.dark,
         scaffoldBackgroundColor: SpotColors.bg,
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          },
+        ),
         colorScheme: const ColorScheme.dark(
           primary:     SpotColors.accent,
           secondary:   SpotColors.accent,
