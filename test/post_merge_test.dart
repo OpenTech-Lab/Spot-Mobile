@@ -66,6 +66,21 @@ void main() {
     expect(merged.single.isLikedByMe, isTrue);
     expect(merged.single.displayLikeCount, 3);
   });
+
+  test('orderedPostsEqual catches same-length media upgrades', () {
+    final current = [
+      _post(previewBase64: 'YWJj', previewMimeType: 'image/jpeg'),
+    ];
+    final updated = [
+      _post(
+        mediaPaths: const ['/tmp/local-image.jpg'],
+        previewBase64: 'YWJj',
+        previewMimeType: 'image/jpeg',
+      ),
+    ];
+
+    expect(orderedPostsEqual(current, updated), isFalse);
+  });
 }
 
 MediaPost _post({
@@ -74,6 +89,8 @@ MediaPost _post({
   String? caption,
   DateTime? capturedAt,
   List<String> mediaPaths = const [],
+  String? previewBase64,
+  String? previewMimeType,
 }) => MediaPost(
   id: 'post-id',
   pubkey: 'pubkey',
@@ -84,5 +101,7 @@ MediaPost _post({
   caption: caption,
   likeCount: likeCount,
   isLikedByMe: isLikedByMe,
+  previewBase64: previewBase64,
+  previewMimeType: previewMimeType,
   nostrEventId: 'post-id',
 );

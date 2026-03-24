@@ -81,7 +81,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         .toList();
     if (mine.isEmpty) return;
     final merged = _mergePosts(_posts, mine);
-    if (merged.length == _posts.length) return;
+    if (orderedPostsEqual(merged, _posts)) return;
     setState(() => _posts = merged);
   }
 

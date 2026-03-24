@@ -249,7 +249,36 @@ class MediaPost {
   MediaPost mergeLocalStateFrom(MediaPost existing) => copyWith(
     isLikedByMe: existing.isLikedByMe,
     mediaPaths: _mergeMediaPaths(existing.mediaPaths),
+    previewBase64: previewBase64 ?? existing.previewBase64,
+    previewMimeType: previewMimeType ?? existing.previewMimeType,
   );
+
+  bool isEquivalentTo(MediaPost other) {
+    return id == other.id &&
+        pubkey == other.pubkey &&
+        _stringListEquals(contentHashes, other.contentHashes) &&
+        _stringListEquals(mediaPaths, other.mediaPaths) &&
+        ipfsCid == other.ipfsCid &&
+        latitude == other.latitude &&
+        longitude == other.longitude &&
+        capturedAt.isAtSameMomentAs(other.capturedAt) &&
+        _stringListEquals(eventTags, other.eventTags) &&
+        isDangerMode == other.isDangerMode &&
+        isAiGenerated == other.isAiGenerated &&
+        isTextOnly == other.isTextOnly &&
+        previewBase64 == other.previewBase64 &&
+        previewMimeType == other.previewMimeType &&
+        sourceType == other.sourceType &&
+        isVirtual == other.isVirtual &&
+        spotName == other.spotName &&
+        replyCount == other.replyCount &&
+        likeCount == other.likeCount &&
+        isLikedByMe == other.isLikedByMe &&
+        caption == other.caption &&
+        replyToId == other.replyToId &&
+        _stringListEquals(tags, other.tags) &&
+        nostrEventId == other.nostrEventId;
+  }
 
   List<String> _mergeMediaPaths(List<String> existingMediaPaths) {
     if (mediaPaths.isEmpty) return existingMediaPaths;
@@ -277,6 +306,14 @@ class MediaPost {
     'secondhand' => PostSourceType.secondhand,
     _ => PostSourceType.firsthand,
   };
+
+  static bool _stringListEquals(List<String> left, List<String> right) {
+    if (left.length != right.length) return false;
+    for (var i = 0; i < left.length; i++) {
+      if (left[i] != right[i]) return false;
+    }
+    return true;
+  }
 
   @override
   String toString() =>

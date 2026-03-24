@@ -15,6 +15,14 @@ List<MediaPost> mergePostsPreservingLocalState(
     ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
 }
 
+bool orderedPostsEqual(List<MediaPost> current, List<MediaPost> incoming) {
+  if (current.length != incoming.length) return false;
+  for (var i = 0; i < current.length; i++) {
+    if (!current[i].isEquivalentTo(incoming[i])) return false;
+  }
+  return true;
+}
+
 List<MediaPost> replacePostsById(
   List<MediaPost> current,
   Iterable<MediaPost> updates,

@@ -359,13 +359,11 @@ class EventRepository {
   }
 
   void _mergePost(String hashtag, MediaPost post) {
-    // Track post count per pubkey for reputation scoring
-    _postCountByPubkey[post.pubkey] =
-        (_postCountByPubkey[post.pubkey] ?? 0) + 1;
-
     final existing = _cache[hashtag];
 
     if (existing == null) {
+      _postCountByPubkey[post.pubkey] =
+          (_postCountByPubkey[post.pubkey] ?? 0) + 1;
       final civic = CivicEvent(
         hashtag: hashtag,
         title: '#$hashtag',
@@ -377,12 +375,23 @@ class EventRepository {
       );
       _cache[hashtag] = _applyTrust(civic);
     } else {
-      // Deduplicate by post ID
-      final alreadyPresent = existing.posts.any((p) => p.id == post.id);
-      if (alreadyPresent) return;
+      final existingIndex = existing.posts.indexWhere((p) => p.id == post.id);
+      late final List<MediaPost> updatedPosts;
 
-      final updatedPosts = [...existing.posts, post]
-        ..sort((a, b) => a.capturedAt.compareTo(b.capturedAt));
+      if (existingIndex == -1) {
+        _postCountByPubkey[post.pubkey] =
+            (_postCountByPubkey[post.pubkey] ?? 0) + 1;
+        updatedPosts = [...existing.posts, post];
+      } else {
+        final mergedPost = post.mergeLocalStateFrom(
+          existing.posts[existingIndex],
+        );
+        if (mergedPost.isEquivalentTo(existing.posts[existingIndex])) return;
+        updatedPosts = [...existing.posts];
+        updatedPosts[existingIndex] = mergedPost;
+      }
+
+      updatedPosts.sort((a, b) => a.capturedAt.compareTo(b.capturedAt));
 
       final uniquePubkeys = updatedPosts.map((p) => p.pubkey).toSet();
 

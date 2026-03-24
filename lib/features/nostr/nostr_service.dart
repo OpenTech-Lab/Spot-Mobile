@@ -6,18 +6,12 @@ import 'package:image/image.dart' as img;
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import 'package:mobile/core/app_config.dart';
 import 'package:mobile/core/wallet.dart';
 import 'package:mobile/features/nostr/nostr_models.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
-
-/// Default public Nostr relays used when none are specified.
-const _defaultRelays = [
-  'wss://relay.damus.io',
-  'wss://nos.lol',
-  'wss://relay.nostr.band',
-];
 
 const _relayConnectTimeout = Duration(seconds: 5);
 const _publishAckTimeout = Duration(seconds: 4);
@@ -74,7 +68,7 @@ double _coarseCoord(double v) => (v / 0.5).round() * 0.5;
 /// ```
 class NostrService {
   NostrService({List<String>? relayUrls})
-    : _relayUrls = relayUrls ?? _defaultRelays;
+    : _relayUrls = relayUrls ?? AppConfig.relays;
 
   final List<String> _relayUrls;
   final _uuid = const Uuid();

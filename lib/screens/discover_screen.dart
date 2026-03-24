@@ -97,7 +97,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   void _onEvent(CivicEvent event) {
     if (!mounted) return;
     final merged = _mergePosts(_posts, event.posts);
-    if (merged.length == _posts.length) return;
+    if (orderedPostsEqual(merged, _posts)) return;
     unawaited(LocalPostStore.instance.savePosts(event.posts));
     setState(() => _posts = merged);
   }

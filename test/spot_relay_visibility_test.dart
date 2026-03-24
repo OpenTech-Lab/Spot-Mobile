@@ -204,6 +204,34 @@ void main() {
       await service.disconnect();
     });
 
+    test(
+      'event repository upgrades duplicate posts with richer local media state',
+      () async {
+        final repo = EventRepository(
+          nostrService: NostrService(relayUrls: const []),
+        );
+        addTearDown(repo.dispose);
+
+        final updatesFuture = repo.subscribeToEvents().take(2).toList();
+
+        repo.addPost(
+          _post().copyWith(
+            previewBase64: 'YWJj',
+            previewMimeType: 'image/jpeg',
+          ),
+        );
+        repo.addPost(
+          _post().copyWith(mediaPaths: const ['/tmp/local-image.jpg']),
+        );
+
+        final updates = await updatesFuture;
+
+        expect(updates, hasLength(2));
+        expect(updates.last.posts.single.mediaPaths, ['/tmp/local-image.jpg']);
+        expect(updates.last.posts.single.previewBase64, 'YWJj');
+      },
+    );
+
     test('publishMediaPost succeeds when at least one relay accepts', () async {
       acceptedRelay = await _TestRelay.start(
         name: 'accepted',

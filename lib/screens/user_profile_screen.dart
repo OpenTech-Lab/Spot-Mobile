@@ -78,7 +78,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     final posts = event.posts.where((p) => p.pubkey == widget.pubkey).toList();
     if (posts.isEmpty) return;
     final merged = _mergePosts(_posts, posts);
-    if (merged.length == _posts.length) return;
+    if (orderedPostsEqual(merged, _posts)) return;
     unawaited(LocalPostStore.instance.savePosts(posts));
     setState(() => _posts = merged);
   }
