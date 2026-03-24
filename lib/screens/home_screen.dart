@@ -65,7 +65,11 @@ class _HomeScreenState extends State<HomeScreen> {
       nostrService: _nostrService,
       wallet: widget.wallet,
     ),
-    ProfileScreen(wallet: widget.wallet, nostrService: _nostrService, eventRepo: _eventRepo),
+    ProfileScreen(
+      wallet: widget.wallet,
+      nostrService: _nostrService,
+      eventRepo: _eventRepo,
+    ),
   ];
 
   void _openComposer() {
@@ -74,6 +78,11 @@ class _HomeScreenState extends State<HomeScreen> {
       wallet: widget.wallet,
       nostrService: _nostrService,
       eventRepo: _eventRepo,
+      onPublished: (post) {
+        if (!mounted) return;
+        setState(() => _selectedTab = 0);
+        _feedKey.currentState?.showPublishedPost(post);
+      },
     );
   }
 

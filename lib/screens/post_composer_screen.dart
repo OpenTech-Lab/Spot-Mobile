@@ -10,15 +10,14 @@ import 'package:mobile/core/encryption.dart';
 import 'package:mobile/core/wallet.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
-import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/camera_service.dart';
 import 'package:mobile/services/cdn_media_service.dart';
 import 'package:mobile/services/geo_lookup.dart';
-import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/media_processing_service.dart';
+import 'package:mobile/services/post_publish_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
@@ -225,12 +224,13 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
   Future<void> _publish() async {
     setState(() => _isPublishing = true);
+    MediaPost? post;
 
     // Push a full-screen black overlay that blocks all interaction.
     final overlay = PageRouteBuilder<void>(
       opaque: false,
       barrierDismissible: false,
-      pageBuilder: (_, __, ___) => const ColoredBox(
+      pageBuilder: (_, animation, secondaryAnimation) => const ColoredBox(
         color: Color(0xBB000000),
         child: Center(
           child: SizedBox(
@@ -289,7 +289,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
           ? _spotName!.trim()
           : null;
 
-      final post = MediaPost(
+      post = MediaPost(
         id: hashes.first,
         pubkey: widget.wallet.publicKeyHex,
         contentHashes: hashes,
@@ -321,29 +321,13 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
         }
       }
 
-      final signed = await widget.nostrService.publishMediaPost(
-        post,
-        widget.wallet,
+      final savedPost = await PostPublishService.instance.publishDraft(
+        draft: post,
+        wallet: widget.wallet,
+        nostrService: widget.nostrService,
+        eventRepo: widget.eventRepo,
       );
-
-      final savedPost = post.copyWith(
-        id: signed.id,
-        nostrEventId: signed.id,
-        contentHashes: isTextOnly ? [signed.id] : post.contentHashes,
-        capturedAt: DateTime.fromMillisecondsSinceEpoch(
-          signed.createdAt * 1000,
-        ),
-      );
-
-      await LocalPostStore.instance.savePost(savedPost);
-      widget.eventRepo?.addPost(savedPost);
       widget.onPublished?.call(savedPost);
-
-      for (var i = 0; i < hashes.length; i++) {
-        if (i < paths.length) {
-          await P2PService.instance.seedMedia(paths[i], hashes[i]);
-        }
-      }
 
       // Fire-and-forget CDN upload (non-blocking).
       // Danger Mode posts stay P2P-only for maximum privacy.
@@ -373,9 +357,20 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
         Navigator.of(context).pop(); // composer
       }
     } catch (e) {
-      // Pop the overlay so the user sees the composer + error snackbar.
-      if (mounted) Navigator.of(context).pop();
-      _showSnack('Publish failed: $e');
+      if (!mounted) return;
+      Navigator.of(context).pop(); // overlay
+      if (post != null) {
+        await PostPublishService.instance.saveFailedPublish(post, e);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Publish failed. Saved in Profile so you can retry.'),
+          ),
+        );
+        Navigator.of(context).pop(); // composer
+      } else {
+        _showSnack('Publish failed: $e');
+      }
     } finally {
       if (mounted) setState(() => _isPublishing = false);
     }

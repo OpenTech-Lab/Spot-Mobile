@@ -56,6 +56,8 @@ class PostThreadRow extends StatelessWidget {
     this.onLike,
     this.onDelete,
     this.onReport,
+    this.onRetryPublish,
+    this.isRetrying = false,
     this.isMediaLoading = false,
     this.onMediaUpdated,
   });
@@ -67,6 +69,8 @@ class PostThreadRow extends StatelessWidget {
   final VoidCallback? onLike;
   final VoidCallback? onDelete;
   final VoidCallback? onReport;
+  final VoidCallback? onRetryPublish;
+  final bool isRetrying;
   final bool isMediaLoading;
   final ValueChanged<MediaPost>? onMediaUpdated;
 
@@ -262,6 +266,38 @@ class PostThreadRow extends StatelessWidget {
                             bg: SpotColors.surfaceHigh,
                           ),
                         ],
+                        if (post.isPendingRetry) ...[
+                          const SizedBox(width: SpotSpacing.sm),
+                          _PostBadge(
+                            label: 'Not sent',
+                            color: SpotColors.warning,
+                            bg: SpotColors.warningSubtle,
+                          ),
+                        ],
+                        if (onRetryPublish != null) ...[
+                          const SizedBox(width: SpotSpacing.sm),
+                          GestureDetector(
+                            onTap: isRetrying ? null : onRetryPublish,
+                            behavior: HitTestBehavior.opaque,
+                            child: Padding(
+                              padding: const EdgeInsets.all(2),
+                              child: isRetrying
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 1.5,
+                                        color: SpotColors.warning,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      CupertinoIcons.refresh,
+                                      size: 16,
+                                      color: SpotColors.warning,
+                                    ),
+                            ),
+                          ),
+                        ],
                         if (onDelete != null || onReport != null) ...[
                           const Spacer(),
                           GestureDetector(
@@ -329,6 +365,17 @@ class PostThreadRow extends StatelessWidget {
                     ),
                     const SizedBox(height: SpotSpacing.sm),
                     _PostLocationRow(post: post),
+                    if (post.isPendingRetry) ...[
+                      const SizedBox(height: SpotSpacing.xs),
+                      Text(
+                        post.lastPublishError?.isNotEmpty == true
+                            ? 'Not posted yet. Tap refresh to resend.'
+                            : 'Saved locally only. Tap refresh to resend.',
+                        style: SpotType.caption.copyWith(
+                          color: SpotColors.warning,
+                        ),
+                      ),
+                    ],
                     // ── Control panel: reply · like · indicators ──
                     const SizedBox(height: SpotSpacing.xs),
                     Row(

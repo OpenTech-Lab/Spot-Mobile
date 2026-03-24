@@ -22,6 +22,22 @@ import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
 /// Home feed — LATEST (real-time) and FOLLOWING (people you follow).
+List<MediaPost> visibleFollowingPosts(
+  Iterable<MediaPost> posts, {
+  required String selfPubkey,
+  required Set<String> followedPubkeys,
+  required Set<String> followedTags,
+}) {
+  return posts
+      .where(
+        (post) =>
+            post.pubkey == selfPubkey ||
+            followedPubkeys.contains(post.pubkey) ||
+            post.eventTags.any(followedTags.contains),
+      )
+      .toList(growable: false);
+}
+
 class FeedScreen extends StatefulWidget {
   const FeedScreen({
     super.key,
@@ -72,6 +88,25 @@ class FeedScreenState extends State<FeedScreen>
 
   /// Called externally (e.g. double-tap on Home nav icon) to reload the feed.
   void triggerRefresh() => _refresh();
+
+  /// Called externally after a successful publish so Home can show the new
+  /// thread immediately instead of waiting for the repository stream.
+  void showPublishedPost(MediaPost post) {
+    final merged = _mergePosts(_posts, [post]);
+    if (orderedPostsEqual(merged, _posts)) {
+      if (_tabController.index != 0) {
+        _tabController.animateTo(0);
+      }
+      return;
+    }
+    setState(() {
+      _posts = merged;
+    });
+    if (_tabController.index != 0) {
+      _tabController.animateTo(0);
+    }
+    unawaited(LocalPostStore.instance.savePost(post));
+  }
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
@@ -238,14 +273,12 @@ class FeedScreenState extends State<FeedScreen>
   // ── Following filter ──────────────────────────────────────────────────────
 
   List<MediaPost> get _followingPosts {
-    final tags = FollowService.instance.followedTags.toSet();
-    return _posts
-        .where(
-          (p) =>
-              FollowService.instance.isFollowing(p.pubkey) ||
-              p.eventTags.any(tags.contains),
-        )
-        .toList();
+    return visibleFollowingPosts(
+      _posts,
+      selfPubkey: widget.wallet.publicKeyHex,
+      followedPubkeys: FollowService.instance.following.toSet(),
+      followedTags: FollowService.instance.followedTags.toSet(),
+    );
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────

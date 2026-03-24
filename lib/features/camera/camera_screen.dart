@@ -8,14 +8,13 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:mobile/core/encryption.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
-import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/camera_service.dart';
 import 'package:mobile/services/geo_lookup.dart';
-import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/media_processing_service.dart';
+import 'package:mobile/services/post_publish_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
 /// Full-screen camera UI.
@@ -223,27 +222,19 @@ class _CameraScreenState extends State<CameraScreen>
       for (var i = 0; i < hashes.length; i++) {
         await CacheManager.instance.addToCache(hashes[i], paths[i]);
       }
-      final signed = await widget.nostrService.publishMediaPost(
-        post,
-        widget.wallet,
+      await PostPublishService.instance.publishDraft(
+        draft: post,
+        wallet: widget.wallet,
+        nostrService: widget.nostrService,
       );
-      await LocalPostStore.instance.savePost(
-        post.copyWith(
-          id: signed.id,
-          nostrEventId: signed.id,
-          capturedAt: DateTime.fromMillisecondsSinceEpoch(
-            signed.createdAt * 1000,
-          ),
-        ),
-      );
-      for (var i = 0; i < hashes.length; i++) {
-        await P2PService.instance.seedMedia(paths[i], hashes[i]);
-      }
       if (mounted) {
         Navigator.of(context).pop();
       }
     } catch (e) {
-      _showError('Publish failed: $e');
+      await PostPublishService.instance.saveFailedPublish(post, e);
+      if (!mounted) return;
+      _showError('Publish failed. Saved in Profile so you can retry.');
+      Navigator.of(context).pop();
     }
   }
 

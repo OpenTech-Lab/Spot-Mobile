@@ -6,6 +6,7 @@
 /// A Nostr subscription filter.  Null fields are omitted from the JSON
 /// to avoid sending unnecessary constraints to the relay.
 class NostrFilter {
+  final List<String>? ids;
   final List<int>? kinds;
   final List<String>? authors;
   final int? since;
@@ -16,6 +17,7 @@ class NostrFilter {
   final Map<String, List<String>>? tags;
 
   const NostrFilter({
+    this.ids,
     this.kinds,
     this.authors,
     this.since,
@@ -26,6 +28,7 @@ class NostrFilter {
 
   Map<String, dynamic> toJson() {
     final m = <String, dynamic>{};
+    if (ids != null) m['ids'] = ids;
     if (kinds != null) m['kinds'] = kinds;
     if (authors != null) m['authors'] = authors;
     if (since != null) m['since'] = since;
@@ -60,9 +63,9 @@ class NostrRelay {
   const NostrRelay({required this.url, required this.isConnected});
 
   NostrRelay copyWith({String? url, bool? isConnected}) => NostrRelay(
-        url: url ?? this.url,
-        isConnected: isConnected ?? this.isConnected,
-      );
+    url: url ?? this.url,
+    isConnected: isConnected ?? this.isConnected,
+  );
 
   @override
   String toString() => 'NostrRelay($url, connected: $isConnected)';

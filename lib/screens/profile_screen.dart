@@ -14,6 +14,7 @@ import 'package:mobile/screens/settings_screen.dart';
 import 'package:mobile/screens/thread_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/post_publish_service.dart';
 import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
@@ -39,10 +40,12 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   EventRepository get _repo => widget.eventRepo;
   StreamSubscription<CivicEvent>? _sub;
+  StreamSubscription<List<MediaPost>>? _localSub;
 
   List<MediaPost> _posts = [];
   bool _isLoading = true;
   String? _error;
+  final Set<String> _retryingPostIds = {};
 
   @override
   void initState() {
@@ -53,6 +56,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void dispose() {
     _sub?.cancel();
+    _localSub?.cancel();
     super.dispose();
   }
 
@@ -62,6 +66,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _error = null;
     });
     try {
+      _localSub ??= LocalPostStore.instance.changes.listen(
+        _onLocalPostsChanged,
+      );
       await _loadPersistedPosts();
       await widget.nostrService.connect();
       _sub = _repo
@@ -95,22 +102,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadPersistedPosts() async {
     final persisted = await LocalPostStore.instance.loadPosts(
       authorPubkey: widget.wallet.publicKeyHex,
+      includeFailedToSend: true,
     );
-    final visible = persisted
-        .where(
-          (post) => post.contentHashes.every(
-            (hash) => !CacheManager.instance.isBlocked(hash),
-          ),
-        )
-        .toList();
-    if (!mounted || visible.isEmpty) return;
-    setState(() => _posts = _mergePosts(_posts, visible));
+    final visible = _visiblePersistedPosts(persisted);
+    if (!mounted) return;
+    setState(() => _posts = _mergePersistedPosts(visible));
   }
 
   List<MediaPost> _mergePosts(
     List<MediaPost> current,
     Iterable<MediaPost> incoming,
   ) => mergePostsPreservingLocalState(current, incoming);
+
+  List<MediaPost> _visiblePersistedPosts(Iterable<MediaPost> posts) {
+    return posts
+        .where(
+          (post) =>
+              post.pubkey == widget.wallet.publicKeyHex &&
+              post.contentHashes.every(
+                (hash) => !CacheManager.instance.isBlocked(hash),
+              ),
+        )
+        .toList();
+  }
+
+  List<MediaPost> _mergePersistedPosts(Iterable<MediaPost> persisted) {
+    final nonPending = _posts.where((post) => !post.isPendingRetry).toList();
+    return _mergePosts(nonPending, persisted);
+  }
+
+  void _onLocalPostsChanged(List<MediaPost> persisted) {
+    if (!mounted) return;
+    final merged = _mergePersistedPosts(_visiblePersistedPosts(persisted));
+    if (orderedPostsEqual(merged, _posts)) return;
+    setState(() => _posts = merged);
+  }
 
   void _toggleLike(MediaPost post) {
     final updated = post.copyWith(isLikedByMe: !post.isLikedByMe);
@@ -127,6 +153,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // Optimistic removal from UI
     setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
     await LocalPostStore.instance.removePost(post.id);
+    if (post.isPendingRetry) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Removed local unsent post')),
+        );
+      }
+      return;
+    }
     try {
       // Publish revocation event (kind-5) with content hash (spec v1.4 §12)
       await widget.nostrService.deletePost(
@@ -154,6 +188,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
           context,
         ).showSnackBar(const SnackBar(content: Text('Failed to delete post')));
       }
+    }
+  }
+
+  Future<void> _retryPost(MediaPost post) async {
+    if (_retryingPostIds.contains(post.id)) return;
+    setState(() => _retryingPostIds.add(post.id));
+    try {
+      final published = await PostPublishService.instance.publishDraft(
+        draft: post,
+        wallet: widget.wallet,
+        nostrService: widget.nostrService,
+        eventRepo: _repo,
+        replaceLocalPostId: post.id,
+      );
+      if (!mounted) return;
+      final withoutOld = _posts.where((item) => item.id != post.id).toList();
+      setState(() {
+        _retryingPostIds.remove(post.id);
+        _posts = _mergePosts(withoutOld, [published]);
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Post sent')));
+    } catch (e) {
+      final failed = await PostPublishService.instance.saveFailedPublish(
+        post,
+        e,
+      );
+      if (!mounted) return;
+      setState(() {
+        _retryingPostIds.remove(post.id);
+        _posts = replacePostsById(_posts, [failed]);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Retry failed. The post is still saved locally.'),
+        ),
+      );
     }
   }
 
@@ -276,29 +348,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 delegate: SliverChildBuilderDelegate((ctx, i) {
                   final post = roots[i];
                   return InkWell(
-                    onTap: () => Navigator.of(ctx).push(
-                      buildThreadScreenRoute(
-                        rootPostId: post.nostrEventId,
-                        initialPosts: _posts,
-                        wallet: widget.wallet,
-                        nostrService: widget.nostrService,
-                        eventRepo: _repo,
-                      ),
-                    ),
+                    onTap: post.isPendingRetry
+                        ? null
+                        : () => Navigator.of(ctx).push(
+                            buildThreadScreenRoute(
+                              rootPostId: post.nostrEventId,
+                              initialPosts: _posts,
+                              wallet: widget.wallet,
+                              nostrService: widget.nostrService,
+                              eventRepo: _repo,
+                            ),
+                          ),
                     child: PostThreadRow(
                       post: post,
                       isLast: true,
                       onMediaUpdated: _updateMediaPost,
-                      onReply: () => showPostComposer(
-                        ctx,
-                        wallet: widget.wallet,
-                        nostrService: widget.nostrService,
-                        eventRepo: _repo,
-                        replyToPost: post,
-                      ),
+                      onReply: post.isPendingRetry
+                          ? null
+                          : () => showPostComposer(
+                              ctx,
+                              wallet: widget.wallet,
+                              nostrService: widget.nostrService,
+                              eventRepo: _repo,
+                              replyToPost: post,
+                            ),
                       onDelete: () => _deletePost(post),
                       onReport: () => _reportPost(post),
-                      onLike: () => _toggleLike(post),
+                      onLike: post.isPendingRetry
+                          ? null
+                          : () => _toggleLike(post),
+                      onRetryPublish: post.isPendingRetry
+                          ? () => _retryPost(post)
+                          : null,
+                      isRetrying: _retryingPostIds.contains(post.id),
                     ),
                   );
                 }, childCount: roots.length),

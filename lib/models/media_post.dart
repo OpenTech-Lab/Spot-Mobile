@@ -7,6 +7,8 @@ enum PostSourceType {
   secondhand,
 }
 
+enum PostDeliveryState { sent, failedToSend }
+
 /// Represents a geo-tagged media post (photo or video).
 /// GPS coordinates are locked at the moment of capture.
 class MediaPost {
@@ -85,6 +87,12 @@ class MediaPost {
   /// The full Nostr event ID for this post (same as [id], kept for clarity)
   final String nostrEventId;
 
+  /// Whether this post was accepted by relays or is still only stored locally.
+  final PostDeliveryState deliveryState;
+
+  /// Last publish error shown to the local author for retryable failures.
+  final String? lastPublishError;
+
   const MediaPost({
     required this.id,
     required this.pubkey,
@@ -110,7 +118,11 @@ class MediaPost {
     this.replyCount = 0,
     this.likeCount = 0,
     this.isLikedByMe = false,
+    this.deliveryState = PostDeliveryState.sent,
+    this.lastPublishError,
   });
+
+  static const Object _copyWithUnset = Object();
 
   // ── Convenience getters ────────────────────────────────────────────────────
 
@@ -126,6 +138,8 @@ class MediaPost {
   bool get hasGps => latitude != null && longitude != null;
 
   int get displayLikeCount => likeCount + (isLikedByMe ? 1 : 0);
+
+  bool get isPendingRetry => deliveryState == PostDeliveryState.failedToSend;
 
   /// Whether this post is a Spot check-in with a named place.
   bool get isSpotCheckIn => spotName != null && spotName!.isNotEmpty;
@@ -157,6 +171,8 @@ class MediaPost {
     'replyCount': replyCount,
     'likeCount': likeCount,
     'isLikedByMe': isLikedByMe,
+    'deliveryState': deliveryState.name,
+    'lastPublishError': lastPublishError,
   };
 
   factory MediaPost.fromJson(Map<String, dynamic> json) => MediaPost(
@@ -192,6 +208,8 @@ class MediaPost {
     replyCount: json['replyCount'] as int? ?? 0,
     likeCount: json['likeCount'] as int? ?? 0,
     isLikedByMe: json['isLikedByMe'] as bool? ?? false,
+    deliveryState: _parseDeliveryState(json['deliveryState'] as String?),
+    lastPublishError: json['lastPublishError'] as String?,
   );
 
   MediaPost copyWith({
@@ -219,6 +237,8 @@ class MediaPost {
     int? replyCount,
     int? likeCount,
     bool? isLikedByMe,
+    PostDeliveryState? deliveryState,
+    Object? lastPublishError = _copyWithUnset,
   }) => MediaPost(
     id: id ?? this.id,
     pubkey: pubkey ?? this.pubkey,
@@ -244,6 +264,10 @@ class MediaPost {
     replyCount: replyCount ?? this.replyCount,
     likeCount: likeCount ?? this.likeCount,
     isLikedByMe: isLikedByMe ?? this.isLikedByMe,
+    deliveryState: deliveryState ?? this.deliveryState,
+    lastPublishError: identical(lastPublishError, _copyWithUnset)
+        ? this.lastPublishError
+        : lastPublishError as String?,
   );
 
   MediaPost mergeLocalStateFrom(MediaPost existing) => copyWith(
@@ -274,6 +298,8 @@ class MediaPost {
         replyCount == other.replyCount &&
         likeCount == other.likeCount &&
         isLikedByMe == other.isLikedByMe &&
+        deliveryState == other.deliveryState &&
+        lastPublishError == other.lastPublishError &&
         caption == other.caption &&
         replyToId == other.replyToId &&
         _stringListEquals(tags, other.tags) &&
@@ -306,6 +332,12 @@ class MediaPost {
     'secondhand' => PostSourceType.secondhand,
     _ => PostSourceType.firsthand,
   };
+
+  static PostDeliveryState _parseDeliveryState(String? value) =>
+      switch (value) {
+        'failedToSend' => PostDeliveryState.failedToSend,
+        _ => PostDeliveryState.sent,
+      };
 
   static bool _stringListEquals(List<String> left, List<String> right) {
     if (left.length != right.length) return false;

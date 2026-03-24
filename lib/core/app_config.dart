@@ -17,9 +17,14 @@ abstract final class AppConfig {
   ];
 
   static const testRelays = [
+    // 'wss://relay.damus.io',
+    // 'wss://nos.lol',
+    // 'wss://relay.nostr.band',
     'wss://testnet.plebnet.dev',
     'wss://relay.staging.geyser.fund',
     'wss://nostrja-world-relays-test.heguro.com',
+    'wss://relay.nostr.net',
+    'wss://nostr.mom',
   ];
 
   static List<String> get relays =>

@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:image/image.dart' as img;
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -14,19 +12,7 @@ import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 
 const _relayConnectTimeout = Duration(seconds: 5);
-const _publishAckTimeout = Duration(seconds: 4);
-const _maxInlinePreviewBytes = 4 * 1024;
-const _previewCandidates = <({int maxDimension, int quality})>[
-  (maxDimension: 320, quality: 55),
-  (maxDimension: 240, quality: 45),
-  (maxDimension: 160, quality: 35),
-  (maxDimension: 128, quality: 30),
-  (maxDimension: 96, quality: 25),
-  (maxDimension: 72, quality: 20),
-  (maxDimension: 56, quality: 16),
-  (maxDimension: 40, quality: 12),
-];
-
+const _publishAckTimeout = Duration(seconds: 8);
 /// Relay-indexable single-letter marker used to discover Spot events.
 const spotRelayMarkerTag = 'd';
 
@@ -151,6 +137,8 @@ class NostrService {
 
   /// Broadcasts [event] to all connected relays.
   Future<void> publishEvent(NostrEvent event) async {
+    // Purge stale channels so connect() re-establishes them.
+    _channels.removeWhere((url, channel) => channel.closeCode != null);
     await connect();
     if (_channels.isEmpty) {
       throw StateError('No connected relays available');
@@ -164,10 +152,14 @@ class NostrService {
     for (final channel in _channels.values.toList(growable: false)) {
       channel.sink.add(msg);
     }
+    final verifySubId = subscribe([
+      NostrFilter(ids: [event.id], limit: 1),
+    ], (_) {});
 
     try {
       await pending.waitForAcceptance(_publishAckTimeout);
     } finally {
+      unsubscribe(verifySubId);
       _pendingPublishes.remove(event.id);
     }
   }
@@ -186,32 +178,21 @@ class NostrService {
     for (final t in post.eventTags) {
       contentParts.add('#$t');
     }
-    final content = contentParts.join('\n');
-    final previewTags = await _buildPreviewTags(post);
-    NostrEvent? signed;
-    StateError? lastError;
-
-    for (final previewTag in [...previewTags, null]) {
-      signed = _signMediaPostEvent(
-        post,
-        wallet,
-        now: now,
-        content: content,
-        previewTag: previewTag,
-      );
-
-      try {
-        await publishEvent(signed);
-        break;
-      } on StateError catch (error) {
-        lastError = error;
-        if (previewTag == null) rethrow;
-      }
+    String content = contentParts.join('\n');
+    if (content.isEmpty) {
+      // Some Nostr relays reject kind-1 events with completely empty content.
+      // Provide a minimal fallback for image-only posts.
+      content = ' ';
     }
 
-    if (signed == null) {
-      throw lastError ?? StateError('Failed to publish media post');
-    }
+    final signed = _signMediaPostEvent(
+      post,
+      wallet,
+      now: now,
+      content: content,
+    );
+
+    await publishEvent(signed);
 
     // Self-deliver immediately so the post appears in the feed without
     // waiting for a relay echo (many relays delay or filter kind-1 events).
@@ -227,7 +208,6 @@ class NostrService {
     WalletModel wallet, {
     required int now,
     required String content,
-    List<String>? previewTag,
   }) {
     final tags = <List<String>>[
       ..._spotOriginTags(),
@@ -259,8 +239,6 @@ class NostrService {
       if (post.isTextOnly) ['text_only', '1'],
       ['source', post.sourceType.name],
     ];
-    if (previewTag != null) tags.add(previewTag);
-
     final placeholder = NostrEvent(
       id: '',
       pubkey: wallet.publicKeyHex,
@@ -542,6 +520,11 @@ class NostrService {
           final subId = data[1] as String;
           final eventJson = data[2] as Map<String, dynamic>;
           final event = NostrEvent.fromJson(eventJson);
+          _pendingPublishes[event.id]?.record(
+            relayUrl,
+            accepted: true,
+            message: 'relay echoed stored event',
+          );
           _subscriptions[subId]?.onEvent(event);
           _inbound.add(_RelayMessage(relayUrl: relayUrl, event: event));
 
@@ -584,57 +567,6 @@ class NostrService {
     }
   }
 
-  Future<List<List<String>>> _buildPreviewTags(MediaPost post) async {
-    if (post.isTextOnly || post.mediaPaths.isEmpty) return const [];
-
-    final path = post.mediaPaths.first;
-    if (_isVideoPath(path)) return const [];
-
-    final file = File(path);
-    if (!file.existsSync()) return const [];
-
-    try {
-      final bytes = await file.readAsBytes();
-      final decoded = img.decodeImage(bytes);
-      if (decoded == null) return const [];
-
-      final tags = <List<String>>[];
-      final seenBase64 = <String>{};
-      for (final candidate in _previewCandidates) {
-        final resized = _resizeToFit(decoded, candidate.maxDimension);
-        final encoded = img.encodeJpg(resized, quality: candidate.quality);
-        if (encoded.length > _maxInlinePreviewBytes) {
-          continue;
-        }
-        final base64 = base64Encode(encoded);
-        if (!seenBase64.add(base64)) continue;
-        tags.add(['preview', 'image/jpeg', base64]);
-      }
-      return tags;
-    } catch (_) {
-      return const [];
-    }
-  }
-
-  img.Image _resizeToFit(img.Image image, int maxDimension) {
-    final width = image.width;
-    final height = image.height;
-    final longest = width > height ? width : height;
-    if (longest <= maxDimension) return image;
-
-    if (width >= height) {
-      return img.copyResize(image, width: maxDimension);
-    }
-    return img.copyResize(image, height: maxDimension);
-  }
-
-  bool _isVideoPath(String path) {
-    final lower = path.toLowerCase();
-    return lower.endsWith('.mp4') ||
-        lower.endsWith('.mov') ||
-        lower.endsWith('.avi') ||
-        lower.endsWith('.mkv');
-  }
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────

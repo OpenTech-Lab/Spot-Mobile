@@ -257,6 +257,51 @@ void main() {
     });
 
     test(
+      'publishMediaPost succeeds when a relay echoes the stored event without OK',
+      () async {
+        acceptedRelay = await _TestRelay.start(
+          name: 'echo-only',
+          acceptEvents: true,
+          echoPublishedEvents: true,
+          skipOkResponses: true,
+        );
+        final service = NostrService(relayUrls: [acceptedRelay!.url]);
+        await service.connect();
+
+        service.subscribe(
+          EventRepository.buildSpotPostFilters(
+            limit: 20,
+            includeGenericFallback: true,
+          ),
+          (_) {},
+        );
+
+        final event = await service.publishMediaPost(_post(), _wallet());
+
+        expect(acceptedRelay!.receivedEventIds, contains(event.id));
+        await service.disconnect();
+      },
+    );
+
+    test(
+      'publishMediaPost succeeds when a relay confirms storage via event-id REQ without OK',
+      () async {
+        acceptedRelay = await _TestRelay.start(
+          name: 'req-confirmed',
+          acceptEvents: true,
+          skipOkResponses: true,
+        );
+        final service = NostrService(relayUrls: [acceptedRelay!.url]);
+        await service.connect();
+
+        final event = await service.publishMediaPost(_post(), _wallet());
+
+        expect(acceptedRelay!.receivedEventIds, contains(event.id));
+        await service.disconnect();
+      },
+    );
+
+    test(
       'publishMediaPost retries without preview when relays reject preview payloads',
       () async {
         acceptedRelay = await _TestRelay.start(
@@ -428,6 +473,8 @@ class _TestRelay {
     required this.okMessage,
     required this.rejectPreviewEvents,
     required this.maxPreviewBase64Length,
+    required this.echoPublishedEvents,
+    required this.skipOkResponses,
   });
 
   final String name;
@@ -436,10 +483,14 @@ class _TestRelay {
   final String okMessage;
   final bool rejectPreviewEvents;
   final int? maxPreviewBase64Length;
+  final bool echoPublishedEvents;
+  final bool skipOkResponses;
   final List<WebSocket> _sockets = [];
   final List<String> receivedEventIds = [];
   final List<bool> receivedPreviewFlags = [];
   final List<int> receivedPreviewLengths = [];
+  final Set<String> subscriptionIds = {};
+  final Map<String, Map<String, dynamic>> storedAcceptedEventsById = {};
 
   String get url => 'ws://${server.address.host}:${server.port}';
 
@@ -449,6 +500,8 @@ class _TestRelay {
     String okMessage = 'saved',
     bool rejectPreviewEvents = false,
     int? maxPreviewBase64Length,
+    bool echoPublishedEvents = false,
+    bool skipOkResponses = false,
   }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final relay = _TestRelay._(
@@ -458,6 +511,8 @@ class _TestRelay {
       okMessage: okMessage,
       rejectPreviewEvents: rejectPreviewEvents,
       maxPreviewBase64Length: maxPreviewBase64Length,
+      echoPublishedEvents: echoPublishedEvents,
+      skipOkResponses: skipOkResponses,
     );
     relay._listen();
     return relay;
@@ -471,6 +526,24 @@ class _TestRelay {
         (raw) {
           final data = jsonDecode(raw as String) as List<dynamic>;
           if (data.isEmpty) return;
+          if (data.first == 'REQ' && data.length >= 2) {
+            final subscriptionId = data[1] as String;
+            subscriptionIds.add(subscriptionId);
+            for (final rawFilter in data.skip(2)) {
+              if (rawFilter is! Map) continue;
+              final ids = (rawFilter['ids'] as List<dynamic>?)
+                  ?.map((value) => value.toString())
+                  .toSet();
+              if (ids == null || ids.isEmpty) continue;
+              for (final eventId in ids) {
+                final stored = storedAcceptedEventsById[eventId];
+                if (stored == null) continue;
+                socket.add(jsonEncode(['EVENT', subscriptionId, stored]));
+              }
+            }
+            socket.add(jsonEncode(['EOSE', subscriptionId]));
+            return;
+          }
           if (data.first == 'EVENT' && data.length >= 2) {
             final eventJson = Map<String, dynamic>.from(data[1] as Map);
             final eventId = eventJson['id'] as String;
@@ -503,7 +576,17 @@ class _TestRelay {
                         previewLength > maxPreviewBase64Length!))
                 ? 'invalid: event too large'
                 : okMessage;
-            socket.add(jsonEncode(['OK', eventId, accepted, message]));
+            if (accepted) {
+              storedAcceptedEventsById[eventId] = eventJson;
+            }
+            if (echoPublishedEvents) {
+              for (final subscriptionId in subscriptionIds) {
+                socket.add(jsonEncode(['EVENT', subscriptionId, eventJson]));
+              }
+            }
+            if (!skipOkResponses) {
+              socket.add(jsonEncode(['OK', eventId, accepted, message]));
+            }
           }
         },
         onDone: () {
