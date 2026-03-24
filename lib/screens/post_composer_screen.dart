@@ -101,9 +101,6 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
       if (mounted) setState(() {});
     });
     _fetchGps();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _captionFocus.requestFocus();
-    });
   }
 
   @override
@@ -414,6 +411,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                             isDense: true,
                           ),
                           textInputAction: TextInputAction.done,
+                          onTapOutside: (_) => _dismissKeyboard(),
                           onSubmitted: _addTag,
                           onChanged: _onTagFieldChanged,
                         ),
@@ -467,6 +465,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                         isDense: true,
                       ),
                       textInputAction: TextInputAction.done,
+                      onTapOutside: (_) => _dismissKeyboard(),
                       onSubmitted: _addTag,
                       onChanged: _onTagFieldChanged,
                     ),
@@ -574,6 +573,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                                     isDense: true,
                                   ),
                                   onChanged: (_) => setState(() {}),
+                                  onTapOutside: (_) => _dismissKeyboard(),
                                 ),
                               ),
                             ],
@@ -870,6 +870,8 @@ class _ComposerOptions extends StatelessWidget {
                   final trimmed = v.trim();
                   onSpotNameChanged(trimmed.isEmpty ? ' ' : trimmed);
                 },
+                onTapOutside: (_) =>
+                    FocusManager.instance.primaryFocus?.unfocus(),
               ),
             ],
             const SizedBox(height: SpotSpacing.sm),

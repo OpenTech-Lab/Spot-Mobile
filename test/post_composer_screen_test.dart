@@ -73,6 +73,58 @@ void main() {
     expect(tester.widget<TextField>(captionField).focusNode?.hasFocus, isFalse);
   });
 
+  testWidgets('composer does not auto-focus the caption field on open', (
+    tester,
+  ) async {
+    final wallet = _wallet();
+
+    await tester.pumpWidget(_ComposerHarness(wallet: wallet));
+
+    await tester.tap(find.text('Compose'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final captionField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.hintText == "What's happening?",
+    );
+
+    expect(captionField, findsOneWidget);
+    expect(tester.widget<TextField>(captionField).focusNode?.hasFocus, isFalse);
+  });
+
+  testWidgets('tapping composer content dismisses the focused caption field', (
+    tester,
+  ) async {
+    final wallet = _wallet();
+
+    await tester.pumpWidget(_ComposerHarness(wallet: wallet));
+
+    await tester.tap(find.text('Compose'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final captionField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.hintText == "What's happening?",
+    );
+
+    await tester.tap(captionField);
+    await tester.pump();
+
+    expect(tester.widget<TextField>(captionField).focusNode?.hasFocus, isTrue);
+
+    await tester.tap(
+      find.textContaining('First tag is the event category'),
+      warnIfMissed: false,
+    );
+    await tester.pump();
+
+    expect(tester.widget<TextField>(captionField).focusNode?.hasFocus, isFalse);
+  });
+
   testWidgets('composer content scroll view dismisses keyboard on drag', (
     tester,
   ) async {
