@@ -123,10 +123,13 @@ class LocalPostStore {
       final raw = await file.readAsString();
       if (raw.trim().isEmpty) return [];
       final decoded = jsonDecode(raw) as List;
-      return decoded
-          .whereType<Map<String, dynamic>>()
-          .map(MediaPost.fromJson)
-          .toList();
+      final list = <MediaPost>[];
+      for (final row in decoded.whereType<Map<String, dynamic>>()) {
+        try {
+          list.add(MediaPost.fromJson(row));
+        } catch (_) {}
+      }
+      return list;
     } catch (_) {
       return [];
     }
