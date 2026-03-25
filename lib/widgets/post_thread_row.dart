@@ -524,7 +524,11 @@ class _PostMedia extends StatelessWidget {
     final previewBytes = _decodePreviewBytes();
     if (previewBytes != null) {
       return GestureDetector(
-        onTap: () => _openDetail(context),
+        onTap: () {
+          if (!isMediaLoading) {
+            onPostUpdated?.call(post);
+          }
+        },
         behavior: HitTestBehavior.opaque,
         child: SizedBox(
           height: _maxImageHeight,
@@ -584,7 +588,13 @@ class _PostMedia extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: () => _openDetail(context),
+      onTap: () {
+        if (!isMediaLoading) {
+          // Trigger media fetch via CDN / P2P instead of opening an empty
+          // detail screen.
+          onPostUpdated?.call(post);
+        }
+      },
       behavior: HitTestBehavior.opaque,
       child: _mediaShell(
         child: Column(
@@ -597,7 +607,7 @@ class _PostMedia extends StatelessWidget {
               )
             else
               const Icon(
-                CupertinoIcons.photo,
+                CupertinoIcons.cloud_download,
                 color: SpotColors.overlay,
                 size: 26,
               ),
@@ -607,7 +617,9 @@ class _PostMedia extends StatelessWidget {
             ),
             const SizedBox(height: SpotSpacing.xs),
             Text(
-              'Opens full-screen viewer',
+              isMediaLoading
+                  ? 'Downloading from CDN…'
+                  : 'Downloads via CDN or P2P',
               style: SpotType.caption.copyWith(
                 color: SpotColors.textTertiary.withAlpha(150),
               ),

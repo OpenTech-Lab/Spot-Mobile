@@ -154,6 +154,26 @@ class _ThreadScreenState extends State<ThreadScreen> {
     unawaited(LocalPostStore.instance.savePost(post));
   }
 
+  Future<void> _hydrateMediaPost(MediaPost post) async {
+    if (_loadingMediaPostIds.contains(post.id)) return;
+    setState(() => _loadingMediaPostIds.add(post.id));
+
+    try {
+      await P2PService.instance.startSwarm();
+      final sync = MediaSyncService(
+        fetchMedia: widget.mediaFetcher ?? MediaResolver.instance.resolve,
+      );
+      final hydrated = await sync.hydratePost(post);
+
+      if (!mounted) return;
+      _updateMediaPost(hydrated);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingMediaPostIds.remove(post.id));
+      }
+    }
+  }
+
   Future<void> _primeThreadPosts() async {
     await _restorePersistedPosts();
     await _syncThreadMedia();
@@ -243,7 +263,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
                   onAvatarTap: () => _openUserProfile(ctx, post.pubkey),
                   onReport: () => _reportPost(post),
                   onLike: () => _toggleLike(post),
-                  onMediaUpdated: _updateMediaPost,
+                  onMediaUpdated: _hydrateMediaPost,
                   onReply: () => showPostComposer(
                     ctx,
                     wallet: widget.wallet,

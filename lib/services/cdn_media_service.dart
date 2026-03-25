@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:mobile/core/encryption.dart';
@@ -49,14 +50,14 @@ class CdnMediaService {
   ///     --dart-define=CDN_BASE_URL=https://d1234.cloudfront.net \
   ///     --dart-define=CDN_PRESIGN_URL=https://xyz.lambda-url.ap-northeast-1.on.aws
   ///
-  /// In GitHub Actions, feed from secrets:
-  ///
-  ///   --dart-define=CDN_BASE_URL=${{ secrets.CDN_BASE_URL }}
-  ///   --dart-define=CDN_PRESIGN_URL=${{ secrets.CDN_PRESIGN_URL }}
-  ///
-  /// Falls back to empty string (CDN disabled) when not provided.
-  static const _defaultCdnBaseUrl = String.fromEnvironment('CDN_BASE_URL');
-  static const _defaultPresignEndpoint = String.fromEnvironment('CDN_PRESIGN_URL');
+  /// For fetch (read-only), falls back to the production CloudFront domain when
+  /// not provided — this is a public, unauthenticated endpoint.
+  static const _compileCdnBaseUrl = String.fromEnvironment('CDN_BASE_URL');
+  static final String _defaultCdnBaseUrl = _compileCdnBaseUrl.isNotEmpty
+      ? _compileCdnBaseUrl
+      : 'https://d3ttkxcceqn0cp.cloudfront.net';
+  static const _defaultPresignEndpoint =
+      String.fromEnvironment('CDN_PRESIGN_URL');
 
   static const _fetchTimeout = Duration(seconds: 10);
   static const _presignTimeout = Duration(seconds: 15);
@@ -87,9 +88,7 @@ class CdnMediaService {
 
     try {
       final uri = Uri.parse('$_cdnBaseUrl/$contentHash');
-      final request = await _httpClient
-          .getUrl(uri)
-          .timeout(_fetchTimeout);
+      final request = await _httpClient.getUrl(uri).timeout(_fetchTimeout);
       final response = await request.close().timeout(_fetchTimeout);
 
       if (response.statusCode != 200) {
@@ -98,13 +97,17 @@ class CdnMediaService {
       }
 
       final bytes = await _collectBytes(response);
-      if (bytes == null) return null; // exceeded size cap
+      if (bytes == null) {
+        debugPrint('[CDN] Fetch failed: response exceeded size cap');
+        return null;
+      }
 
       // Verify SHA-256 integrity
-      final downloadedHash = EncryptionUtils.sha256BytesHex(
-        Uint8List.fromList(bytes),
-      );
+      final downloadedHash = EncryptionUtils.sha256BytesHex(bytes);
       if (downloadedHash != contentHash) {
+        debugPrint(
+          '[CDN] Integrity check failed for $contentHash (got $downloadedHash)',
+        );
         return null;
       }
 
@@ -123,8 +126,10 @@ class CdnMediaService {
       await CacheManager.instance.addToCache(contentHash, file.path);
       return file;
     } on TimeoutException {
+      debugPrint('[CDN] Fetch timed out for $contentHash');
       return null;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[CDN] Fetch error for $contentHash: $e');
       return null;
     }
   }
@@ -157,7 +162,10 @@ class CdnMediaService {
 
     try {
       final file = File(filePath);
-      if (!file.existsSync()) return;
+      if (!file.existsSync()) {
+        debugPrint('[CDN] Upload aborted: file not found at $filePath');
+        return;
+      }
 
       // Upload the exact optimized bytes — no re-encoding so hash stays valid.
       final bytes = await file.readAsBytes();
@@ -166,6 +174,8 @@ class CdnMediaService {
       final resolvedContentType =
           contentType ?? (isImage ? 'image/jpeg' : 'application/octet-stream');
 
+      debugPrint('[CDN] Requesting presigned URL for $contentHash...');
+
       // Request presigned URL
       final timestamp =
           (DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000).toString();
@@ -173,46 +183,60 @@ class CdnMediaService {
       final auth = await signPayload(message);
 
       final presignUri = Uri.parse(_presignEndpoint);
-      final presignRequest = await _httpClient
-          .postUrl(presignUri)
-          .timeout(_presignTimeout);
+      final presignRequest =
+          await _httpClient.postUrl(presignUri).timeout(_presignTimeout);
       presignRequest.headers.contentType = ContentType.json;
-      presignRequest.write(jsonEncode({
-        'pubkey': auth.pubkey,
-        'contentHash': contentHash,
-        'timestamp': timestamp,
-        'signature': auth.signature,
-        'contentType': resolvedContentType,
-      }));
+      presignRequest.write(
+        jsonEncode({
+          'pubkey': auth.pubkey,
+          'contentHash': contentHash,
+          'timestamp': timestamp,
+          'signature': auth.signature,
+          'contentType': resolvedContentType,
+        }),
+      );
       final presignResponse =
           await presignRequest.close().timeout(_presignTimeout);
 
       if (presignResponse.statusCode != 200) {
-        await presignResponse.drain<void>();
+        final body = await _collectString(presignResponse);
+        debugPrint(
+          '[CDN] Presign request failed (${presignResponse.statusCode}): $body',
+        );
         return;
       }
 
       final presignBody = await _collectString(presignResponse);
       final presignJson = jsonDecode(presignBody) as Map<String, dynamic>;
       final uploadUrl = presignJson['uploadUrl'] as String?;
-      if (uploadUrl == null) return;
+      if (uploadUrl == null) {
+        debugPrint('[CDN] Presign response missing uploadUrl');
+        return;
+      }
+
+      debugPrint('[CDN] Uploading bytes to S3...');
 
       // PUT to S3 via presigned URL
       final putUri = Uri.parse(uploadUrl);
-      final putRequest = await _httpClient
-          .putUrl(putUri)
-          .timeout(_uploadTimeout);
-      putRequest.headers.contentType =
-          ContentType.parse(resolvedContentType);
+      final putRequest = await _httpClient.putUrl(putUri).timeout(_uploadTimeout);
+      putRequest.headers.contentType = ContentType.parse(resolvedContentType);
       putRequest.contentLength = bytes.length;
       putRequest.add(bytes);
+
       final putResponse = await putRequest.close().timeout(_uploadTimeout);
       await putResponse.drain<void>();
-      // Silently ignore non-200 — P2P is the fallback.
+
+      if (putResponse.statusCode == 200 || putResponse.statusCode == 204) {
+        debugPrint('[CDN] Successfully uploaded $contentHash');
+      } else {
+        debugPrint(
+          '[CDN] S3 upload failed with status ${putResponse.statusCode}',
+        );
+      }
     } on TimeoutException {
-      // CDN upload timeout — acceptable, P2P covers it.
-    } catch (_) {
-      // CDN upload failed — acceptable, P2P covers it.
+      debugPrint('[CDN] Upload timed out for $contentHash');
+    } catch (e) {
+      debugPrint('[CDN] Upload failed for $contentHash: $e');
     }
   }
 

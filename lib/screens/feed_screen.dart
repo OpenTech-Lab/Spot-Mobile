@@ -13,6 +13,9 @@ import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/thread_screen.dart';
 import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
+import 'package:mobile/features/p2p/p2p_service.dart';
+import 'package:mobile/services/media_resolver.dart';
+import 'package:mobile/services/media_sync_service.dart';
 import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/post_merge.dart';
@@ -61,6 +64,7 @@ class FeedScreenState extends State<FeedScreen>
   StreamSubscription<CivicEvent>? _sub;
 
   List<MediaPost> _posts = [];
+  final Set<String> _loadingMediaPostIds = {};
   bool _isLoading = true;
   String? _error;
 
@@ -222,8 +226,29 @@ class FeedScreenState extends State<FeedScreen>
   }
 
   void _updateMediaPost(MediaPost post) {
-    setState(() => _posts = replacePostsById(_posts, [post]));
+    setState(() {
+      _posts = replacePostsById(_posts, [post]);
+      _loadingMediaPostIds.remove(post.id);
+    });
     unawaited(LocalPostStore.instance.savePost(post));
+  }
+
+  Future<void> _hydrateMediaPost(MediaPost post) async {
+    if (_loadingMediaPostIds.contains(post.id)) return;
+    setState(() => _loadingMediaPostIds.add(post.id));
+
+    try {
+      await P2PService.instance.startSwarm();
+      final sync = MediaSyncService(fetchMedia: MediaResolver.instance.resolve);
+      final hydrated = await sync.hydratePost(post);
+      
+      if (!mounted) return;
+      _updateMediaPost(hydrated);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingMediaPostIds.remove(post.id));
+      }
+    }
   }
 
   Future<void> _reportPost(MediaPost post) async {
@@ -298,11 +323,12 @@ class FeedScreenState extends State<FeedScreen>
                 isLoading: _isLoading,
                 error: _error,
                 isFetchingMore: _isFetchingMore,
+                loadingMediaPostIds: _loadingMediaPostIds,
                 onRefresh: _refresh,
                 onLoadMore: _loadMorePosts,
                 onReport: _reportPost,
                 onLike: _toggleLike,
-                onMediaUpdated: _updateMediaPost,
+                onMediaUpdated: _hydrateMediaPost,
                 onAvatarTap: _openUserProfile,
                 wallet: widget.wallet,
                 nostrService: widget.nostrService,
@@ -312,10 +338,11 @@ class FeedScreenState extends State<FeedScreen>
                 posts: _followingPosts,
                 allPosts: _posts,
                 isLoading: _isLoading,
+                loadingMediaPostIds: _loadingMediaPostIds,
                 onRefresh: _refresh,
                 onReport: _reportPost,
                 onLike: _toggleLike,
-                onMediaUpdated: _updateMediaPost,
+                onMediaUpdated: _hydrateMediaPost,
                 onAvatarTap: _openUserProfile,
                 wallet: widget.wallet,
                 nostrService: widget.nostrService,
@@ -353,6 +380,7 @@ class _LatestTab extends StatefulWidget {
     required this.allPosts,
     required this.isLoading,
     required this.isFetchingMore,
+    required this.loadingMediaPostIds,
     this.error,
     required this.onRefresh,
     required this.onLoadMore,
@@ -369,6 +397,7 @@ class _LatestTab extends StatefulWidget {
   final List<MediaPost> allPosts;
   final bool isLoading;
   final bool isFetchingMore;
+  final Set<String> loadingMediaPostIds;
   final String? error;
   final Future<void> Function() onRefresh;
   final Future<void> Function() onLoadMore;
@@ -466,6 +495,7 @@ class _LatestTabState extends State<_LatestTab> {
                 child: PostThreadRow(
                   post: post,
                   isLast: true,
+                  isMediaLoading: widget.loadingMediaPostIds.contains(post.id),
                   onAvatarTap: () => widget.onAvatarTap(ctx, post.pubkey),
                   onReport: () => widget.onReport(post),
                   onLike: () => widget.onLike(post),
@@ -605,6 +635,7 @@ class _FollowingTab extends StatelessWidget {
     required this.posts,
     required this.allPosts,
     required this.isLoading,
+    required this.loadingMediaPostIds,
     required this.onRefresh,
     required this.onReport,
     required this.onLike,
@@ -618,6 +649,7 @@ class _FollowingTab extends StatelessWidget {
   final List<MediaPost> posts;
   final List<MediaPost> allPosts;
   final bool isLoading;
+  final Set<String> loadingMediaPostIds;
   final Future<void> Function() onRefresh;
   final void Function(MediaPost) onReport;
   final void Function(MediaPost) onLike;
@@ -724,6 +756,7 @@ class _FollowingTab extends StatelessWidget {
                 child: PostThreadRow(
                   post: post,
                   isLast: true,
+                  isMediaLoading: loadingMediaPostIds.contains(post.id),
                   onAvatarTap: () => onAvatarTap(ctx, post.pubkey),
                   onReport: () => onReport(post),
                   onLike: () => onLike(post),
