@@ -96,20 +96,13 @@ class FeedScreenState extends State<FeedScreen>
   /// Called externally after a successful publish so Home can show the new
   /// thread immediately instead of waiting for the repository stream.
   void showPublishedPost(MediaPost post) {
-    final merged = _mergePosts(_posts, [post]);
-    if (orderedPostsEqual(merged, _posts)) {
-      if (_tabController.index != 0) {
-        _tabController.animateTo(0);
-      }
-      return;
-    }
+    if (!mounted) return;
     setState(() {
-      _posts = merged;
+      _posts = _mergePosts(_posts, [post]);
     });
     if (_tabController.index != 0) {
       _tabController.animateTo(0);
     }
-    unawaited(LocalPostStore.instance.savePost(post));
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -132,10 +125,10 @@ class FeedScreenState extends State<FeedScreen>
 
   void _onEvent(CivicEvent event) {
     if (!mounted) return;
-    final merged = _mergePosts(_posts, event.posts);
-    if (orderedPostsEqual(merged, _posts)) return;
+    setState(() {
+      _posts = _mergePosts(_posts, event.posts);
+    });
     unawaited(LocalPostStore.instance.savePosts(event.posts));
-    setState(() => _posts = merged);
   }
 
   Future<void> _refresh() async {
