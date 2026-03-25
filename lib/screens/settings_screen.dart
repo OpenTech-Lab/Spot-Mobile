@@ -7,6 +7,8 @@ import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/asset_transport_settings_screen.dart';
 import 'package:mobile/screens/relay_list_screen.dart';
 import 'package:mobile/screens/wallet_screen.dart';
+import 'package:mobile/services/cache_manager.dart';
+import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
@@ -34,6 +36,88 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (mounted) {
       setState(() {});
+    }
+  }
+
+  Future<void> _clearCache() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SpotColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(SpotRadius.md),
+        ),
+        title: const Text('Clear Cache', style: SpotType.subheading),
+        content: const Text(
+          'This will delete all cached media files. '
+          'Your posts and settings will not be affected.',
+          style: SpotType.bodySecondary,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel', style: SpotType.bodySecondary),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('Clear', style: SpotType.body.copyWith(color: SpotColors.danger)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await CacheManager.instance.purgeAll();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cache cleared')),
+        );
+      }
+    }
+  }
+
+  Future<void> _clearAllData() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SpotColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(SpotRadius.md),
+        ),
+        title: const Text('Clear All Data', style: SpotType.subheading),
+        content: const Text(
+          'This will delete ALL local data including:\n'
+          '• Cached media\n'
+          '• Saved posts\n'
+          '• Blocklist\n\n'
+          'Your identity will NOT be deleted. '
+          'Posts will re-sync from relays.',
+          style: SpotType.bodySecondary,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel', style: SpotType.bodySecondary),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('Clear All', style: SpotType.body.copyWith(color: SpotColors.danger)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await Future.wait([
+        CacheManager.instance.purgeAll(),
+        CacheManager.instance.clearBlocklist(),
+        LocalPostStore.instance.clearAll(),
+      ]);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('All data cleared. Restart app to re-sync.')),
+        );
+      }
     }
   }
 
@@ -77,6 +161,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 builder: (_) => WalletScreen(wallet: widget.wallet),
               ),
             ),
+          ),
+          const SizedBox(height: SpotSpacing.xl),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: SpotSpacing.sm),
+            child: Text('Storage', style: SpotType.label),
+          ),
+          _SettingsRow(
+            icon: CupertinoIcons.trash,
+            label: 'Clear Cache',
+            onTap: _clearCache,
+          ),
+          const SizedBox(height: SpotSpacing.sm),
+          _SettingsRow(
+            icon: CupertinoIcons.delete,
+            label: 'Clear All Data',
+            onTap: _clearAllData,
           ),
         ],
       ),

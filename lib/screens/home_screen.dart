@@ -42,9 +42,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     _nostrService.connect();
     unawaited(P2PService.instance.refreshTransportAvailability());
-    
-    // TEMPORARY: Clear blocklist to fix blocked content issue
-    unawaited(CacheManager.instance.clearBlocklist());
   }
 
   @override

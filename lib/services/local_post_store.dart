@@ -92,6 +92,12 @@ class LocalPostStore {
     });
   }
 
+  Future<void> clearAll() async {
+    await _enqueue(() async {
+      await _writePosts([]);
+    });
+  }
+
   void debugSetStorageDirectory(Directory? directory) {
     _debugStorageDirectory = directory;
   }

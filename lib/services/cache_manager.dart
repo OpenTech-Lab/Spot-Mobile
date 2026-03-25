@@ -71,6 +71,20 @@ class CacheManager {
     await _saveManifest();
   }
 
+  /// Deletes all cached files and clears the manifest.
+  Future<void> purgeAll() async {
+    for (final entry in _entries.values) {
+      final file = File(entry.path);
+      if (file.existsSync()) {
+        try {
+          await file.delete();
+        } catch (_) {}
+      }
+    }
+    _entries.clear();
+    await _saveManifest();
+  }
+
   /// Total bytes currently tracked in cache.
   int get totalCacheBytes =>
       _entries.values.fold(0, (sum, e) => sum + e.sizeBytes);

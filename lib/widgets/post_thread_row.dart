@@ -426,7 +426,7 @@ class PostThreadRow extends StatelessWidget {
 
 // ── Post media ────────────────────────────────────────────────────────────────
 
-class _PostMedia extends StatelessWidget {
+class _PostMedia extends StatefulWidget {
   const _PostMedia({
     required this.post,
     required this.isMediaLoading,
@@ -438,15 +438,54 @@ class _PostMedia extends StatelessWidget {
   final ValueChanged<MediaPost>? onPostUpdated;
 
   // Max height for a single image — keeps tall portraits from dominating the feed.
-  static const double _maxImageHeight = 200;
+  static const double maxImageHeight = 200;
+
+  @override
+  State<_PostMedia> createState() => _PostMediaState();
+}
+
+class _PostMediaState extends State<_PostMedia> {
+  bool _hasTriedAutoLoad = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tryAutoLoad();
+  }
+
+  @override
+  void didUpdateWidget(_PostMedia oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.post.id != oldWidget.post.id) {
+      _hasTriedAutoLoad = false;
+      _tryAutoLoad();
+    }
+  }
+
+  void _tryAutoLoad() {
+    if (_hasTriedAutoLoad || widget.isMediaLoading) return;
+    if (widget.post.isTextOnly) return;
+    
+    // Check if media is already available
+    final hasLocalMedia = widget.post.mediaPaths.any((path) => File(path).existsSync());
+    if (hasLocalMedia) return;
+    
+    // Auto-load if only preview is available
+    _hasTriedAutoLoad = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.onPostUpdated != null) {
+        widget.onPostUpdated!(widget.post);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (post.isTextOnly) return const SizedBox.shrink();
+    if (widget.post.isTextOnly) return const SizedBox.shrink();
 
     final availableMedia = <({int index, String path})>[];
-    for (var i = 0; i < post.mediaPaths.length; i++) {
-      final path = post.mediaPaths[i];
+    for (var i = 0; i < widget.post.mediaPaths.length; i++) {
+      final path = widget.post.mediaPaths[i];
       if (File(path).existsSync()) {
         availableMedia.add((index: i, path: path));
       }
@@ -454,7 +493,7 @@ class _PostMedia extends StatelessWidget {
 
     if (availableMedia.length > 1) {
       return SizedBox(
-        height: _maxImageHeight,
+        height: _PostMedia.maxImageHeight,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: availableMedia.length,
@@ -496,7 +535,7 @@ class _PostMedia extends StatelessWidget {
       final child = _isVideo(media.path)
           ? _VideoThumb(path: media.path)
           : SizedBox(
-              height: _maxImageHeight,
+              height: _PostMedia.maxImageHeight,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(SpotRadius.md),
                 child: Image.file(
@@ -525,13 +564,13 @@ class _PostMedia extends StatelessWidget {
     if (previewBytes != null) {
       return GestureDetector(
         onTap: () {
-          if (!isMediaLoading) {
-            onPostUpdated?.call(post);
+          if (!widget.isMediaLoading) {
+            widget.onPostUpdated?.call(widget.post);
           }
         },
         behavior: HitTestBehavior.opaque,
         child: SizedBox(
-          height: _maxImageHeight,
+          height: _PostMedia.maxImageHeight,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(SpotRadius.md),
             child: Stack(
@@ -553,10 +592,10 @@ class _PostMedia extends StatelessWidget {
                   left: SpotSpacing.sm,
                   bottom: SpotSpacing.sm,
                   child: _TransportStatusChip(
-                    label: isMediaLoading
+                    label: widget.isMediaLoading
                         ? 'Loading full image…'
                         : 'Tap to load full',
-                    showSpinner: isMediaLoading,
+                    showSpinner: widget.isMediaLoading,
                   ),
                 ),
                 Positioned(
@@ -589,10 +628,10 @@ class _PostMedia extends StatelessWidget {
 
     return GestureDetector(
       onTap: () {
-        if (!isMediaLoading) {
+        if (!widget.isMediaLoading) {
           // Trigger media fetch via CDN / P2P instead of opening an empty
           // detail screen.
-          onPostUpdated?.call(post);
+          widget.onPostUpdated?.call(widget.post);
         }
       },
       behavior: HitTestBehavior.opaque,
@@ -600,7 +639,7 @@ class _PostMedia extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (isMediaLoading)
+            if (widget.isMediaLoading)
               const Padding(
                 padding: EdgeInsets.only(bottom: SpotSpacing.sm),
                 child: CupertinoActivityIndicator(radius: 10),
@@ -612,12 +651,12 @@ class _PostMedia extends StatelessWidget {
                 size: 26,
               ),
             Text(
-              isMediaLoading ? 'Loading full media…' : 'Tap to load media',
+              widget.isMediaLoading ? 'Loading full media…' : 'Tap to load media',
               style: SpotType.caption.copyWith(color: SpotColors.textTertiary),
             ),
             const SizedBox(height: SpotSpacing.xs),
             Text(
-              isMediaLoading
+              widget.isMediaLoading
                   ? 'Downloading from CDN…'
                   : 'Downloads via CDN or P2P',
               style: SpotType.caption.copyWith(
@@ -634,16 +673,16 @@ class _PostMedia extends StatelessWidget {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => MediaDetailScreen(
-          post: post,
+          post: widget.post,
           initialIndex: initialIndex,
-          onPostUpdated: onPostUpdated,
+          onPostUpdated: widget.onPostUpdated,
         ),
       ),
     );
   }
 
   Widget _mediaShell({required Widget child}) => Container(
-    height: _maxImageHeight,
+    height: _PostMedia.maxImageHeight,
     width: double.infinity,
     decoration: BoxDecoration(
       color: SpotColors.surface,
@@ -654,10 +693,10 @@ class _PostMedia extends StatelessWidget {
   );
 
   Uint8List? _decodePreviewBytes() {
-    final previewBase64 = post.previewBase64;
+    final previewBase64 = widget.post.previewBase64;
     if (previewBase64 == null || previewBase64.isEmpty) return null;
 
-    final mimeType = post.previewMimeType;
+    final mimeType = widget.post.previewMimeType;
     if (mimeType != null && !mimeType.startsWith('image/')) return null;
 
     try {
@@ -720,7 +759,7 @@ class _VideoThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: compact ? double.infinity : _PostMedia._maxImageHeight,
+      height: compact ? double.infinity : _PostMedia.maxImageHeight,
       width: double.infinity,
       decoration: BoxDecoration(
         color: SpotColors.surface,

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
+import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -14,6 +15,8 @@ import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/feed_scoring_service.dart';
 import 'package:mobile/services/location_service.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/media_resolver.dart';
+import 'package:mobile/services/media_sync_service.dart';
 import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/services/user_prefs_service.dart';
@@ -46,6 +49,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   List<MediaPost> _posts = [];
   bool _isLoading = true;
+  final Set<String> _loadingMediaPostIds = {};
 
   double? _userLat;
   double? _userLon;
@@ -137,8 +141,29 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   }
 
   void _updateMediaPost(MediaPost post) {
-    setState(() => _posts = replacePostsById(_posts, [post]));
+    setState(() {
+      _posts = replacePostsById(_posts, [post]);
+      _loadingMediaPostIds.remove(post.id);
+    });
     unawaited(LocalPostStore.instance.savePost(post));
+  }
+
+  Future<void> _hydrateMediaPost(MediaPost post) async {
+    if (_loadingMediaPostIds.contains(post.id)) return;
+    setState(() => _loadingMediaPostIds.add(post.id));
+
+    try {
+      await P2PService.instance.startSwarm();
+      final sync = MediaSyncService(fetchMedia: MediaResolver.instance.resolve);
+      final hydrated = await sync.hydratePost(post);
+      
+      if (!mounted) return;
+      _updateMediaPost(hydrated);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingMediaPostIds.remove(post.id));
+      }
+    }
   }
 
   // ── Post actions ──────────────────────────────────────────────────────────
@@ -345,10 +370,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 child: PostThreadRow(
                   post: post,
                   isLast: true,
+                  isMediaLoading: _loadingMediaPostIds.contains(post.id),
                   onAvatarTap: () => _openUserProfile(ctx, post.pubkey),
                   onReport: () => _reportPost(post),
                   onLike: () => _toggleLike(post),
-                  onMediaUpdated: _updateMediaPost,
+                  onMediaUpdated: _hydrateMediaPost,
                   onReply: () => showPostComposer(
                     ctx,
                     wallet: widget.wallet,
