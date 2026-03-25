@@ -1,3 +1,6 @@
+# env
+.env
+
 # ios certificates and provisioning profiles
 scripts/ios/**/*.p8
 scripts/ios/**/*.cer
