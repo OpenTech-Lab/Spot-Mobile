@@ -87,6 +87,18 @@ class CacheManager {
     await Future.wait([_saveBlocklist(), purgeCached(contentHash)]);
   }
 
+  /// Removes [contentHash] from the blocklist.
+  Future<void> unblock(String contentHash) async {
+    _blocklist.remove(contentHash);
+    await _saveBlocklist();
+  }
+
+  /// Clears the entire blocklist.
+  Future<void> clearBlocklist() async {
+    _blocklist.clear();
+    await _saveBlocklist();
+  }
+
   // ── Private: eviction ─────────────────────────────────────────────────────
 
   Future<void> _evictIfNeeded() async {

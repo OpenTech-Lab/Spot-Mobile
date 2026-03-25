@@ -12,6 +12,7 @@ import 'package:mobile/screens/discover_screen.dart';
 import 'package:mobile/screens/feed_screen.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/profile_screen.dart';
+import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
 /// Main app shell with bottom navigation.
@@ -41,6 +42,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     _nostrService.connect();
     unawaited(P2PService.instance.refreshTransportAvailability());
+    
+    // TEMPORARY: Clear blocklist to fix blocked content issue
+    unawaited(CacheManager.instance.clearBlocklist());
   }
 
   @override

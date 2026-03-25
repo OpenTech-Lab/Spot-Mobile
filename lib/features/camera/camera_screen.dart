@@ -226,6 +226,7 @@ class _CameraScreenState extends State<CameraScreen>
         draft: post,
         wallet: widget.wallet,
         nostrService: widget.nostrService,
+        eventRepo: widget.eventRepo,
       );
       if (mounted) {
         Navigator.of(context).pop();

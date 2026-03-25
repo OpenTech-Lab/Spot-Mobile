@@ -97,9 +97,11 @@ class FeedScreenState extends State<FeedScreen>
   /// thread immediately instead of waiting for the repository stream.
   void showPublishedPost(MediaPost post) {
     if (!mounted) return;
+    debugPrint('[FeedScreen] showPublishedPost called for ${post.id}');
     setState(() {
       _posts = _mergePosts(_posts, [post]);
     });
+    debugPrint('[FeedScreen] Total posts after showPublishedPost: ${_posts.length}');
     if (_tabController.index != 0) {
       _tabController.animateTo(0);
     }
@@ -125,9 +127,11 @@ class FeedScreenState extends State<FeedScreen>
 
   void _onEvent(CivicEvent event) {
     if (!mounted) return;
+    debugPrint('[FeedScreen] Received CivicEvent: ${event.hashtag}, ${event.posts.length} posts');
     setState(() {
       _posts = _mergePosts(_posts, event.posts);
     });
+    debugPrint('[FeedScreen] Total posts after merge: ${_posts.length}');
     unawaited(LocalPostStore.instance.savePosts(event.posts));
   }
 
@@ -204,12 +208,20 @@ class FeedScreenState extends State<FeedScreen>
     List<MediaPost> current,
     Iterable<MediaPost> incoming,
   ) {
-    return mergePostsPreservingLocalState(
+    debugPrint('[FeedScreen] _mergePosts: ${current.length} current + ${incoming.length} incoming');
+    for (final post in incoming) {
+      debugPrint('[FeedScreen] Incoming post: ${post.id}, tags: ${post.eventTags}');
+      final isBlocked = CacheManager.instance.isBlocked(post.contentHash);
+      debugPrint('[FeedScreen] Post ${post.id} blocked: $isBlocked, contentHash: ${post.contentHash}');
+    }
+    final result = mergePostsPreservingLocalState(
       current,
       incoming.where(
         (post) => !CacheManager.instance.isBlocked(post.contentHash),
       ),
     );
+    debugPrint('[FeedScreen] _mergePosts result: ${result.length} posts');
+    return result;
   }
 
   void _toggleLike(MediaPost post) {
@@ -291,12 +303,16 @@ class FeedScreenState extends State<FeedScreen>
   // ── Following filter ──────────────────────────────────────────────────────
 
   List<MediaPost> get _followingPosts {
-    return visibleFollowingPosts(
+    final filtered = visibleFollowingPosts(
       _posts,
       selfPubkey: widget.wallet.publicKeyHex,
       followedPubkeys: FollowService.instance.following.toSet(),
       followedTags: FollowService.instance.followedTags.toSet(),
     );
+    debugPrint('[FeedScreen] Following filter: ${_posts.length} total → ${filtered.length} visible');
+    debugPrint('[FeedScreen] selfPubkey: ${widget.wallet.publicKeyHex}');
+    debugPrint('[FeedScreen] followedTags: ${FollowService.instance.followedTags}');
+    return filtered;
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────

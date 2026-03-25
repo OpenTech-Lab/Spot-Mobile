@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
@@ -18,6 +20,9 @@ class PostPublishService {
     EventRepository? eventRepo,
     String? replaceLocalPostId,
   }) async {
+    debugPrint('[PostPublish] Starting publish for ${draft.id}');
+    debugPrint('[PostPublish] eventRepo is ${eventRepo == null ? "NULL" : "present"}');
+    
     final signed = await nostrService.publishMediaPost(draft, wallet);
     final published = draft.copyWith(
       id: signed.id,
@@ -30,11 +35,18 @@ class PostPublishService {
 
     if (replaceLocalPostId != null) {
       await LocalPostStore.instance.replacePost(replaceLocalPostId, published);
+      debugPrint('[PostPublish] Replaced local post $replaceLocalPostId with ${published.id}');
     } else {
       await LocalPostStore.instance.savePost(published);
+      debugPrint('[PostPublish] Saved to LocalPostStore: ${published.id}');
     }
 
-    eventRepo?.addPost(published);
+    if (eventRepo != null) {
+      eventRepo.addPost(published);
+      debugPrint('[PostPublish] Added to EventRepository: ${published.id}, tags: ${published.eventTags}');
+    } else {
+      debugPrint('[PostPublish] WARNING: eventRepo is null, post will not appear in feed!');
+    }
 
     for (var i = 0; i < draft.contentHashes.length; i++) {
       if (i >= draft.mediaPaths.length) break;
@@ -44,6 +56,7 @@ class PostPublishService {
       );
     }
 
+    debugPrint('[PostPublish] Publish complete for ${published.id}');
     return published;
   }
 

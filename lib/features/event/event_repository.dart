@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:mobile/features/ebes/trust_service.dart';
 import 'package:mobile/features/nostr/nostr_models.dart';
 import 'package:mobile/features/nostr/nostr_service.dart';
@@ -235,7 +237,9 @@ class EventRepository {
 
   /// Adds a locally-created [MediaPost] to the cache immediately (optimistic update).
   void addPost(MediaPost post) {
+    debugPrint('[EventRepo] addPost called for ${post.id}, tags: ${post.eventTags}');
     final tag = post.eventTag ?? '_unsorted';
+    debugPrint('[EventRepo] Using tag bucket: $tag');
     _mergePost(tag, post);
   }
 
@@ -359,9 +363,11 @@ class EventRepository {
   }
 
   void _mergePost(String hashtag, MediaPost post) {
+    debugPrint('[EventRepo] _mergePost: hashtag=$hashtag, postId=${post.id}');
     final existing = _cache[hashtag];
 
     if (existing == null) {
+      debugPrint('[EventRepo] Creating new CivicEvent for $hashtag');
       _postCountByPubkey[post.pubkey] =
           (_postCountByPubkey[post.pubkey] ?? 0) + 1;
       final civic = CivicEvent(
@@ -375,6 +381,7 @@ class EventRepository {
       );
       _cache[hashtag] = _applyTrust(civic);
     } else {
+      debugPrint('[EventRepo] Merging into existing CivicEvent for $hashtag');
       final existingIndex = existing.posts.indexWhere((p) => p.id == post.id);
       late final List<MediaPost> updatedPosts;
 
@@ -418,7 +425,10 @@ class EventRepository {
     }
 
     if (!_controller.isClosed) {
+      debugPrint('[EventRepo] Emitting CivicEvent for $hashtag to stream');
       _controller.add(_cache[hashtag]!);
+    } else {
+      debugPrint('[EventRepo] WARNING: Controller is closed, cannot emit event!');
     }
   }
 
