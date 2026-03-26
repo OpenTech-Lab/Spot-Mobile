@@ -6,6 +6,23 @@ import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 
 void main() {
+  test(
+    'eventRootThreads excludes replies whose parents exist in the event',
+    () {
+      final roots = eventRootThreads([
+        _post(id: 'root-1', capturedAt: DateTime.utc(2026, 3, 26, 10)),
+        _post(
+          id: 'reply-1',
+          replyToId: 'event-root-1',
+          capturedAt: DateTime.utc(2026, 3, 26, 11),
+        ),
+        _post(id: 'root-2', capturedAt: DateTime.utc(2026, 3, 26, 12)),
+      ]);
+
+      expect(roots.map((post) => post.id), ['root-1', 'root-2']);
+    },
+  );
+
   test('eventLocationSpots returns every geo-tagged post as a map spot', () {
     final spots = eventLocationSpots([
       _post(id: 'a', latitude: 35.68, longitude: 139.76, spotName: 'Shibuya'),
@@ -62,21 +79,72 @@ void main() {
       expect(summary, contains('35.6850'));
     },
   );
+
+  test('buildEventTrendSnapshot marks activity as increasing', () {
+    final snapshot = buildEventTrendSnapshot(
+      CivicEvent(
+        hashtag: 'tokyo',
+        title: '#tokyo',
+        posts: [
+          _post(id: 'a', capturedAt: DateTime.utc(2026, 3, 26, 8)),
+          _post(id: 'b', capturedAt: DateTime.utc(2026, 3, 26, 9)),
+          _post(id: 'c', capturedAt: DateTime.utc(2026, 3, 26, 14)),
+          _post(id: 'd', capturedAt: DateTime.utc(2026, 3, 26, 15)),
+          _post(id: 'e', capturedAt: DateTime.utc(2026, 3, 26, 16)),
+        ],
+        firstSeen: DateTime.utc(2026, 3, 26, 8),
+        participantCount: 5,
+      ),
+    );
+
+    expect(snapshot.totalThreadCount, 5);
+    expect(snapshot.direction, EventTrendDirection.increasing);
+    expect(
+      snapshot.recentThreadCount,
+      greaterThan(snapshot.earlierThreadCount),
+    );
+  });
+
+  test('buildEventTrendSnapshot marks activity as decreasing', () {
+    final snapshot = buildEventTrendSnapshot(
+      CivicEvent(
+        hashtag: 'tokyo',
+        title: '#tokyo',
+        posts: [
+          _post(id: 'a', capturedAt: DateTime.utc(2026, 3, 26, 8)),
+          _post(id: 'b', capturedAt: DateTime.utc(2026, 3, 26, 9)),
+          _post(id: 'c', capturedAt: DateTime.utc(2026, 3, 26, 10)),
+          _post(id: 'd', capturedAt: DateTime.utc(2026, 3, 26, 15)),
+        ],
+        firstSeen: DateTime.utc(2026, 3, 26, 8),
+        participantCount: 4,
+      ),
+    );
+
+    expect(snapshot.direction, EventTrendDirection.decreasing);
+    expect(
+      snapshot.earlierThreadCount,
+      greaterThan(snapshot.recentThreadCount),
+    );
+  });
 }
 
 MediaPost _post({
   required String id,
+  DateTime? capturedAt,
   double? latitude,
   double? longitude,
   String? spotName,
+  String? replyToId,
 }) => MediaPost(
   id: id,
   pubkey: 'pubkey-$id',
   contentHashes: [id],
-  capturedAt: DateTime.utc(2026, 3, 26),
+  capturedAt: capturedAt ?? DateTime.utc(2026, 3, 26),
   latitude: latitude,
   longitude: longitude,
   spotName: spotName,
+  replyToId: replyToId,
   eventTags: const ['tokyo'],
   nostrEventId: 'event-$id',
 );

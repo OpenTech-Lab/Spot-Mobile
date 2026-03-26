@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui show Path;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -89,6 +90,213 @@ String eventLocationSummary(CivicEvent event) {
   return '${spots.length} spots · '
       '${event.centerLat!.toStringAsFixed(4)}, '
       '${event.centerLon!.toStringAsFixed(4)}';
+}
+
+enum EventTrendDirection { increasing, decreasing, steady }
+
+class EventTrendBucket {
+  const EventTrendBucket({
+    required this.start,
+    required this.end,
+    required this.threadCount,
+  });
+
+  final DateTime start;
+  final DateTime end;
+  final int threadCount;
+}
+
+class EventTrendSnapshot {
+  const EventTrendSnapshot({
+    required this.buckets,
+    required this.rangeStart,
+    required this.rangeEnd,
+    required this.totalThreadCount,
+    required this.earlierThreadCount,
+    required this.recentThreadCount,
+    required this.direction,
+  });
+
+  final List<EventTrendBucket> buckets;
+  final DateTime rangeStart;
+  final DateTime rangeEnd;
+  final int totalThreadCount;
+  final int earlierThreadCount;
+  final int recentThreadCount;
+  final EventTrendDirection direction;
+
+  int get maxBucketCount {
+    if (buckets.isEmpty) return 0;
+    return buckets.map((bucket) => bucket.threadCount).reduce(math.max);
+  }
+
+  String get directionLabel => switch (direction) {
+    EventTrendDirection.increasing => 'Increasing',
+    EventTrendDirection.decreasing => 'Decreasing',
+    EventTrendDirection.steady => 'Stable',
+  };
+
+  Color get directionColor => switch (direction) {
+    EventTrendDirection.increasing => SpotColors.success,
+    EventTrendDirection.decreasing => SpotColors.danger,
+    EventTrendDirection.steady => SpotColors.accent,
+  };
+
+  IconData get directionIcon => switch (direction) {
+    EventTrendDirection.increasing => CupertinoIcons.arrow_up_right,
+    EventTrendDirection.decreasing => CupertinoIcons.arrow_down_right,
+    EventTrendDirection.steady => CupertinoIcons.arrow_left_right,
+  };
+
+  String get summaryText {
+    if (totalThreadCount == 0) {
+      return 'No thread activity yet for this category.';
+    }
+    if (totalThreadCount == 1) {
+      return 'Only one thread so far. More activity will make the direction clearer.';
+    }
+
+    return switch (direction) {
+      EventTrendDirection.increasing =>
+        '$recentThreadCount recent threads vs $earlierThreadCount earlier. Activity is accelerating.',
+      EventTrendDirection.decreasing =>
+        '$recentThreadCount recent threads vs $earlierThreadCount earlier. Activity is cooling down.',
+      EventTrendDirection.steady =>
+        '$recentThreadCount recent threads vs $earlierThreadCount earlier. Activity is holding steady.',
+    };
+  }
+
+  String get startAxisLabel => _formatEventTrendAxisLabel(
+    rangeStart,
+    rangeStart: rangeStart,
+    rangeEnd: rangeEnd,
+  );
+
+  String get midAxisLabel => _formatEventTrendAxisLabel(
+    rangeStart.add(
+      Duration(
+        milliseconds: rangeEnd.difference(rangeStart).inMilliseconds ~/ 2,
+      ),
+    ),
+    rangeStart: rangeStart,
+    rangeEnd: rangeEnd,
+  );
+
+  String get endAxisLabel => _formatEventTrendAxisLabel(
+    rangeEnd,
+    rangeStart: rangeStart,
+    rangeEnd: rangeEnd,
+  );
+}
+
+List<MediaPost> eventRootThreads(Iterable<MediaPost> posts) {
+  final allPosts = posts.toList(growable: false);
+  final ids = allPosts.map((post) => post.nostrEventId).toSet();
+  final roots =
+      allPosts
+          .where(
+            (post) => post.replyToId == null || !ids.contains(post.replyToId),
+          )
+          .toList(growable: false)
+        ..sort((a, b) => a.capturedAt.compareTo(b.capturedAt));
+  return roots;
+}
+
+EventTrendSnapshot buildEventTrendSnapshot(
+  CivicEvent event, {
+  int bucketCount = 6,
+}) {
+  final roots = eventRootThreads(event.posts);
+  final effectiveBucketCount = math.max(4, bucketCount);
+
+  final rangeStart = roots.isEmpty ? event.firstSeen : roots.first.capturedAt;
+  var rangeEnd = roots.isEmpty ? event.firstSeen : roots.last.capturedAt;
+  if (!rangeEnd.isAfter(rangeStart)) {
+    rangeEnd = rangeStart.add(const Duration(hours: 1));
+  }
+
+  final totalRangeMs = math.max(
+    1,
+    rangeEnd.difference(rangeStart).inMilliseconds,
+  );
+  final bucketSpanMs = math.max(
+    1,
+    (totalRangeMs / effectiveBucketCount).ceil(),
+  );
+  final counts = List<int>.filled(effectiveBucketCount, 0);
+
+  for (final root in roots) {
+    final offsetMs = root.capturedAt.difference(rangeStart).inMilliseconds;
+    final index = math.min(
+      effectiveBucketCount - 1,
+      math.max(0, offsetMs ~/ bucketSpanMs),
+    );
+    counts[index] += 1;
+  }
+
+  final buckets = List<EventTrendBucket>.generate(effectiveBucketCount, (
+    index,
+  ) {
+    final start = rangeStart.add(Duration(milliseconds: index * bucketSpanMs));
+    final end = index == effectiveBucketCount - 1
+        ? rangeEnd
+        : rangeStart.add(Duration(milliseconds: (index + 1) * bucketSpanMs));
+    return EventTrendBucket(start: start, end: end, threadCount: counts[index]);
+  }, growable: false);
+
+  final splitIndex = effectiveBucketCount ~/ 2;
+  final earlierThreadCount = counts
+      .take(splitIndex)
+      .fold<int>(0, (sum, value) => sum + value);
+  final recentThreadCount = counts
+      .skip(splitIndex)
+      .fold<int>(0, (sum, value) => sum + value);
+
+  return EventTrendSnapshot(
+    buckets: buckets,
+    rangeStart: rangeStart,
+    rangeEnd: rangeEnd,
+    totalThreadCount: roots.length,
+    earlierThreadCount: earlierThreadCount,
+    recentThreadCount: recentThreadCount,
+    direction: _eventTrendDirection(
+      earlierThreadCount: earlierThreadCount,
+      recentThreadCount: recentThreadCount,
+    ),
+  );
+}
+
+EventTrendDirection _eventTrendDirection({
+  required int earlierThreadCount,
+  required int recentThreadCount,
+}) {
+  final delta = recentThreadCount - earlierThreadCount;
+  final baseline = math.max(earlierThreadCount, 1);
+  final changeRatio = delta / baseline;
+
+  if (delta >= 1 && changeRatio >= 0.25) {
+    return EventTrendDirection.increasing;
+  }
+  if (delta <= -1 && changeRatio <= -0.25) {
+    return EventTrendDirection.decreasing;
+  }
+  return EventTrendDirection.steady;
+}
+
+String _formatEventTrendAxisLabel(
+  DateTime value, {
+  required DateTime rangeStart,
+  required DateTime rangeEnd,
+}) {
+  final localValue = value.toLocal();
+  final range = rangeEnd.difference(rangeStart);
+  if (range <= const Duration(hours: 18)) {
+    return DateFormat.Hm().format(localValue);
+  }
+  if (range <= const Duration(days: 3)) {
+    return DateFormat('MMM d\nHH:mm').format(localValue);
+  }
+  return DateFormat('MMM d').format(localValue);
 }
 
 class EventScreen extends StatefulWidget {
@@ -195,6 +403,7 @@ class _EventScreenState extends State<EventScreen> {
           SliverToBoxAdapter(
             child: _WitnessSummary(event: _event, onWitness: _submitWitness),
           ),
+          SliverToBoxAdapter(child: _EventTrendPanel(event: _event)),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(
@@ -401,6 +610,244 @@ class _EventLocationMarker extends StatelessWidget {
       ),
     );
   }
+}
+
+class _EventTrendPanel extends StatelessWidget {
+  const _EventTrendPanel({required this.event});
+
+  final CivicEvent event;
+
+  @override
+  Widget build(BuildContext context) {
+    final trend = buildEventTrendSnapshot(event);
+    final yAxisMax = math.max(1, trend.maxBucketCount);
+    final yAxisMid = math.max(1, (yAxisMax / 2).ceil());
+
+    return Container(
+      margin: const EdgeInsets.symmetric(
+        horizontal: SpotSpacing.lg,
+        vertical: SpotSpacing.xs,
+      ),
+      padding: const EdgeInsets.all(SpotSpacing.lg),
+      decoration: SpotDecoration.cardBordered(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('THREAD TREND', style: SpotType.label),
+              const Spacer(),
+              _TrendDirectionBadge(trend: trend),
+            ],
+          ),
+          const SizedBox(height: SpotSpacing.sm),
+          const Text('Thread Activity', style: SpotType.body),
+          const SizedBox(height: SpotSpacing.xs),
+          Text(trend.summaryText, style: SpotType.bodySecondary),
+          const SizedBox(height: SpotSpacing.lg),
+          SizedBox(
+            height: 156,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  width: 28,
+                  child: _TrendYAxis(
+                    topLabel: yAxisMax.toString(),
+                    middleLabel: yAxisMid.toString(),
+                  ),
+                ),
+                const SizedBox(width: SpotSpacing.sm),
+                Expanded(
+                  child: CustomPaint(
+                    painter: _EventTrendChartPainter(trend: trend),
+                    child: const SizedBox.expand(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: SpotSpacing.sm),
+          Padding(
+            padding: const EdgeInsets.only(left: 36),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _TrendAxisLabel(
+                  label: trend.startAxisLabel,
+                  alignment: TextAlign.left,
+                ),
+                _TrendAxisLabel(
+                  label: trend.midAxisLabel,
+                  alignment: TextAlign.center,
+                ),
+                _TrendAxisLabel(
+                  label: trend.endAxisLabel,
+                  alignment: TextAlign.right,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrendDirectionBadge extends StatelessWidget {
+  const _TrendDirectionBadge({required this.trend});
+
+  final EventTrendSnapshot trend;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = trend.directionColor;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpotSpacing.sm,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(SpotRadius.full),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 0.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(trend.directionIcon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            trend.directionLabel,
+            style: SpotType.caption.copyWith(color: color),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrendYAxis extends StatelessWidget {
+  const _TrendYAxis({required this.topLabel, required this.middleLabel});
+
+  final String topLabel;
+  final String middleLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = SpotType.caption.copyWith(color: SpotColors.textSecondary);
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(topLabel, style: style),
+        Text(middleLabel, style: style),
+        Text('0', style: style),
+      ],
+    );
+  }
+}
+
+class _TrendAxisLabel extends StatelessWidget {
+  const _TrendAxisLabel({required this.label, required this.alignment});
+
+  final String label;
+  final TextAlign alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Text(
+        label,
+        textAlign: alignment,
+        style: SpotType.caption.copyWith(color: SpotColors.textSecondary),
+      ),
+    );
+  }
+}
+
+class _EventTrendChartPainter extends CustomPainter {
+  const _EventTrendChartPainter({required this.trend});
+
+  final EventTrendSnapshot trend;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final chartTop = 6.0;
+    final chartBottom = size.height - 8;
+    final chartHeight = chartBottom - chartTop;
+    final maxCount = math.max(1, trend.maxBucketCount);
+
+    final gridPaint = Paint()
+      ..color = SpotColors.border.withValues(alpha: 0.9)
+      ..strokeWidth = 0.5;
+    final baselinePaint = Paint()
+      ..color = SpotColors.border
+      ..strokeWidth = 1;
+
+    for (final fraction in [0.0, 0.5, 1.0]) {
+      final y = chartBottom - (chartHeight * fraction);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    final bucketCount = trend.buckets.length;
+    if (bucketCount == 0) return;
+
+    final gap = 6.0;
+    final barWidth = math.max(
+      8.0,
+      (size.width - ((bucketCount - 1) * gap)) / bucketCount,
+    );
+    final totalBarWidth = (barWidth * bucketCount) + ((bucketCount - 1) * gap);
+    final startX = math.max(0.0, (size.width - totalBarWidth) / 2);
+    final color = trend.directionColor;
+
+    final trendPath = ui.Path();
+    for (int index = 0; index < bucketCount; index++) {
+      final bucket = trend.buckets[index];
+      final ratio = bucket.threadCount / maxCount;
+      final barHeight = math.max(
+        bucket.threadCount > 0 ? 4.0 : 0.0,
+        chartHeight * ratio,
+      );
+      final x = startX + (index * (barWidth + gap));
+      final top = chartBottom - barHeight;
+
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(x, top, barWidth, barHeight),
+        const Radius.circular(4),
+      );
+      final barPaint = Paint()
+        ..color = color.withValues(
+          alpha: 0.35 + (0.45 * ((index + 1) / bucketCount)),
+        );
+      canvas.drawRRect(rect, barPaint);
+
+      final point = Offset(x + (barWidth / 2), top);
+      if (index == 0) {
+        trendPath.moveTo(point.dx, point.dy);
+      } else {
+        trendPath.lineTo(point.dx, point.dy);
+      }
+    }
+
+    canvas.drawLine(
+      Offset(0, chartBottom),
+      Offset(size.width, chartBottom),
+      baselinePaint,
+    );
+    canvas.drawPath(
+      trendPath,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _EventTrendChartPainter oldDelegate) =>
+      oldDelegate.trend != trend;
 }
 
 class _StatRow extends StatelessWidget {
