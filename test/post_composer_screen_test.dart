@@ -143,6 +143,45 @@ void main() {
       ScrollViewKeyboardDismissBehavior.onDrag,
     );
   });
+
+  testWidgets(
+    'category tag uses the trailing create button and still accepts enter',
+    (tester) async {
+      final wallet = _wallet();
+
+      await tester.pumpWidget(_ComposerHarness(wallet: wallet));
+
+      await tester.tap(find.text('Compose'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      final categoryField = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.hintText ==
+                'Category tag (e.g. AWSSummitTokyo2026)',
+      );
+
+      await tester.enterText(categoryField, 'tokyo,');
+      await tester.pump();
+
+      expect(find.text('#tokyo'), findsNothing);
+
+      await tester.tap(find.byIcon(CupertinoIcons.plus_circle_fill));
+      await tester.pump();
+
+      expect(find.text('#tokyo'), findsOneWidget);
+
+      await tester.tap(find.byIcon(CupertinoIcons.xmark_circle_fill));
+      await tester.pump();
+
+      await tester.enterText(categoryField, 'shibuya');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      expect(find.text('#shibuya'), findsOneWidget);
+    },
+  );
 }
 
 class _ComposerHarness extends StatelessWidget {

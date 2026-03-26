@@ -94,6 +94,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
     if (widget.replyToPost?.eventTag != null) {
       _tags.add(widget.replyToPost!.eventTag!);
     }
+    _tagInputCtrl.addListener(_onTagInputChanged);
     _captionFocus.addListener(() {
       if (mounted) setState(() {});
     });
@@ -103,6 +104,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
   @override
   void dispose() {
     _captionCtrl.dispose();
+    _tagInputCtrl.removeListener(_onTagInputChanged);
     _tagInputCtrl.dispose();
     _spotNameCtrl.dispose();
     _captionFocus.dispose();
@@ -115,7 +117,11 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
   }
 
   void _addTag(String raw) {
-    final tag = raw.trim().replaceAll('#', '').toLowerCase();
+    final tag = raw
+        .trim()
+        .replaceAll('#', '')
+        .replaceAll(',', '')
+        .toLowerCase();
     if (tag.isEmpty || _tags.contains(tag)) {
       _tagInputCtrl.clear();
       return;
@@ -126,7 +132,22 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
     });
   }
 
+  void _onTagInputChanged() {
+    if (mounted) setState(() {});
+  }
+
   void _removeTag(String tag) => setState(() => _tags.remove(tag));
+
+  bool get _canCreateCategoryTag => _tagInputCtrl.text
+      .trim()
+      .replaceAll('#', '')
+      .replaceAll(',', '')
+      .isNotEmpty;
+
+  void _createCategoryTag() {
+    if (!_canCreateCategoryTag) return;
+    _addTag(_tagInputCtrl.text);
+  }
 
   Future<void> _fetchGps() async {
     final lock = await (widget.gpsLoader ?? CameraService.instance.lockGPS)();
@@ -454,9 +475,27 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                           textInputAction: TextInputAction.done,
                           onTapOutside: (_) => _dismissKeyboard(),
                           onSubmitted: _addTag,
-                          onChanged: _onTagFieldChanged,
                         ),
                 ),
+                if (!hasCategory) ...[
+                  const SizedBox(width: SpotSpacing.xs),
+                  IconButton(
+                    onPressed: _canCreateCategoryTag
+                        ? _createCategoryTag
+                        : null,
+                    tooltip: 'Create category tag',
+                    splashRadius: 18,
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      CupertinoIcons.plus_circle_fill,
+                      size: 20,
+                      color: _canCreateCategoryTag
+                          ? SpotColors.accent
+                          : SpotColors.textTertiary,
+                    ),
+                    disabledColor: SpotColors.textTertiary,
+                  ),
+                ],
               ],
             ),
           ),
