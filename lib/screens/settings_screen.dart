@@ -145,7 +145,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: SpotSpacing.sm),
           _SettingsRow(
             icon: CupertinoIcons.person_crop_circle,
-            label: 'Identity',
+            label: 'Account',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => WalletScreen(wallet: widget.wallet),

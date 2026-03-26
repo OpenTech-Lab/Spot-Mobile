@@ -100,6 +100,17 @@ class UserPrefsService {
     await _save();
   }
 
+  Future<void> clearAll() async {
+    _data = {};
+    _loaded = true;
+    try {
+      final file = await _file();
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {}
+  }
+
   // ── Persistence ───────────────────────────────────────────────────────────
 
   Future<void> _save() async {

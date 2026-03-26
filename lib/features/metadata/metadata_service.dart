@@ -151,6 +151,18 @@ class MetadataService {
     return updatedProfile;
   }
 
+  Future<void> deleteCurrentAccount() async {
+    final user = client.auth.currentUser;
+    if (user == null) {
+      throw StateError(
+        'Missing Supabase session for account deletion. Restart the app and try again.',
+      );
+    }
+
+    await client.from('profiles').delete().eq('id', user.id);
+    await client.auth.signOut();
+  }
+
   Future<MediaPost> publishPost(MediaPost draft, WalletModel wallet) async {
     final normalizedDraft = draft.copyWith(
       eventTags: normalizeUniqueTags(draft.eventTags),
