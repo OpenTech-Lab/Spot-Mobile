@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
@@ -14,6 +15,7 @@ import 'package:mobile/screens/thread_screen.dart';
 import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/discover_feed_service.dart';
 import 'package:mobile/services/feed_scoring_service.dart';
+import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/services/location_service.dart';
 import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/media_resolver.dart';
@@ -29,6 +31,30 @@ import 'package:mobile/widgets/post_thread_row.dart';
 /// Shows algorithmically ranked and geo-filtered content.
 /// Moving discovery tabs here keeps the home feed focused on chronology.
 String normalizeDiscoverSearchQuery(String query) => query.trim().toLowerCase();
+
+String? discoverFollowableTagForQuery(String query) {
+  final normalizedQuery = normalizeDiscoverSearchQuery(query);
+  if (!normalizedQuery.startsWith('#')) return null;
+  final tag = normalizeTag(normalizedQuery.substring(1));
+  if (tag.isEmpty) return null;
+  return tag;
+}
+
+Route<void> buildDiscoverScreenRoute({
+  required WalletModel wallet,
+  String initialSearchQuery = '',
+}) {
+  return CupertinoPageRoute<void>(
+    builder: (_) => Scaffold(
+      backgroundColor: SpotColors.bg,
+      body: DiscoverScreen(
+        wallet: wallet,
+        initialSearchQuery: initialSearchQuery,
+        showBackButton: true,
+      ),
+    ),
+  );
+}
 
 bool discoverThreadPostMatchesQuery(MediaPost post, String query) {
   final normalizedQuery = normalizeDiscoverSearchQuery(query);
@@ -83,9 +109,16 @@ List<MediaPost> visibleDiscoverThreads(
 }
 
 class DiscoverScreen extends StatefulWidget {
-  const DiscoverScreen({super.key, required this.wallet});
+  const DiscoverScreen({
+    super.key,
+    required this.wallet,
+    this.initialSearchQuery = '',
+    this.showBackButton = false,
+  });
 
   final WalletModel wallet;
+  final String initialSearchQuery;
+  final bool showBackButton;
 
   @override
   State<DiscoverScreen> createState() => _DiscoverScreenState();
@@ -96,12 +129,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   late final TabController _tabController;
   late final EventRepository _repo;
   StreamSubscription<CivicEvent>? _sub;
+  StreamSubscription<void>? _followChangesSub;
   final TextEditingController _searchController = TextEditingController();
 
   List<MediaPost> _posts = [];
   bool _isLoading = true;
   final Set<String> _loadingMediaPostIds = {};
   String _searchQuery = '';
+  bool _isFollowingSearchTag = false;
 
   double? _userLat;
   double? _userLon;
@@ -114,8 +149,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_onTabChanged);
     _repo = EventRepository();
+    _searchQuery = widget.initialSearchQuery;
+    _searchController.text = widget.initialSearchQuery;
     _initFeed();
     _loadLocation();
+    unawaited(_initFollowState());
   }
 
   @override
@@ -123,6 +161,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _sub?.cancel();
+    _followChangesSub?.cancel();
     _repo.dispose();
     _searchController.dispose();
     super.dispose();
@@ -133,6 +172,56 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     if (_tabController.index == 2 && _userLat == null) {
       _loadLocation();
     }
+  }
+
+  Future<void> _initFollowState() async {
+    await FollowService.instance.init();
+    if (!mounted) return;
+    _followChangesSub = FollowService.instance.changes.listen((_) {
+      if (!mounted) return;
+      setState(() {
+        _isFollowingSearchTag =
+            _currentSearchTag != null &&
+            FollowService.instance.isFollowingTag(_currentSearchTag!);
+      });
+    });
+    setState(() {
+      _isFollowingSearchTag =
+          _currentSearchTag != null &&
+          FollowService.instance.isFollowingTag(_currentSearchTag!);
+    });
+  }
+
+  String? get _currentSearchTag => discoverFollowableTagForQuery(_searchQuery);
+
+  void _onSearchChanged(String value) {
+    setState(() {
+      _searchQuery = value;
+      _isFollowingSearchTag =
+          _currentSearchTag != null &&
+          FollowService.instance.isFollowingTag(_currentSearchTag!);
+    });
+  }
+
+  Future<void> _toggleFollowSearchTag() async {
+    final tag = _currentSearchTag;
+    if (tag == null) return;
+    if (_isFollowingSearchTag) {
+      await FollowService.instance.unfollowTag(tag);
+    } else {
+      await FollowService.instance.followTag(tag);
+    }
+    if (!mounted) return;
+    setState(() => _isFollowingSearchTag = !_isFollowingSearchTag);
+  }
+
+  void _openDiscoverTag(String tag) {
+    Navigator.of(context).push(
+      buildDiscoverScreenRoute(
+        wallet: widget.wallet,
+        initialSearchQuery: '#$tag',
+      ),
+    );
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -322,6 +411,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   }
 
   Widget _buildHeader() {
+    final currentSearchTag = _currentSearchTag;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         SpotSpacing.lg,
@@ -329,20 +419,60 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         SpotSpacing.lg,
         SpotSpacing.sm,
       ),
-      child: Row(
+      child: Column(
         children: [
-          const Text('Discover', style: SpotType.subheading),
-          const SizedBox(width: SpotSpacing.md),
-          Expanded(
-            child: CupertinoSearchTextField(
-              controller: _searchController,
-              placeholder: 'Search threads or #tags',
-              backgroundColor: SpotColors.surface,
-              itemColor: SpotColors.textSecondary,
-              style: SpotType.body.copyWith(color: SpotColors.textPrimary),
-              onChanged: (value) => setState(() => _searchQuery = value),
-            ),
+          Row(
+            children: [
+              if (widget.showBackButton) ...[
+                IconButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  icon: const Icon(CupertinoIcons.back, size: 20),
+                  color: SpotColors.textSecondary,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 28,
+                    height: 28,
+                  ),
+                ),
+                const SizedBox(width: SpotSpacing.sm),
+              ],
+              const Text('Discover', style: SpotType.subheading),
+              const SizedBox(width: SpotSpacing.md),
+              Expanded(
+                child: CupertinoSearchTextField(
+                  controller: _searchController,
+                  placeholder: 'Search threads or #tags',
+                  backgroundColor: SpotColors.surface,
+                  itemColor: SpotColors.textSecondary,
+                  style: SpotType.body.copyWith(color: SpotColors.textPrimary),
+                  onChanged: _onSearchChanged,
+                ),
+              ),
+            ],
           ),
+          if (currentSearchTag != null) ...[
+            const SizedBox(height: SpotSpacing.xs),
+            Row(
+              children: [
+                Text('#$currentSearchTag', style: SpotType.caption),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: _toggleFollowSearchTag,
+                  icon: Icon(
+                    _isFollowingSearchTag
+                        ? CupertinoIcons.star_fill
+                        : CupertinoIcons.add,
+                    size: 16,
+                  ),
+                  label: Text(
+                    _isFollowingSearchTag
+                        ? 'Remove Favorite'
+                        : 'Add as Favorite',
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -437,6 +567,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   isLast: true,
                   isMediaLoading: _loadingMediaPostIds.contains(post.id),
                   onAvatarTap: () => _openUserProfile(ctx, post.pubkey),
+                  onTagTap: _openDiscoverTag,
                   onReport: () => _reportPost(post),
                   onLike: () => _toggleLike(post),
                   onMediaUpdated: _hydrateMediaPost,

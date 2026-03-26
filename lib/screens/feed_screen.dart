@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/screens/discover_screen.dart';
 import 'package:mobile/screens/interests_screen.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/thread_screen.dart';
@@ -31,12 +33,18 @@ List<MediaPost> visibleFollowingPosts(
   required Set<String> followedPubkeys,
   required Set<String> followedTags,
 }) {
+  final normalizedFollowedTags = followedTags
+      .map(normalizeTag)
+      .where((tag) => tag.isNotEmpty)
+      .toSet();
   return posts
       .where(
         (post) =>
             post.pubkey != selfPubkey &&
             (followedPubkeys.contains(post.pubkey) ||
-                post.eventTags.any(followedTags.contains)),
+                post.eventTags
+                    .map(normalizeTag)
+                    .any(normalizedFollowedTags.contains)),
       )
       .toList(growable: false);
 }
@@ -279,6 +287,15 @@ class FeedScreenState extends State<FeedScreen>
     );
   }
 
+  void _openDiscoverTag(BuildContext ctx, String tag) {
+    Navigator.of(ctx).push(
+      buildDiscoverScreenRoute(
+        wallet: widget.wallet,
+        initialSearchQuery: '#$tag',
+      ),
+    );
+  }
+
   // ── Following filter ──────────────────────────────────────────────────────
 
   List<MediaPost> get _followingPosts {
@@ -322,6 +339,7 @@ class FeedScreenState extends State<FeedScreen>
                 onLike: _toggleLike,
                 onMediaUpdated: _hydrateMediaPost,
                 onAvatarTap: _openUserProfile,
+                onTagTap: _openDiscoverTag,
                 wallet: widget.wallet,
                 eventRepo: _repo,
               ),
@@ -335,6 +353,7 @@ class FeedScreenState extends State<FeedScreen>
                 onLike: _toggleLike,
                 onMediaUpdated: _hydrateMediaPost,
                 onAvatarTap: _openUserProfile,
+                onTagTap: _openDiscoverTag,
                 wallet: widget.wallet,
                 eventRepo: _repo,
               ),
@@ -378,6 +397,7 @@ class _LatestTab extends StatefulWidget {
     required this.onLike,
     required this.onMediaUpdated,
     required this.onAvatarTap,
+    required this.onTagTap,
     required this.wallet,
     required this.eventRepo,
   });
@@ -394,6 +414,7 @@ class _LatestTab extends StatefulWidget {
   final void Function(MediaPost) onLike;
   final void Function(MediaPost) onMediaUpdated;
   final void Function(BuildContext, String) onAvatarTap;
+  final void Function(BuildContext, String) onTagTap;
   final WalletModel wallet;
   final EventRepository eventRepo;
 
@@ -484,6 +505,7 @@ class _LatestTabState extends State<_LatestTab> {
                   isLast: true,
                   isMediaLoading: widget.loadingMediaPostIds.contains(post.id),
                   onAvatarTap: () => widget.onAvatarTap(ctx, post.pubkey),
+                  onTagTap: (tag) => widget.onTagTap(ctx, tag),
                   onReport: () => widget.onReport(post),
                   onLike: () => widget.onLike(post),
                   onMediaUpdated: widget.onMediaUpdated,
@@ -627,6 +649,7 @@ class _FollowingTab extends StatelessWidget {
     required this.onLike,
     required this.onMediaUpdated,
     required this.onAvatarTap,
+    required this.onTagTap,
     required this.wallet,
     required this.eventRepo,
   });
@@ -640,6 +663,7 @@ class _FollowingTab extends StatelessWidget {
   final void Function(MediaPost) onLike;
   final void Function(MediaPost) onMediaUpdated;
   final void Function(BuildContext, String) onAvatarTap;
+  final void Function(BuildContext, String) onTagTap;
   final WalletModel wallet;
   final EventRepository eventRepo;
 
@@ -741,6 +765,7 @@ class _FollowingTab extends StatelessWidget {
                   isLast: true,
                   isMediaLoading: loadingMediaPostIds.contains(post.id),
                   onAvatarTap: () => onAvatarTap(ctx, post.pubkey),
+                  onTagTap: (tag) => onTagTap(ctx, tag),
                   onReport: () => onReport(post),
                   onLike: () => onLike(post),
                   onMediaUpdated: onMediaUpdated,

@@ -4,6 +4,11 @@ import 'package:mobile/models/media_post.dart';
 import 'package:mobile/screens/discover_screen.dart';
 
 void main() {
+  test('discoverFollowableTagForQuery normalizes hash-prefixed tags', () {
+    expect(discoverFollowableTagForQuery('  #Test, '), 'test');
+    expect(discoverFollowableTagForQuery('test'), isNull);
+  });
+
   test('discover search matches keyword in caption', () {
     final posts = [
       _post(id: '1', caption: 'Fire near station'),

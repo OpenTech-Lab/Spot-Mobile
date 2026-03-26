@@ -9,6 +9,7 @@ import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/screens/discover_screen.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/local_post_store.dart';
@@ -107,6 +108,15 @@ class _ThreadScreenState extends State<ThreadScreen> {
       MaterialPageRoute(
         builder: (_) =>
             UserProfileScreen(pubkey: pubkey, wallet: widget.wallet),
+      ),
+    );
+  }
+
+  void _openDiscoverTag(BuildContext ctx, String tag) {
+    Navigator.of(ctx).push(
+      buildDiscoverScreenRoute(
+        wallet: widget.wallet,
+        initialSearchQuery: '#$tag',
       ),
     );
   }
@@ -254,6 +264,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
                   isLast: i == entries.length - 1,
                   isMediaLoading: _loadingMediaPostIds.contains(post.id),
                   onAvatarTap: () => _openUserProfile(ctx, post.pubkey),
+                  onTagTap: (tag) => _openDiscoverTag(ctx, tag),
                   onReport: () => _reportPost(post),
                   onLike: () => _toggleLike(post),
                   onMediaUpdated: _hydrateMediaPost,

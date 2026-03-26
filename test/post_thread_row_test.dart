@@ -126,6 +126,29 @@ void main() {
     expect(find.textContaining('#tokyo'), findsOneWidget);
   });
 
+  testWidgets('PostThreadRow calls onTagTap for the category tag', (
+    tester,
+  ) async {
+    String? tappedTag;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PostThreadRow(
+            post: _post(eventTags: const ['tokyo', 'news']),
+            isLast: true,
+            onTagTap: (tag) => tappedTag = tag,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('#tokyo'));
+    await tester.pump();
+
+    expect(tappedTag, 'tokyo');
+  });
+
   testWidgets(
     'PostThreadRow shows full spot location between body and actions',
     (tester) async {

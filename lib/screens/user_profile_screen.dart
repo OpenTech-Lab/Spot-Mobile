@@ -9,6 +9,7 @@ import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/profile_model.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/screens/discover_screen.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/thread_screen.dart';
 import 'package:mobile/services/follow_service.dart';
@@ -155,6 +156,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         );
       }
     } catch (_) {}
+  }
+
+  void _openDiscoverTag(BuildContext ctx, String tag) {
+    Navigator.of(ctx).push(
+      buildDiscoverScreenRoute(
+        wallet: widget.wallet,
+        initialSearchQuery: '#$tag',
+      ),
+    );
   }
 
   // ── User settings menu ────────────────────────────────────────────────────
@@ -370,6 +380,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     child: PostThreadRow(
                       post: post,
                       isLast: true,
+                      onTagTap: (tag) => _openDiscoverTag(ctx, tag),
                       onReport: () => _reportPost(post),
                       onLike: () => _toggleLike(post),
                       onMediaUpdated: _updateMediaPost,

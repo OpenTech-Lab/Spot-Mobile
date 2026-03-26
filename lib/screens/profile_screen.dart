@@ -14,6 +14,7 @@ import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/profile_model.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/screens/discover_screen.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/settings_screen.dart';
 import 'package:mobile/screens/thread_screen.dart';
@@ -268,6 +269,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _openSettings() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => SettingsScreen(wallet: widget.wallet)),
+    );
+  }
+
+  void _openDiscoverTag(BuildContext ctx, String tag) {
+    Navigator.of(ctx).push(
+      buildDiscoverScreenRoute(
+        wallet: widget.wallet,
+        initialSearchQuery: '#$tag',
+      ),
     );
   }
 
@@ -553,6 +563,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: PostThreadRow(
                       post: post,
                       isLast: true,
+                      onTagTap: (tag) => _openDiscoverTag(ctx, tag),
                       onMediaUpdated: _updateMediaPost,
                       onReply: post.isPendingRetry
                           ? null

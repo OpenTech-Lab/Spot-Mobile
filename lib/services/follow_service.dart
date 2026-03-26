@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:mobile/core/tag_normalizer.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// On-device follow/mute/block list (JSON file, never leaves the device).
@@ -16,6 +18,9 @@ class FollowService {
   Set<String> _blocked = {};
   Set<String> _followedTags = {};
   bool _loaded = false;
+  final _changes = StreamController<void>.broadcast();
+
+  Stream<void> get changes => _changes.stream;
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -29,7 +34,10 @@ class FollowService {
         _following = Set<String>.from(data['following'] as List? ?? []);
         _muted = Set<String>.from(data['muted'] as List? ?? []);
         _blocked = Set<String>.from(data['blocked'] as List? ?? []);
-        _followedTags = Set<String>.from(data['followedTags'] as List? ?? []);
+        _followedTags = (data['followedTags'] as List? ?? const [])
+            .map((tag) => normalizeTag(tag.toString()))
+            .where((tag) => tag.isNotEmpty)
+            .toSet();
       }
     } catch (_) {}
     _loaded = true;
@@ -40,21 +48,27 @@ class FollowService {
   bool isFollowing(String pubkey) => _following.contains(pubkey);
   bool isMuted(String pubkey) => _muted.contains(pubkey);
   bool isBlocked(String pubkey) => _blocked.contains(pubkey);
-  bool isFollowingTag(String tag) => _followedTags.contains(tag);
+  bool isFollowingTag(String tag) => _followedTags.contains(normalizeTag(tag));
 
   List<String> get following => _following.toList();
-  List<String> get followedTags => _followedTags.toList();
+  List<String> get followedTags => _followedTags.toList()..sort();
 
   // ── Follow tag ────────────────────────────────────────────────────────────
 
   Future<void> followTag(String tag) async {
-    _followedTags.add(tag);
+    final normalized = normalizeTag(tag);
+    if (normalized.isEmpty) return;
+    _followedTags.add(normalized);
     await _save();
+    _emitChange();
   }
 
   Future<void> unfollowTag(String tag) async {
-    _followedTags.remove(tag);
+    final normalized = normalizeTag(tag);
+    if (normalized.isEmpty) return;
+    _followedTags.remove(normalized);
     await _save();
+    _emitChange();
   }
 
   // ── Follow ────────────────────────────────────────────────────────────────
@@ -62,11 +76,13 @@ class FollowService {
   Future<void> follow(String pubkey) async {
     _following.add(pubkey);
     await _save();
+    _emitChange();
   }
 
   Future<void> unfollow(String pubkey) async {
     _following.remove(pubkey);
     await _save();
+    _emitChange();
   }
 
   // ── Mute ──────────────────────────────────────────────────────────────────
@@ -75,11 +91,13 @@ class FollowService {
     _muted.add(pubkey);
     _following.remove(pubkey); // implicit unfollow
     await _save();
+    _emitChange();
   }
 
   Future<void> unmute(String pubkey) async {
     _muted.remove(pubkey);
     await _save();
+    _emitChange();
   }
 
   // ── Block ─────────────────────────────────────────────────────────────────
@@ -89,12 +107,14 @@ class FollowService {
     _following.remove(pubkey); // implicit unfollow
     _muted.add(pubkey); // implicit mute
     await _save();
+    _emitChange();
   }
 
   Future<void> unblock(String pubkey) async {
     _blocked.remove(pubkey);
     _muted.remove(pubkey);
     await _save();
+    _emitChange();
   }
 
   Future<void> clearAll() async {
@@ -109,6 +129,7 @@ class FollowService {
         await file.delete();
       }
     } catch (_) {}
+    _emitChange();
   }
 
   // ── Persistence ───────────────────────────────────────────────────────────
@@ -130,5 +151,11 @@ class FollowService {
   Future<File> _file() async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/$_fileName');
+  }
+
+  void _emitChange() {
+    if (!_changes.isClosed) {
+      _changes.add(null);
+    }
   }
 }

@@ -7,6 +7,7 @@ import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/screens/discover_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/post_merge.dart';
@@ -107,6 +108,15 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
   void _updateMediaPost(MediaPost post) {
     setState(() => _posts = replacePostsById(_posts, [post]));
     unawaited(LocalPostStore.instance.savePost(post));
+  }
+
+  void _openDiscoverTag(BuildContext context, String tag) {
+    Navigator.of(context).push(
+      buildDiscoverScreenRoute(
+        wallet: widget.wallet,
+        initialSearchQuery: '#$tag',
+      ),
+    );
   }
 
   @override
@@ -226,6 +236,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
             itemBuilder: (ctx, i) => PostThreadRow(
               post: entries[i].post,
               isLast: isLastInThread(entries, i),
+              onTagTap: (tag) => _openDiscoverTag(ctx, tag),
               onLike: () => _toggleLike(entries[i].post),
               onMediaUpdated: _updateMediaPost,
             ),

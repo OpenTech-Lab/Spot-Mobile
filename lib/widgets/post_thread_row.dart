@@ -52,6 +52,7 @@ class PostThreadRow extends StatelessWidget {
     required this.post,
     required this.isLast,
     this.onAvatarTap,
+    this.onTagTap,
     this.onReply,
     this.onLike,
     this.onDelete,
@@ -65,6 +66,7 @@ class PostThreadRow extends StatelessWidget {
   final MediaPost post;
   final bool isLast;
   final VoidCallback? onAvatarTap;
+  final ValueChanged<String>? onTagTap;
   final VoidCallback? onReply;
   final VoidCallback? onLike;
   final VoidCallback? onDelete;
@@ -226,13 +228,19 @@ class PostThreadRow extends StatelessWidget {
                                   constraints: const BoxConstraints(
                                     maxWidth: 96,
                                   ),
-                                  child: Text(
-                                    '#$headerCategoryTag',
-                                    style: SpotType.caption.copyWith(
-                                      color: SpotColors.accent,
+                                  child: GestureDetector(
+                                    onTap: onTagTap == null
+                                        ? null
+                                        : () => onTagTap!(headerCategoryTag),
+                                    behavior: HitTestBehavior.opaque,
+                                    child: Text(
+                                      '#$headerCategoryTag',
+                                      style: SpotType.caption.copyWith(
+                                        color: SpotColors.accent,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               Text(
@@ -342,10 +350,14 @@ class PostThreadRow extends StatelessWidget {
                         spacing: SpotSpacing.sm,
                         children: [
                           for (final t in visibleTags)
-                            Text(
-                              '#$t',
-                              style: SpotType.body.copyWith(
-                                color: SpotColors.accent,
+                            GestureDetector(
+                              onTap: onTagTap == null ? null : () => onTagTap!(t),
+                              behavior: HitTestBehavior.opaque,
+                              child: Text(
+                                '#$t',
+                                style: SpotType.body.copyWith(
+                                  color: SpotColors.accent,
+                                ),
                               ),
                             ),
                         ],
