@@ -4,11 +4,22 @@ import 'package:flutter/material.dart';
 import 'package:mobile/models/asset_transport_policy.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/asset_transport_settings_screen.dart';
+import 'package:mobile/screens/interests_screen.dart';
 import 'package:mobile/screens/wallet_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
+
+String favoriteTopicsSummary(Iterable<String> topics) {
+  final unique = topics
+      .map((topic) => topic.trim())
+      .where((topic) => topic.isNotEmpty)
+      .toList(growable: false);
+  if (unique.isEmpty) return 'Not set';
+  if (unique.length <= 2) return unique.map((topic) => '#$topic').join(', ');
+  return '#${unique[0]}, #${unique[1]} +${unique.length - 2}';
+}
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.wallet});
@@ -22,10 +33,30 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   AssetTransportPolicy get _assetTransportPolicy =>
       UserPrefsService.instance.assetTransportPolicy;
+  String get _favoriteTopicsValue =>
+      favoriteTopicsSummary(UserPrefsService.instance.interests);
 
   Future<void> _openAssetTransportSettings() async {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const AssetTransportSettingsScreen()),
+    );
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _openFavoriteTopics() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => InterestsScreen(
+        onDone: () {
+          if (mounted) {
+            setState(() {});
+          }
+        },
+      ),
     );
     if (mounted) {
       setState(() {});
@@ -136,6 +167,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           vertical: SpotSpacing.lg,
         ),
         children: [
+          _SettingsRow(
+            icon: CupertinoIcons.star,
+            label: 'Favorite Topics',
+            value: _favoriteTopicsValue,
+            onTap: _openFavoriteTopics,
+          ),
+          const SizedBox(height: SpotSpacing.sm),
           _SettingsRow(
             icon: CupertinoIcons.wifi,
             label: 'Asset Transport',

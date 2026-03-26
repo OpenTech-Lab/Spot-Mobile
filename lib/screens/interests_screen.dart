@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
-/// Suggested hashtags shown during first-time interest selection.
+/// Suggested hashtags shown during interest selection.
 const _suggestedInterests = [
   'protest',
   'fire',
@@ -23,11 +23,11 @@ const _suggestedInterests = [
   'environment',
 ];
 
-/// Bottom-sheet modal for first-time interest hashtag selection.
+/// Bottom-sheet modal for choosing favorite topics/interests.
 ///
-/// Shown once from [FeedScreen] when [UserPrefsService.hasSetInterests] is
-/// false.  The user picks 3–10 topics; the choice is persisted and used by
-/// Scheme B (For You) and Nearby scoring.
+/// Used both from the one-time Home flow and from Settings so the user can
+/// revisit and update the same topic list later. The choice is persisted and
+/// used by the personalized discovery/feed ranking.
 class InterestsScreen extends StatefulWidget {
   const InterestsScreen({super.key, this.onDone});
 
@@ -92,7 +92,9 @@ class _InterestsScreenState extends State<InterestsScreen> {
     return Container(
       decoration: const BoxDecoration(
         color: SpotColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(SpotRadius.xl)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(SpotRadius.xl),
+        ),
       ),
       padding: EdgeInsets.only(
         left: SpotSpacing.lg,
@@ -118,7 +120,7 @@ class _InterestsScreenState extends State<InterestsScreen> {
             ),
             const SizedBox(height: SpotSpacing.xl),
 
-            const Text('Your Interests', style: SpotType.subheading),
+            const Text('Favorite Topics', style: SpotType.subheading),
             const SizedBox(height: SpotSpacing.xs),
             const Text(
               'Pick at least 3 topics to personalise your For You feed.',
@@ -146,9 +148,7 @@ class _InterestsScreenState extends State<InterestsScreen> {
                           : SpotColors.bg,
                       borderRadius: BorderRadius.circular(SpotRadius.full),
                       border: Border.all(
-                        color: active
-                            ? SpotColors.accent
-                            : SpotColors.border,
+                        color: active ? SpotColors.accent : SpotColors.border,
                         width: 0.5,
                       ),
                     ),
@@ -218,25 +218,33 @@ class _InterestsScreenState extends State<InterestsScreen> {
                 runSpacing: SpotSpacing.sm,
                 children: _selected
                     .where((t) => !_suggestedInterests.contains(t))
-                    .map((tag) => GestureDetector(
-                          onTap: () => _toggle(tag),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: SpotSpacing.md,
-                              vertical: SpotSpacing.xs,
-                            ),
-                            decoration: BoxDecoration(
-                              color: SpotColors.accent.withAlpha(40),
-                              borderRadius:
-                                  BorderRadius.circular(SpotRadius.full),
-                              border: Border.all(
-                                  color: SpotColors.accent, width: 0.5),
-                            ),
-                            child: Text('#$tag',
-                                style: SpotType.bodySecondary.copyWith(
-                                    color: SpotColors.accent)),
+                    .map(
+                      (tag) => GestureDetector(
+                        onTap: () => _toggle(tag),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: SpotSpacing.md,
+                            vertical: SpotSpacing.xs,
                           ),
-                        ))
+                          decoration: BoxDecoration(
+                            color: SpotColors.accent.withAlpha(40),
+                            borderRadius: BorderRadius.circular(
+                              SpotRadius.full,
+                            ),
+                            border: Border.all(
+                              color: SpotColors.accent,
+                              width: 0.5,
+                            ),
+                          ),
+                          child: Text(
+                            '#$tag',
+                            style: SpotType.bodySecondary.copyWith(
+                              color: SpotColors.accent,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
                     .toList(),
               ),
             ],
