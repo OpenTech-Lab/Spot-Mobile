@@ -12,7 +12,7 @@ import 'package:mobile/services/user_prefs_service.dart';
 
 /// CDN media service for accelerated media fetch and upload.
 ///
-/// Fetch path: GET https://<cloudfront>/‹sha256Hash›
+/// Fetch path: GET `https://<cloudfront>/<sha256Hash>`
 /// Upload path: POST presign-lambda → presigned S3 PUT URL → PUT file bytes
 ///
 /// All objects are keyed by their SHA-256 content hash, making the store
@@ -22,9 +22,9 @@ class CdnMediaService {
     HttpClient? httpClient,
     String? cdnBaseUrl,
     String? presignEndpoint,
-  })  : _httpClient = httpClient ?? HttpClient(),
-        _cdnBaseUrl = cdnBaseUrl ?? _defaultCdnBaseUrl,
-        _presignEndpoint = presignEndpoint ?? _defaultPresignEndpoint;
+  }) : _httpClient = httpClient ?? HttpClient(),
+       _cdnBaseUrl = cdnBaseUrl ?? _defaultCdnBaseUrl,
+       _presignEndpoint = presignEndpoint ?? _defaultPresignEndpoint;
 
   static final CdnMediaService instance = CdnMediaService._();
 
@@ -33,12 +33,11 @@ class CdnMediaService {
     HttpClient? httpClient,
     String? cdnBaseUrl,
     String? presignEndpoint,
-  }) =>
-      CdnMediaService._(
-        httpClient: httpClient,
-        cdnBaseUrl: cdnBaseUrl,
-        presignEndpoint: presignEndpoint,
-      );
+  }) => CdnMediaService._(
+    httpClient: httpClient,
+    cdnBaseUrl: cdnBaseUrl,
+    presignEndpoint: presignEndpoint,
+  );
 
   final HttpClient _httpClient;
   final String _cdnBaseUrl;
@@ -56,8 +55,9 @@ class CdnMediaService {
   static final String _defaultCdnBaseUrl = _compileCdnBaseUrl.isNotEmpty
       ? _compileCdnBaseUrl
       : 'https://d3ttkxcceqn0cp.cloudfront.net';
-  static const _defaultPresignEndpoint =
-      String.fromEnvironment('CDN_PRESIGN_URL');
+  static const _defaultPresignEndpoint = String.fromEnvironment(
+    'CDN_PRESIGN_URL',
+  );
 
   static const _fetchTimeout = Duration(seconds: 10);
   static const _presignTimeout = Duration(seconds: 15);
@@ -83,8 +83,12 @@ class CdnMediaService {
   ///
   /// Returns the local [File] on success (also cached via [CacheManager]),
   /// or null if the CDN does not have this content or the fetch fails.
-  Future<File?> fetchFromCdn(String contentHash) async {
-    if (!isEnabled) return null;
+  Future<File?> fetchFromCdn(
+    String contentHash, {
+    bool ignorePreference = false,
+  }) async {
+    final fetchAllowed = ignorePreference ? isConfigured : isEnabled;
+    if (!fetchAllowed) return null;
 
     try {
       final uri = Uri.parse('$_cdnBaseUrl/$contentHash');
@@ -117,9 +121,7 @@ class CdnMediaService {
 
       // Save to temp directory and register in cache
       final tempDir = await getTemporaryDirectory();
-      final file = File(
-        '${tempDir.path}/spot_cdn_media/$contentHash$ext',
-      );
+      final file = File('${tempDir.path}/spot_cdn_media/$contentHash$ext');
       await file.parent.create(recursive: true);
       await file.writeAsBytes(bytes);
 
@@ -161,9 +163,54 @@ class CdnMediaService {
     if (!isUploadEnabled) return;
 
     try {
+      await _uploadToCdn(
+        contentHash: contentHash,
+        filePath: filePath,
+        signPayload: signPayload,
+        contentType: contentType,
+        throwOnFailure: false,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> ensureUploadedToCdn({
+    required String contentHash,
+    required String filePath,
+    required Future<PresignAuth> Function(String message) signPayload,
+    String? contentType,
+  }) async {
+    if (_presignEndpoint.isEmpty) {
+      throw StateError('CDN upload is not configured for this build');
+    }
+    await _uploadToCdn(
+      contentHash: contentHash,
+      filePath: filePath,
+      signPayload: signPayload,
+      contentType: contentType,
+      throwOnFailure: true,
+    );
+  }
+
+  Future<void> _uploadToCdn({
+    required String contentHash,
+    required String filePath,
+    required Future<PresignAuth> Function(String message) signPayload,
+    required bool throwOnFailure,
+    String? contentType,
+  }) async {
+    if (_presignEndpoint.isEmpty) {
+      if (throwOnFailure) {
+        throw StateError('CDN upload is not configured for this build');
+      }
+      return;
+    }
+
+    try {
       final file = File(filePath);
       if (!file.existsSync()) {
-        debugPrint('[CDN] Upload aborted: file not found at $filePath');
+        final message = '[CDN] Upload aborted: file not found at $filePath';
+        debugPrint(message);
+        if (throwOnFailure) throw StateError(message);
         return;
       }
 
@@ -177,14 +224,15 @@ class CdnMediaService {
       debugPrint('[CDN] Requesting presigned URL for $contentHash...');
 
       // Request presigned URL
-      final timestamp =
-          (DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000).toString();
+      final timestamp = (DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000)
+          .toString();
       final message = 'PUT:$contentHash:$timestamp';
       final auth = await signPayload(message);
 
       final presignUri = Uri.parse(_presignEndpoint);
-      final presignRequest =
-          await _httpClient.postUrl(presignUri).timeout(_presignTimeout);
+      final presignRequest = await _httpClient
+          .postUrl(presignUri)
+          .timeout(_presignTimeout);
       presignRequest.headers.contentType = ContentType.json;
       presignRequest.write(
         jsonEncode({
@@ -195,14 +243,16 @@ class CdnMediaService {
           'contentType': resolvedContentType,
         }),
       );
-      final presignResponse =
-          await presignRequest.close().timeout(_presignTimeout);
+      final presignResponse = await presignRequest.close().timeout(
+        _presignTimeout,
+      );
 
       if (presignResponse.statusCode != 200) {
         final body = await _collectString(presignResponse);
-        debugPrint(
-          '[CDN] Presign request failed (${presignResponse.statusCode}): $body',
-        );
+        final message =
+            '[CDN] Presign request failed (${presignResponse.statusCode}): $body';
+        debugPrint(message);
+        if (throwOnFailure) throw StateError(message);
         return;
       }
 
@@ -210,7 +260,9 @@ class CdnMediaService {
       final presignJson = jsonDecode(presignBody) as Map<String, dynamic>;
       final uploadUrl = presignJson['uploadUrl'] as String?;
       if (uploadUrl == null) {
-        debugPrint('[CDN] Presign response missing uploadUrl');
+        const message = '[CDN] Presign response missing uploadUrl';
+        debugPrint(message);
+        if (throwOnFailure) throw StateError(message);
         return;
       }
 
@@ -218,7 +270,9 @@ class CdnMediaService {
 
       // PUT to S3 via presigned URL
       final putUri = Uri.parse(uploadUrl);
-      final putRequest = await _httpClient.putUrl(putUri).timeout(_uploadTimeout);
+      final putRequest = await _httpClient
+          .putUrl(putUri)
+          .timeout(_uploadTimeout);
       putRequest.headers.contentType = ContentType.parse(resolvedContentType);
       putRequest.contentLength = bytes.length;
       putRequest.add(bytes);
@@ -229,14 +283,18 @@ class CdnMediaService {
       if (putResponse.statusCode == 200 || putResponse.statusCode == 204) {
         debugPrint('[CDN] Successfully uploaded $contentHash');
       } else {
-        debugPrint(
-          '[CDN] S3 upload failed with status ${putResponse.statusCode}',
-        );
+        final message =
+            '[CDN] S3 upload failed with status ${putResponse.statusCode}';
+        debugPrint(message);
+        if (throwOnFailure) throw StateError(message);
       }
     } on TimeoutException {
-      debugPrint('[CDN] Upload timed out for $contentHash');
+      final message = '[CDN] Upload timed out for $contentHash';
+      debugPrint(message);
+      if (throwOnFailure) throw TimeoutException(message);
     } catch (e) {
       debugPrint('[CDN] Upload failed for $contentHash: $e');
+      if (throwOnFailure) rethrow;
     }
   }
 

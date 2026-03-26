@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/features/metadata/metadata_post_mapper.dart';
 import 'package:mobile/models/media_post.dart';
+import 'package:mobile/models/profile_model.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/models/witness_model.dart';
 
@@ -42,16 +43,24 @@ class MetadataService {
     if (user == null) {
       throw StateError('Unable to create a Supabase auth session');
     }
+    final existingProfile = await _fetchProfileById(user.id);
+    final displayName = existingProfile?.displayName?.trim().isNotEmpty == true
+        ? existingProfile!.displayName!.trim()
+        : _defaultDisplayNameForWallet(wallet);
+    final avatarSeed = existingProfile?.avatarSeed?.trim().isNotEmpty == true
+        ? existingProfile!.avatarSeed!.trim()
+        : wallet.publicKeyHex.substring(0, 12);
 
     debugPrint('[MetadataService] Syncing profile for ${user.id}');
     try {
       await client.from('profiles').upsert({
         'id': user.id,
-        'display_name': 'citizen-${wallet.publicKeyHex.substring(0, 8)}',
+        'display_name': displayName,
         'legacy_pubkey': wallet.publicKeyHex,
         'legacy_npub': wallet.npub,
         'device_id': wallet.deviceId,
-        'avatar_seed': wallet.publicKeyHex.substring(0, 12),
+        'avatar_seed': avatarSeed,
+        'avatar_content_hash': existingProfile?.avatarContentHash,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }, onConflict: 'id');
       debugPrint('[MetadataService] Profile sync complete for ${user.id}');
@@ -72,6 +81,74 @@ class MetadataService {
         '${error.hint != null ? ' hint=${error.hint}' : ''}',
       );
     }
+  }
+
+  Future<ProfileModel> fetchCurrentProfile(WalletModel wallet) async {
+    await syncLegacyProfile(wallet);
+    final user = client.auth.currentUser;
+    if (user == null) {
+      throw StateError('Missing Supabase user after profile sync');
+    }
+    final profile = await _fetchProfileById(user.id);
+    if (profile == null) {
+      throw StateError('Supabase profile row missing after sync');
+    }
+    return profile;
+  }
+
+  Future<ProfileModel?> fetchProfileByPubkey(String pubkey) async {
+    final authorIds = await resolveAuthorIds(pubkey);
+    if (authorIds.isEmpty) return null;
+
+    final rows = List<Map<String, dynamic>>.from(
+      await client
+          .from('profiles')
+          .select(
+            'id, display_name, legacy_pubkey, legacy_npub, device_id, '
+            'avatar_seed, avatar_content_hash',
+          )
+          .inFilter('id', authorIds)
+          .limit(1),
+    );
+    if (rows.isEmpty) return null;
+    return ProfileModel.fromRow(rows.first);
+  }
+
+  Future<ProfileModel> updateCurrentProfile({
+    required WalletModel wallet,
+    required String displayName,
+    String? avatarContentHash,
+  }) async {
+    await syncLegacyProfile(wallet);
+    final user = client.auth.currentUser;
+    if (user == null) {
+      throw StateError('Missing Supabase user after profile sync');
+    }
+
+    final normalizedDisplayName = displayName.trim().isNotEmpty
+        ? displayName.trim()
+        : _defaultDisplayNameForWallet(wallet);
+    final existingProfile = await _fetchProfileById(user.id);
+
+    await client.from('profiles').upsert({
+      'id': user.id,
+      'display_name': normalizedDisplayName,
+      'legacy_pubkey': wallet.publicKeyHex,
+      'legacy_npub': wallet.npub,
+      'device_id': wallet.deviceId,
+      'avatar_seed': existingProfile?.avatarSeed?.trim().isNotEmpty == true
+          ? existingProfile!.avatarSeed!.trim()
+          : wallet.publicKeyHex.substring(0, 12),
+      'avatar_content_hash':
+          avatarContentHash ?? existingProfile?.avatarContentHash,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'id');
+
+    final updatedProfile = await _fetchProfileById(user.id);
+    if (updatedProfile == null) {
+      throw StateError('Supabase profile row missing after update');
+    }
+    return updatedProfile;
   }
 
   Future<MediaPost> publishPost(MediaPost draft, WalletModel wallet) async {
@@ -411,7 +488,10 @@ class MetadataService {
     final rows = List<Map<String, dynamic>>.from(
       await client
           .from('profiles')
-          .select('id, legacy_pubkey, legacy_npub, display_name')
+          .select(
+            'id, legacy_pubkey, legacy_npub, display_name, avatar_seed, '
+            'avatar_content_hash',
+          )
           .inFilter('id', userIds),
     );
 
@@ -420,4 +500,22 @@ class MetadataService {
         if (row['id'] != null) row['id'].toString(): row,
     };
   }
+
+  Future<ProfileModel?> _fetchProfileById(String userId) async {
+    final rows = List<Map<String, dynamic>>.from(
+      await client
+          .from('profiles')
+          .select(
+            'id, display_name, legacy_pubkey, legacy_npub, device_id, '
+            'avatar_seed, avatar_content_hash',
+          )
+          .eq('id', userId)
+          .limit(1),
+    );
+    if (rows.isEmpty) return null;
+    return ProfileModel.fromRow(rows.first);
+  }
+
+  String _defaultDisplayNameForWallet(WalletModel wallet) =>
+      'citizen-${wallet.publicKeyHex.substring(0, 8)}';
 }

@@ -7,6 +7,7 @@ import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
+import 'package:mobile/models/profile_model.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/thread_screen.dart';
@@ -15,6 +16,7 @@ import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
+import 'package:mobile/widgets/profile_avatar.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
 /// Profile screen for any user other than the local account.
@@ -41,6 +43,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   List<MediaPost> _posts = [];
   bool _isLoading = true;
   bool _isFollowing = false;
+  ProfileModel? _profile;
 
   @override
   void initState() {
@@ -48,6 +51,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     _repo = EventRepository();
     _isFollowing = FollowService.instance.isFollowing(widget.pubkey);
     _initFeed();
+    _loadProfile();
   }
 
   @override
@@ -98,6 +102,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
     if (!mounted || persisted.isEmpty) return;
     setState(() => _posts = _mergePosts(_posts, persisted));
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await MetadataService.instance.fetchProfileByPubkey(
+        widget.pubkey,
+      );
+      if (!mounted) return;
+      setState(() => _profile = profile);
+    } catch (e) {
+      debugPrint('[UserProfileScreen] Failed to load profile: $e');
+    }
   }
 
   void _toggleLike(MediaPost post) {
@@ -275,7 +291,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
         backgroundColor: SpotColors.bg,
-        title: Text(_shortKey(widget.pubkey), style: SpotType.mono),
+        title: Text(
+          _profile?.displayName?.trim().isNotEmpty == true
+              ? _profile!.displayName!.trim()
+              : _shortKey(widget.pubkey),
+          style: _profile?.displayName?.trim().isNotEmpty == true
+              ? SpotType.subheading
+              : SpotType.mono,
+        ),
         actions: [
           IconButton(
             icon: const Icon(CupertinoIcons.ellipsis, size: 20),
@@ -298,6 +321,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 postCount: _posts.length,
                 isFollowing: _isFollowing,
                 onFollowTap: _toggleFollow,
+                profile: _profile,
               ),
             ),
             const SliverToBoxAdapter(child: Divider(height: 1, thickness: 0.5)),
@@ -377,12 +401,14 @@ class _UserProfileHeader extends StatelessWidget {
     required this.postCount,
     required this.isFollowing,
     required this.onFollowTap,
+    required this.profile,
   });
 
   final String pubkey;
   final int postCount;
   final bool isFollowing;
   final VoidCallback onFollowTap;
+  final ProfileModel? profile;
 
   @override
   Widget build(BuildContext context) {
@@ -399,7 +425,11 @@ class _UserProfileHeader extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _LargeAvatar(pubkeyHex: pubkey),
+              ProfileAvatar(
+                pubkey: pubkey,
+                avatarContentHash: profile?.avatarContentHash,
+                size: 72,
+              ),
               const Spacer(),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -413,6 +443,15 @@ class _UserProfileHeader extends StatelessWidget {
             ],
           ),
           const SizedBox(height: SpotSpacing.md),
+          Text(
+            profile?.displayName?.trim().isNotEmpty == true
+                ? profile!.displayName!.trim()
+                : _shortKey(pubkey),
+            style: profile?.displayName?.trim().isNotEmpty == true
+                ? SpotType.subheading
+                : SpotType.mono,
+          ),
+          const SizedBox(height: SpotSpacing.xs),
           Text(_shortKey(pubkey), style: SpotType.mono),
           const SizedBox(height: SpotSpacing.lg),
           SizedBox(
@@ -428,50 +467,6 @@ class _UserProfileHeader extends StatelessWidget {
                   ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ── Large avatar ──────────────────────────────────────────────────────────────
-
-class _LargeAvatar extends StatelessWidget {
-  const _LargeAvatar({required this.pubkeyHex});
-
-  final String pubkeyHex;
-
-  @override
-  Widget build(BuildContext context) {
-    final hex = pubkeyHex.length >= 6 ? pubkeyHex.substring(0, 6) : '888480';
-    final value = int.tryParse(hex, radix: 16) ?? 0x888480;
-    final r = (value >> 16) & 0xFF;
-    final g = (value >> 8) & 0xFF;
-    final b = value & 0xFF;
-    final accent = Color.fromARGB(
-      255,
-      r.clamp(80, 200),
-      g.clamp(80, 180),
-      b.clamp(60, 160),
-    );
-
-    return Container(
-      width: 72,
-      height: 72,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: SpotColors.surface,
-        border: Border.all(color: accent.withAlpha(120), width: 1),
-      ),
-      child: Center(
-        child: Text(
-          pubkeyHex.substring(0, 2).toUpperCase(),
-          style: TextStyle(
-            color: accent,
-            fontSize: 26,
-            fontWeight: FontWeight.w300,
-            fontFamily: 'monospace',
-          ),
-        ),
       ),
     );
   }

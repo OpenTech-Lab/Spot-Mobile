@@ -1,23 +1,31 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
+import 'package:mobile/core/encryption.dart';
+import 'package:mobile/core/wallet.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
+import 'package:mobile/models/profile_model.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/settings_screen.dart';
 import 'package:mobile/screens/thread_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
+import 'package:mobile/services/cdn_media_service.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/media_processing_service.dart';
 import 'package:mobile/services/post_publish_service.dart';
 import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
+import 'package:mobile/widgets/profile_avatar.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
 /// Profile screen — shows identity summary and the user's own posts.
@@ -44,6 +52,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
   String? _error;
   final Set<String> _retryingPostIds = {};
+  ProfileModel? _profile;
+  bool _isSavingProfile = false;
 
   @override
   void initState() {
@@ -68,6 +78,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _onLocalPostsChanged,
       );
       await _loadPersistedPosts();
+      await _loadProfile();
       _sub = _repo
           .subscribeToAuthorPosts(widget.wallet.publicKeyHex)
           .listen(_onEvent);
@@ -104,6 +115,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final visible = _visiblePersistedPosts(persisted);
     if (!mounted) return;
     setState(() => _posts = _mergePersistedPosts(visible));
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await MetadataService.instance.fetchCurrentProfile(
+        widget.wallet,
+      );
+      if (!mounted) return;
+      setState(() => _profile = profile);
+    } catch (e) {
+      debugPrint('[ProfileScreen] Failed to load profile: $e');
+    }
   }
 
   List<MediaPost> _mergePosts(
@@ -248,6 +271,182 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> _editProfile() async {
+    final nameController = TextEditingController(
+      text: _profile?.displayName ?? '',
+    );
+    final picker = ImagePicker();
+    XFile? selectedAvatar;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: SpotColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(SpotRadius.xl),
+        ),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: SpotSpacing.lg,
+                right: SpotSpacing.lg,
+                top: SpotSpacing.lg,
+                bottom:
+                    MediaQuery.of(sheetContext).viewInsets.bottom +
+                    SpotSpacing.xl,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Edit Profile', style: SpotType.subheading),
+                  const SizedBox(height: SpotSpacing.lg),
+                  Center(
+                    child: GestureDetector(
+                      onTap: _isSavingProfile
+                          ? null
+                          : () async {
+                              final picked = await picker.pickImage(
+                                source: ImageSource.gallery,
+                                imageQuality: 88,
+                                maxWidth: 1200,
+                                maxHeight: 1200,
+                              );
+                              if (picked == null) return;
+                              setSheetState(() => selectedAvatar = picked);
+                            },
+                      child: selectedAvatar != null
+                          ? Container(
+                              width: 84,
+                              height: 84,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                image: DecorationImage(
+                                  image: FileImage(File(selectedAvatar!.path)),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            )
+                          : ProfileAvatar(
+                              pubkey: widget.wallet.publicKeyHex,
+                              avatarContentHash: _profile?.avatarContentHash,
+                              size: 84,
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: SpotSpacing.sm),
+                  Center(
+                    child: Text(
+                      'Tap avatar to choose a new image',
+                      style: SpotType.caption,
+                    ),
+                  ),
+                  const SizedBox(height: SpotSpacing.lg),
+                  TextField(
+                    controller: nameController,
+                    enabled: !_isSavingProfile,
+                    maxLength: 32,
+                    decoration: const InputDecoration(
+                      labelText: 'Username',
+                      hintText: 'Citizen name',
+                    ),
+                  ),
+                  const SizedBox(height: SpotSpacing.lg),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _isSavingProfile
+                          ? null
+                          : () async {
+                              Navigator.of(sheetContext).pop();
+                              await _saveProfile(
+                                displayName: nameController.text,
+                                selectedAvatar: selectedAvatar,
+                              );
+                            },
+                      child: Text(
+                        _isSavingProfile ? 'Saving…' : 'Save Profile',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _saveProfile({
+    required String displayName,
+    XFile? selectedAvatar,
+  }) async {
+    setState(() => _isSavingProfile = true);
+    try {
+      String? avatarContentHash = _profile?.avatarContentHash;
+      if (selectedAvatar != null) {
+        final optimized = await MediaProcessingService.instance
+            .optimizeForUpload(File(selectedAvatar.path), isVideo: false);
+        final bytes = await optimized.readAsBytes();
+        avatarContentHash = EncryptionUtils.sha256BytesHex(
+          Uint8List.fromList(bytes),
+        );
+
+        await CacheManager.instance.addToCache(
+          avatarContentHash,
+          optimized.path,
+        );
+        await CdnMediaService.instance.ensureUploadedToCdn(
+          contentHash: avatarContentHash,
+          filePath: optimized.path,
+          contentType: _profileImageContentType(
+            optimized.path,
+            mimeType: selectedAvatar.mimeType,
+          ),
+          signPayload: (message) async => PresignAuth(
+            pubkey: widget.wallet.publicKeyHex,
+            signature: WalletService.signMessage(
+              message,
+              widget.wallet.privateKeyHex,
+            ),
+          ),
+        );
+      }
+
+      final updatedProfile = await MetadataService.instance
+          .updateCurrentProfile(
+            wallet: widget.wallet,
+            displayName: displayName,
+            avatarContentHash: avatarContentHash,
+          );
+      if (!mounted) return;
+      setState(() => _profile = updatedProfile);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Profile updated')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to update profile: $e')));
+    } finally {
+      if (mounted) setState(() => _isSavingProfile = false);
+    }
+  }
+
+  String _profileImageContentType(String path, {String? mimeType}) {
+    if (mimeType?.startsWith('image/') == true) return mimeType!;
+    final lower = path.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    return 'image/jpeg';
+  }
+
   @override
   Widget build(BuildContext context) {
     final roots = topLevelThreadPosts(_posts);
@@ -277,6 +476,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: _ProfileHeader(
                 wallet: widget.wallet,
                 postCount: _posts.length,
+                profile: _profile,
+                onEdit: _editProfile,
+                isSavingProfile: _isSavingProfile,
               ),
             ),
 
@@ -383,10 +585,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 // ── Profile header ─────────────────────────────────────────────────────────────
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.wallet, required this.postCount});
+  const _ProfileHeader({
+    required this.wallet,
+    required this.postCount,
+    required this.profile,
+    required this.onEdit,
+    required this.isSavingProfile,
+  });
 
   final WalletModel wallet;
   final int postCount;
+  final ProfileModel? profile;
+  final VoidCallback onEdit;
+  final bool isSavingProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -404,7 +615,14 @@ class _ProfileHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               // Avatar
-              _LargeAvatar(pubkeyHex: wallet.publicKeyHex),
+              GestureDetector(
+                onTap: isSavingProfile ? null : onEdit,
+                child: ProfileAvatar(
+                  pubkey: wallet.publicKeyHex,
+                  avatarContentHash: profile?.avatarContentHash,
+                  size: 72,
+                ),
+              ),
               const Spacer(),
               // Post count
               Column(
@@ -419,6 +637,13 @@ class _ProfileHeader extends StatelessWidget {
             ],
           ),
           const SizedBox(height: SpotSpacing.md),
+          Text(
+            profile?.displayName?.trim().isNotEmpty == true
+                ? profile!.displayName!.trim()
+                : 'citizen-${wallet.publicKeyHex.substring(0, 8)}',
+            style: SpotType.subheading,
+          ),
+          const SizedBox(height: SpotSpacing.xs),
           // npub
           GestureDetector(
             onTap: () {
@@ -448,51 +673,15 @@ class _ProfileHeader extends StatelessWidget {
                 : wallet.deviceId,
             style: SpotType.caption,
           ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Large avatar ───────────────────────────────────────────────────────────────
-
-class _LargeAvatar extends StatelessWidget {
-  const _LargeAvatar({required this.pubkeyHex});
-
-  final String pubkeyHex;
-
-  @override
-  Widget build(BuildContext context) {
-    final hex = pubkeyHex.length >= 6 ? pubkeyHex.substring(0, 6) : '888480';
-    final value = int.tryParse(hex, radix: 16) ?? 0x888480;
-    final r = ((value >> 16) & 0xFF);
-    final g = ((value >> 8) & 0xFF);
-    final b = (value & 0xFF);
-    final accent = Color.fromARGB(
-      255,
-      r.clamp(80, 200),
-      g.clamp(80, 180),
-      b.clamp(60, 160),
-    );
-
-    return Container(
-      width: 72,
-      height: 72,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: SpotColors.surface,
-        border: Border.all(color: accent.withAlpha(120), width: 1),
-      ),
-      child: Center(
-        child: Text(
-          pubkeyHex.substring(0, 2).toUpperCase(),
-          style: TextStyle(
-            color: accent,
-            fontSize: 26,
-            fontWeight: FontWeight.w300,
-            fontFamily: 'monospace',
+          const SizedBox(height: SpotSpacing.lg),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: isSavingProfile ? null : onEdit,
+              child: Text(isSavingProfile ? 'Saving…' : 'Edit Profile'),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
