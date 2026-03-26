@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'package:mobile/core/app_config.dart';
 import 'package:mobile/core/encryption.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/user_prefs_service.dart';
@@ -24,7 +25,7 @@ class CdnMediaService {
     String? presignEndpoint,
   }) : _httpClient = httpClient ?? HttpClient(),
        _cdnBaseUrl = cdnBaseUrl ?? _defaultCdnBaseUrl,
-       _presignEndpoint = presignEndpoint ?? _defaultPresignEndpoint;
+       _presignEndpoint = presignEndpoint ?? _resolvedPresignEndpoint;
 
   static final CdnMediaService instance = CdnMediaService._();
 
@@ -49,14 +50,21 @@ class CdnMediaService {
   ///     --dart-define=CDN_BASE_URL=https://d1234.cloudfront.net \
   ///     --dart-define=CDN_PRESIGN_URL=https://xyz.lambda-url.ap-northeast-1.on.aws
   ///
+  /// During local `flutter run`, the same keys may also be provided via `.env`.
+  ///
   /// For fetch (read-only), falls back to the production CloudFront domain when
   /// not provided — this is a public, unauthenticated endpoint.
   static const _compileCdnBaseUrl = String.fromEnvironment('CDN_BASE_URL');
-  static final String _defaultCdnBaseUrl = _compileCdnBaseUrl.isNotEmpty
-      ? _compileCdnBaseUrl
-      : 'https://d3ttkxcceqn0cp.cloudfront.net';
+  static final String _defaultCdnBaseUrl = resolveCdnBaseUrl(
+    compileValue: _compileCdnBaseUrl,
+    runtimeValue: AppConfig.cdnBaseUrl,
+  );
   static const _defaultPresignEndpoint = String.fromEnvironment(
     'CDN_PRESIGN_URL',
+  );
+  static final String _resolvedPresignEndpoint = resolvePresignEndpoint(
+    compileValue: _defaultPresignEndpoint,
+    runtimeValue: AppConfig.cdnPresignUrl,
   );
 
   static const _fetchTimeout = Duration(seconds: 10);
@@ -67,7 +75,7 @@ class CdnMediaService {
   /// Prevents OOM on mobile when downloading large videos.
   static const _maxFetchBytes = 100 * 1024 * 1024;
 
-  /// Whether the CDN endpoint is configured (build-time).
+  /// Whether the CDN endpoint is configured.
   bool get isConfigured => _cdnBaseUrl.isNotEmpty;
 
   /// Whether CDN fetch is enabled (configured + user preference).
@@ -76,6 +84,30 @@ class CdnMediaService {
   /// Whether CDN upload is enabled (configured + user preference).
   bool get isUploadEnabled =>
       _presignEndpoint.isNotEmpty && UserPrefsService.instance.cdnUploadEnabled;
+
+  @visibleForTesting
+  static String resolveCdnBaseUrl({
+    String? compileValue,
+    String? runtimeValue,
+  }) {
+    final runtime = runtimeValue?.trim();
+    if (runtime != null && runtime.isNotEmpty) return runtime;
+    final compile = compileValue?.trim();
+    if (compile != null && compile.isNotEmpty) return compile;
+    return 'https://d3ttkxcceqn0cp.cloudfront.net';
+  }
+
+  @visibleForTesting
+  static String resolvePresignEndpoint({
+    String? compileValue,
+    String? runtimeValue,
+  }) {
+    final runtime = runtimeValue?.trim();
+    if (runtime != null && runtime.isNotEmpty) return runtime;
+    final compile = compileValue?.trim();
+    if (compile != null && compile.isNotEmpty) return compile;
+    return '';
+  }
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
