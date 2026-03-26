@@ -2,7 +2,7 @@ name: mobile
 description: "Spot - Citizen Swarm: Decentralized SNS & Event Timeline Platform"
 publish_to: 'none'
 
-version: 0.4.1+35
+version: 0.5.0+36
 
 environment:
   sdk: ^3.11.0
@@ -32,6 +32,8 @@ dependencies:
   path: ^1.9.0
   video_player: ^2.9.2
   connectivity_plus: ^6.1.5
+  flutter_dotenv: ^5.1.0
+  supabase_flutter: ^2.0.0
 
 dev_dependencies:
   flutter_test:
@@ -53,6 +55,7 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   assets:
+    - .env
     - assets/icon.png
     - assets/logo_transparent.png
     - assets/geo/places.db
