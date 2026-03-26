@@ -26,10 +26,14 @@ Required env vars in vars.env:
   APPLE_API_ISSUER_ID
   IOS_TEAM_ID
   IOS_DISTRIBUTION_CERTIFICATE_PASSWORD
+  SUPABASE_URL
+  SUPABASE_ANON_KEY
 
 Optional env vars in vars.env:
   APPLE_API_KEY_ID
   IOS_KEYCHAIN_PASSWORD
+  CDN_BASE_URL
+  CDN_PRESIGN_URL
 
 Output files:
   testflight-secrets.env
@@ -203,6 +207,8 @@ load_env_file "$env_file"
 [[ -n "${APPLE_API_ISSUER_ID:-}" ]] || fail "APPLE_API_ISSUER_ID missing in $env_file"
 [[ -n "${IOS_TEAM_ID:-}" ]] || fail "IOS_TEAM_ID missing in $env_file"
 [[ -n "${IOS_DISTRIBUTION_CERTIFICATE_PASSWORD:-}" ]] || fail "IOS_DISTRIBUTION_CERTIFICATE_PASSWORD missing in $env_file"
+[[ -n "${SUPABASE_URL:-}" ]] || fail "SUPABASE_URL missing in $env_file"
+[[ -n "${SUPABASE_ANON_KEY:-}" ]] || fail "SUPABASE_ANON_KEY missing in $env_file"
 
 if [[ -z "$key_file" ]]; then
   key_file="$(find_single_file "$input_dir" "AuthKey_*.p8" "key")"
@@ -270,6 +276,15 @@ fi
   cat "$testflight_output"
   echo
   cat "$signing_output"
+  echo
+  printf 'SUPABASE_URL=%s\n' "$SUPABASE_URL"
+  printf 'SUPABASE_ANON_KEY=%s\n' "$SUPABASE_ANON_KEY"
+  if [[ -n "${CDN_BASE_URL:-}" ]]; then
+    printf 'CDN_BASE_URL=%s\n' "$CDN_BASE_URL"
+  fi
+  if [[ -n "${CDN_PRESIGN_URL:-}" ]]; then
+    printf 'CDN_PRESIGN_URL=%s\n' "$CDN_PRESIGN_URL"
+  fi
 } > "$combined_output"
 
 cat > "$apply_script" <<'EOF'

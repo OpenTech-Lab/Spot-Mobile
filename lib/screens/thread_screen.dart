@@ -5,7 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
-import 'package:mobile/features/nostr/nostr_service.dart';
+import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -23,7 +23,6 @@ Route<void> buildThreadScreenRoute({
   required String rootPostId,
   required List<MediaPost> initialPosts,
   required WalletModel wallet,
-  required NostrService nostrService,
   EventRepository? eventRepo,
   MediaFetcher? mediaFetcher,
   Future<List<MediaPost>> Function()? persistedPostsLoader,
@@ -33,7 +32,6 @@ Route<void> buildThreadScreenRoute({
       rootPostId: rootPostId,
       initialPosts: initialPosts,
       wallet: wallet,
-      nostrService: nostrService,
       eventRepo: eventRepo,
       mediaFetcher: mediaFetcher,
       persistedPostsLoader: persistedPostsLoader,
@@ -66,7 +64,6 @@ class ThreadScreen extends StatefulWidget {
     required this.rootPostId,
     required this.initialPosts,
     required this.wallet,
-    required this.nostrService,
     this.eventRepo,
     this.mediaFetcher,
     this.persistedPostsLoader,
@@ -75,7 +72,6 @@ class ThreadScreen extends StatefulWidget {
   final String rootPostId;
   final List<MediaPost> initialPosts;
   final WalletModel wallet;
-  final NostrService nostrService;
   final EventRepository? eventRepo;
   final MediaFetcher? mediaFetcher;
   final Future<List<MediaPost>> Function()? persistedPostsLoader;
@@ -109,19 +105,16 @@ class _ThreadScreenState extends State<ThreadScreen> {
     if (pubkey == widget.wallet.publicKeyHex) return;
     Navigator.of(ctx).push(
       MaterialPageRoute(
-        builder: (_) => UserProfileScreen(
-          pubkey: pubkey,
-          wallet: widget.wallet,
-          nostrService: widget.nostrService,
-        ),
+        builder: (_) =>
+            UserProfileScreen(pubkey: pubkey, wallet: widget.wallet),
       ),
     );
   }
 
   Future<void> _reportPost(MediaPost post) async {
     try {
-      await widget.nostrService.reportContent(
-        eventId: post.nostrEventId,
+      await MetadataService.instance.reportContent(
+        postId: post.nostrEventId,
         contentHash: post.contentHash,
         reason: 'harmful',
         wallet: widget.wallet,
@@ -267,7 +260,6 @@ class _ThreadScreenState extends State<ThreadScreen> {
                   onReply: () => showPostComposer(
                     ctx,
                     wallet: widget.wallet,
-                    nostrService: widget.nostrService,
                     eventRepo: widget.eventRepo,
                     replyToPost: post,
                     onPublished: _mergePost,

@@ -64,11 +64,11 @@ void main() {
             capturedAt: DateTime.utc(2026, 3, 24, 9, 0),
           ).copyWith(
             deliveryState: PostDeliveryState.failedToSend,
-            lastPublishError: 'No relay accepted',
+            lastPublishError: 'publish failed',
           );
       final sentPost = _post(
-        id: 'relay-event-id',
-        nostrEventId: 'relay-event-id',
+        id: 'published-event-id',
+        nostrEventId: 'published-event-id',
         capturedAt: DateTime.utc(2026, 3, 24, 9, 5),
       );
 
@@ -81,7 +81,7 @@ void main() {
       );
 
       expect(posts, hasLength(1));
-      expect(posts.single.id, 'relay-event-id');
+      expect(posts.single.id, 'published-event-id');
       expect(posts.single.deliveryState, PostDeliveryState.sent);
       expect(posts.single.lastPublishError, isNull);
     },

@@ -5,14 +5,13 @@ import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/event/event_screen.dart';
-import 'package:mobile/features/nostr/nostr_service.dart';
+import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/discover_screen.dart';
 import 'package:mobile/screens/feed_screen.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/profile_screen.dart';
-import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
 /// Main app shell with bottom navigation.
@@ -27,20 +26,17 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0;
-  late final NostrService _nostrService;
   late final EventRepository _eventRepo;
   final _feedKey = GlobalKey<FeedScreenState>();
 
   @override
   void initState() {
     super.initState();
-    _nostrService = NostrService();
-    _eventRepo = EventRepository(nostrService: _nostrService);
+    _eventRepo = EventRepository();
+    unawaited(MetadataService.instance.syncLegacyProfile(widget.wallet));
     P2PService.instance.configure(
-      nostrService: _nostrService,
       wallet: widget.wallet,
     );
-    _nostrService.connect();
     unawaited(P2PService.instance.refreshTransportAvailability());
   }
 
@@ -48,7 +44,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _eventRepo.dispose();
     unawaited(P2PService.instance.shutdown());
-    _nostrService.disconnect();
     super.dispose();
   }
 
@@ -56,19 +51,16 @@ class _HomeScreenState extends State<HomeScreen> {
   late final List<Widget> _tabs = [
     FeedScreen(
       key: _feedKey,
-      nostrService: _nostrService,
       wallet: widget.wallet,
       eventRepo: _eventRepo,
     ),
-    DiscoverScreen(nostrService: _nostrService, wallet: widget.wallet),
+    DiscoverScreen(wallet: widget.wallet),
     _EventsListTab(
       eventRepo: _eventRepo,
-      nostrService: _nostrService,
       wallet: widget.wallet,
     ),
     ProfileScreen(
       wallet: widget.wallet,
-      nostrService: _nostrService,
       eventRepo: _eventRepo,
     ),
   ];
@@ -77,7 +69,6 @@ class _HomeScreenState extends State<HomeScreen> {
     showPostComposer(
       context,
       wallet: widget.wallet,
-      nostrService: _nostrService,
       eventRepo: _eventRepo,
       onPublished: (post) {
         if (!mounted) return;
@@ -345,12 +336,10 @@ class _NavItemState extends State<_NavItem>
 class _EventsListTab extends StatelessWidget {
   const _EventsListTab({
     required this.eventRepo,
-    required this.nostrService,
     required this.wallet,
   });
 
   final EventRepository eventRepo;
-  final NostrService nostrService;
   final WalletModel wallet;
 
   @override
@@ -393,7 +382,6 @@ class _EventsListTab extends StatelessWidget {
             MaterialPageRoute(
               builder: (_) => EventScreen(
                 event: event,
-                nostrService: nostrService,
                 wallet: wallet,
               ),
             ),

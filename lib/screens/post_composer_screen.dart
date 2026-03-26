@@ -9,7 +9,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:mobile/core/encryption.dart';
 import 'package:mobile/core/wallet.dart';
 import 'package:mobile/features/event/event_repository.dart';
-import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/cache_manager.dart';
@@ -25,7 +24,6 @@ import 'package:mobile/widgets/post_thread_row.dart';
 Future<void> showPostComposer(
   BuildContext context, {
   required WalletModel wallet,
-  required NostrService nostrService,
   EventRepository? eventRepo,
   MediaPost? replyToPost,
   Future<GpsLock?> Function()? gpsLoader,
@@ -40,7 +38,6 @@ Future<void> showPostComposer(
     ),
     builder: (_) => PostComposerSheet(
       wallet: wallet,
-      nostrService: nostrService,
       eventRepo: eventRepo,
       replyToPost: replyToPost,
       gpsLoader: gpsLoader,
@@ -54,7 +51,6 @@ class PostComposerSheet extends StatefulWidget {
   const PostComposerSheet({
     super.key,
     required this.wallet,
-    required this.nostrService,
     this.eventRepo,
     this.replyToPost,
     this.gpsLoader,
@@ -62,7 +58,6 @@ class PostComposerSheet extends StatefulWidget {
   });
 
   final WalletModel wallet;
-  final NostrService nostrService;
   final EventRepository? eventRepo;
   final MediaPost? replyToPost;
   final Future<GpsLock?> Function()? gpsLoader;
@@ -324,7 +319,6 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
       final savedPost = await PostPublishService.instance.publishDraft(
         draft: post,
         wallet: widget.wallet,
-        nostrService: widget.nostrService,
         eventRepo: widget.eventRepo,
       );
       widget.onPublished?.call(savedPost);

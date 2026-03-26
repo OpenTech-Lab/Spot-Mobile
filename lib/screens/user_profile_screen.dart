@@ -4,7 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
-import 'package:mobile/features/nostr/nostr_service.dart';
+import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -25,12 +25,10 @@ class UserProfileScreen extends StatefulWidget {
     super.key,
     required this.pubkey,
     required this.wallet,
-    required this.nostrService,
   });
 
   final String pubkey;
   final WalletModel wallet;
-  final NostrService nostrService;
 
   @override
   State<UserProfileScreen> createState() => _UserProfileScreenState();
@@ -47,7 +45,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _repo = EventRepository(nostrService: widget.nostrService);
+    _repo = EventRepository();
     _isFollowing = FollowService.instance.isFollowing(widget.pubkey);
     _initFeed();
   }
@@ -65,7 +63,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     setState(() => _isLoading = true);
     try {
       await _loadPersistedPosts();
-      await widget.nostrService.connect();
       _sub = _repo.subscribeToAuthorPosts(widget.pubkey).listen(_onEvent);
     } catch (_) {
     } finally {
@@ -129,8 +126,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   Future<void> _reportPost(MediaPost post) async {
     try {
-      await widget.nostrService.reportContent(
-        eventId: post.nostrEventId,
+      await MetadataService.instance.reportContent(
+        postId: post.nostrEventId,
         contentHash: post.contentHash,
         reason: 'harmful',
         wallet: widget.wallet,
@@ -344,7 +341,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         rootPostId: post.nostrEventId,
                         initialPosts: _posts,
                         wallet: widget.wallet,
-                        nostrService: widget.nostrService,
                       ),
                     ),
                     child: PostThreadRow(
@@ -356,7 +352,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       onReply: () => showPostComposer(
                         ctx,
                         wallet: widget.wallet,
-                        nostrService: widget.nostrService,
                         replyToPost: post,
                         onPublished: (reply) {
                           if (!mounted) return;

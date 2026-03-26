@@ -4,7 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
-import 'package:mobile/features/nostr/nostr_service.dart';
+import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
@@ -28,13 +28,8 @@ import 'package:mobile/widgets/post_thread_row.dart';
 /// Shows algorithmically ranked and geo-filtered content.
 /// Moving discovery tabs here keeps the home feed focused on chronology.
 class DiscoverScreen extends StatefulWidget {
-  const DiscoverScreen({
-    super.key,
-    required this.nostrService,
-    required this.wallet,
-  });
+  const DiscoverScreen({super.key, required this.wallet});
 
-  final NostrService nostrService;
   final WalletModel wallet;
 
   @override
@@ -61,7 +56,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_onTabChanged);
-    _repo = EventRepository(nostrService: widget.nostrService);
+    _repo = EventRepository();
     _initFeed();
     _loadLocation();
   }
@@ -90,7 +85,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     });
     try {
       await _loadPersistedPosts();
-      await widget.nostrService.connect();
       _sub = _repo.subscribeToEvents().listen(_onEvent);
     } catch (_) {
     } finally {
@@ -156,7 +150,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       await P2PService.instance.startSwarm();
       final sync = MediaSyncService(fetchMedia: MediaResolver.instance.resolve);
       final hydrated = await sync.hydratePost(post);
-      
+
       if (!mounted) return;
       _updateMediaPost(hydrated);
     } catch (_) {
@@ -170,8 +164,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   Future<void> _reportPost(MediaPost post) async {
     try {
-      await widget.nostrService.reportContent(
-        eventId: post.nostrEventId,
+      await MetadataService.instance.reportContent(
+        postId: post.nostrEventId,
         contentHash: post.contentHash,
         reason: 'harmful',
         wallet: widget.wallet,
@@ -189,11 +183,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     if (pubkey == widget.wallet.publicKeyHex) return;
     Navigator.of(ctx).push(
       MaterialPageRoute(
-        builder: (_) => UserProfileScreen(
-          pubkey: pubkey,
-          wallet: widget.wallet,
-          nostrService: widget.nostrService,
-        ),
+        builder: (_) =>
+            UserProfileScreen(pubkey: pubkey, wallet: widget.wallet),
       ),
     );
   }
@@ -363,7 +354,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                     rootPostId: post.nostrEventId,
                     initialPosts: _posts,
                     wallet: widget.wallet,
-                    nostrService: widget.nostrService,
                     eventRepo: _repo,
                   ),
                 ),
@@ -378,7 +368,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   onReply: () => showPostComposer(
                     ctx,
                     wallet: widget.wallet,
-                    nostrService: widget.nostrService,
                     eventRepo: _repo,
                     replyToPost: post,
                   ),

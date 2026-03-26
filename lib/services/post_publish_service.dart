@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
-import 'package:mobile/features/nostr/nostr_service.dart';
+import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -16,26 +16,21 @@ class PostPublishService {
   Future<MediaPost> publishDraft({
     required MediaPost draft,
     required WalletModel wallet,
-    required NostrService nostrService,
     EventRepository? eventRepo,
     String? replaceLocalPostId,
   }) async {
     debugPrint('[PostPublish] Starting publish for ${draft.id}');
-    debugPrint('[PostPublish] eventRepo is ${eventRepo == null ? "NULL" : "present"}');
-    
-    final signed = await nostrService.publishMediaPost(draft, wallet);
-    final published = draft.copyWith(
-      id: signed.id,
-      nostrEventId: signed.id,
-      contentHashes: draft.isTextOnly ? [signed.id] : draft.contentHashes,
-      capturedAt: DateTime.fromMillisecondsSinceEpoch(signed.createdAt * 1000),
-      deliveryState: PostDeliveryState.sent,
-      lastPublishError: null,
+    debugPrint(
+      '[PostPublish] eventRepo is ${eventRepo == null ? "NULL" : "present"}',
     );
+
+    final published = await MetadataService.instance.publishPost(draft, wallet);
 
     if (replaceLocalPostId != null) {
       await LocalPostStore.instance.replacePost(replaceLocalPostId, published);
-      debugPrint('[PostPublish] Replaced local post $replaceLocalPostId with ${published.id}');
+      debugPrint(
+        '[PostPublish] Replaced local post $replaceLocalPostId with ${published.id}',
+      );
     } else {
       await LocalPostStore.instance.savePost(published);
       debugPrint('[PostPublish] Saved to LocalPostStore: ${published.id}');
@@ -43,9 +38,13 @@ class PostPublishService {
 
     if (eventRepo != null) {
       eventRepo.addPost(published);
-      debugPrint('[PostPublish] Added to EventRepository: ${published.id}, tags: ${published.eventTags}');
+      debugPrint(
+        '[PostPublish] Added to EventRepository: ${published.id}, tags: ${published.eventTags}',
+      );
     } else {
-      debugPrint('[PostPublish] WARNING: eventRepo is null, post will not appear in feed!');
+      debugPrint(
+        '[PostPublish] WARNING: eventRepo is null, post will not appear in feed!',
+      );
     }
 
     for (var i = 0; i < draft.contentHashes.length; i++) {

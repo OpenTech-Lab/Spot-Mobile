@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import 'package:mobile/features/nostr/nostr_service.dart';
+import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -11,16 +11,10 @@ import 'package:mobile/theme/spot_theme.dart';
 
 /// Event detail — wiki-like timeline for a [CivicEvent] with EBES trust data.
 class EventScreen extends StatefulWidget {
-  const EventScreen({
-    super.key,
-    required this.event,
-    this.nostrService,
-    this.wallet,
-  });
+  const EventScreen({super.key, required this.event, required this.wallet});
 
   final CivicEvent event;
-  final NostrService? nostrService;
-  final WalletModel? wallet;
+  final WalletModel wallet;
 
   @override
   State<EventScreen> createState() => _EventScreenState();
@@ -41,8 +35,7 @@ class _EventScreenState extends State<EventScreen> {
     await FollowService.instance.init();
     if (mounted) {
       setState(() {
-        _isFollowingTag =
-            FollowService.instance.isFollowingTag(_event.hashtag);
+        _isFollowingTag = FollowService.instance.isFollowingTag(_event.hashtag);
       });
     }
   }
@@ -57,17 +50,16 @@ class _EventScreenState extends State<EventScreen> {
   }
 
   Future<void> _submitWitness(String type) async {
-    if (widget.nostrService == null || widget.wallet == null) return;
     try {
-      await widget.nostrService!.publishWitness(
+      await MetadataService.instance.publishWitness(
         hashtag: _event.hashtag,
         witnessType: type,
-        wallet: widget.wallet!,
+        wallet: widget.wallet,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Signal "$type" sent.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Signal "$type" sent.')));
       }
     } catch (_) {}
   }
@@ -120,12 +112,7 @@ class _EventScreenState extends State<EventScreen> {
         slivers: [
           SliverToBoxAdapter(child: _EventHeader(event: _event)),
           SliverToBoxAdapter(
-            child: _WitnessSummary(
-              event: _event,
-              onWitness: widget.nostrService != null && widget.wallet != null
-                  ? _submitWitness
-                  : null,
-            ),
+            child: _WitnessSummary(event: _event, onWitness: _submitWitness),
           ),
           SliverToBoxAdapter(
             child: Padding(
@@ -141,8 +128,7 @@ class _EventScreenState extends State<EventScreen> {
           posts.isEmpty
               ? const SliverFillRemaining(
                   child: Center(
-                    child:
-                        Text('No posts yet', style: SpotType.bodySecondary),
+                    child: Text('No posts yet', style: SpotType.bodySecondary),
                   ),
                 )
               : _ThreadSliver(posts: posts),
@@ -177,20 +163,24 @@ class _EventHeader extends StatelessWidget {
           ),
           const SizedBox(height: SpotSpacing.lg),
 
-          _StatRow(label: 'First seen',     value: df.format(event.firstSeen.toLocal())),
-          const SizedBox(height: SpotSpacing.xs),
-          _StatRow(label: 'Participants',   value: event.participantCount.toString()),
+          _StatRow(
+            label: 'First seen',
+            value: df.format(event.firstSeen.toLocal()),
+          ),
           const SizedBox(height: SpotSpacing.xs),
           _StatRow(
-            label: 'Confidence',
-            value: '${event.trustPercent}%',
+            label: 'Participants',
+            value: event.participantCount.toString(),
           ),
+          const SizedBox(height: SpotSpacing.xs),
+          _StatRow(label: 'Confidence', value: '${event.trustPercent}%'),
 
           if (event.centerLat != null) ...[
             const SizedBox(height: SpotSpacing.xs),
             _StatRow(
               label: 'Location',
-              value: '${event.centerLat!.toStringAsFixed(4)}, '
+              value:
+                  '${event.centerLat!.toStringAsFixed(4)}, '
                   '${event.centerLon!.toStringAsFixed(4)}',
             ),
           ] else ...[
@@ -213,8 +203,11 @@ class _EventHeader extends StatelessWidget {
                   ? Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(CupertinoIcons.location,
-                            color: SpotColors.textTertiary, size: 20),
+                        const Icon(
+                          CupertinoIcons.location,
+                          color: SpotColors.textTertiary,
+                          size: 20,
+                        ),
                         const SizedBox(height: SpotSpacing.xs),
                         Text(
                           '${event.centerLat!.toStringAsFixed(4)}, '
@@ -241,12 +234,13 @@ class _StatRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        SizedBox(
-          width: 90,
-          child: Text(label, style: SpotType.label),
-        ),
+        SizedBox(width: 90, child: Text(label, style: SpotType.label)),
         Expanded(
-          child: Text(value, style: SpotType.bodySecondary, overflow: TextOverflow.ellipsis),
+          child: Text(
+            value,
+            style: SpotType.bodySecondary,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );
@@ -261,20 +255,18 @@ class _ThreadSliver extends StatelessWidget {
   final List<MediaPost> posts;
 
   /// Returns posts in depth-first order with their nesting depth.
-  static List<({MediaPost post, int depth})> _flatten(
-      List<MediaPost> all) {
+  static List<({MediaPost post, int depth})> _flatten(List<MediaPost> all) {
     final ids = {for (final p in all) p.nostrEventId};
-    final roots = all
-        .where((p) => p.replyToId == null || !ids.contains(p.replyToId))
-        .toList()
-      ..sort((a, b) => a.capturedAt.compareTo(b.capturedAt));
+    final roots =
+        all
+            .where((p) => p.replyToId == null || !ids.contains(p.replyToId))
+            .toList()
+          ..sort((a, b) => a.capturedAt.compareTo(b.capturedAt));
 
     final out = <({MediaPost post, int depth})>[];
     void visit(MediaPost p, int depth) {
       out.add((post: p, depth: depth));
-      final replies = all
-          .where((r) => r.replyToId == p.nostrEventId)
-          .toList()
+      final replies = all.where((r) => r.replyToId == p.nostrEventId).toList()
         ..sort((a, b) => a.capturedAt.compareTo(b.capturedAt));
       for (final r in replies) {
         visit(r, depth + 1);
@@ -291,13 +283,10 @@ class _ThreadSliver extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = _flatten(posts);
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (ctx, i) {
-          final (:post, :depth) = items[i];
-          return _ThreadPostCard(post: post, depth: depth);
-        },
-        childCount: items.length,
-      ),
+      delegate: SliverChildBuilderDelegate((ctx, i) {
+        final (:post, :depth) = items[i];
+        return _ThreadPostCard(post: post, depth: depth);
+      }, childCount: items.length),
     );
   }
 }
@@ -374,8 +363,11 @@ class _ThreadPostCard extends StatelessWidget {
                   if (depth > 0)
                     Row(
                       children: [
-                        const Icon(CupertinoIcons.arrow_turn_up_left,
-                            size: 10, color: SpotColors.textTertiary),
+                        const Icon(
+                          CupertinoIcons.arrow_turn_up_left,
+                          size: 10,
+                          color: SpotColors.textTertiary,
+                        ),
                         const SizedBox(width: 3),
                         Text('reply', style: SpotType.caption),
                       ],
@@ -384,21 +376,26 @@ class _ThreadPostCard extends StatelessWidget {
                     Container(
                       margin: const EdgeInsets.only(bottom: 3),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 5, vertical: 2),
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: SpotColors.dangerSubtle,
                         borderRadius: BorderRadius.circular(SpotRadius.xs),
                       ),
                       child: Text(
                         'Protected',
-                        style:
-                            SpotType.label.copyWith(color: SpotColors.danger),
+                        style: SpotType.label.copyWith(
+                          color: SpotColors.danger,
+                        ),
                       ),
                     ),
                   Text(shortKey, style: SpotType.mono),
                   const SizedBox(height: 2),
-                  Text(df.format(post.capturedAt.toLocal()),
-                      style: SpotType.caption),
+                  Text(
+                    df.format(post.capturedAt.toLocal()),
+                    style: SpotType.caption,
+                  ),
                   if (post.caption != null) ...[
                     const SizedBox(height: 3),
                     Text(
@@ -412,8 +409,11 @@ class _ThreadPostCard extends StatelessWidget {
               ),
             ),
           ),
-          const Icon(CupertinoIcons.chevron_right,
-              color: SpotColors.overlay, size: 14),
+          const Icon(
+            CupertinoIcons.chevron_right,
+            color: SpotColors.overlay,
+            size: 14,
+          ),
           const SizedBox(width: SpotSpacing.xs),
         ],
       ),
@@ -491,19 +491,22 @@ class _WitnessSummary extends StatelessWidget {
           Row(
             children: [
               _WitnessCount(
-                  label: 'Seen',
-                  count: event.seenCount,
-                  color: SpotColors.textSecondary),
+                label: 'Seen',
+                count: event.seenCount,
+                color: SpotColors.textSecondary,
+              ),
               const SizedBox(width: SpotSpacing.md),
               _WitnessCount(
-                  label: 'Confirm',
-                  count: event.confirmCount,
-                  color: SpotColors.success),
+                label: 'Confirm',
+                count: event.confirmCount,
+                color: SpotColors.success,
+              ),
               const SizedBox(width: SpotSpacing.md),
               _WitnessCount(
-                  label: 'Deny',
-                  count: event.denyCount,
-                  color: SpotColors.danger),
+                label: 'Deny',
+                count: event.denyCount,
+                color: SpotColors.danger,
+              ),
             ],
           ),
           if (onWitness != null) ...[
@@ -554,14 +557,11 @@ class _WitnessCount extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        children: [
-          Text(
-            count.toString(),
-            style: SpotType.subheading.copyWith(color: color),
-          ),
-          Text(label, style: SpotType.caption),
-        ],
-      );
+    children: [
+      Text(count.toString(), style: SpotType.subheading.copyWith(color: color)),
+      Text(label, style: SpotType.caption),
+    ],
+  );
 }
 
 class _WitnessButton extends StatelessWidget {
@@ -579,24 +579,23 @@ class _WitnessButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Expanded(
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: SpotSpacing.sm),
-            decoration: BoxDecoration(
-              color: color.withAlpha(20),
-              borderRadius: BorderRadius.circular(SpotRadius.sm),
-              border: Border.all(color: color.withAlpha(60), width: 0.5),
-            ),
-            child: Column(
-              children: [
-                Icon(icon, color: color, size: 16),
-                const SizedBox(height: 3),
-                Text(label,
-                    style: SpotType.caption.copyWith(color: color)),
-              ],
-            ),
-          ),
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: SpotSpacing.sm),
+        decoration: BoxDecoration(
+          color: color.withAlpha(20),
+          borderRadius: BorderRadius.circular(SpotRadius.sm),
+          border: Border.all(color: color.withAlpha(60), width: 0.5),
         ),
-      );
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 16),
+            const SizedBox(height: 3),
+            Text(label, style: SpotType.caption.copyWith(color: color)),
+          ],
+        ),
+      ),
+    ),
+  );
 }

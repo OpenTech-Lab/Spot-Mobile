@@ -2,7 +2,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
@@ -23,7 +22,6 @@ void main() {
                 showPostComposer(
                   context,
                   wallet: wallet,
-                  nostrService: NostrService(relayUrls: const []),
                   replyToPost: replyTarget,
                   gpsLoader: () async => null,
                 );
@@ -162,7 +160,6 @@ class _ComposerHarness extends StatelessWidget {
               showPostComposer(
                 context,
                 wallet: wallet,
-                nostrService: NostrService(relayUrls: const []),
                 gpsLoader: () async => null,
               );
             },

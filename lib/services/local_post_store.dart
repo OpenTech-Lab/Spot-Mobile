@@ -7,7 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:mobile/models/media_post.dart';
 
 /// Persists locally-seen posts so feed metadata survives app reloads even
-/// before relays re-deliver the same events from history.
+/// before remote metadata sync repopulates the same events from history.
 ///
 /// All write operations are serialised through [_pendingWrite] to prevent
 /// concurrent read→merge→write cycles from overwriting each other — a race

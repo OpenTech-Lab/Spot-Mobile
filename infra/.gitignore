@@ -1,7 +1,0 @@
-.terraform/
-*.tfstate
-*.tfstate.backup
-.terraform.lock.hcl
-.build/
-lambda/presign/node_modules/
-scripts/*.env

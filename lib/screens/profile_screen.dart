@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
-import 'package:mobile/features/nostr/nostr_service.dart';
+import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -25,12 +25,10 @@ class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
     required this.wallet,
-    required this.nostrService,
     required this.eventRepo,
   });
 
   final WalletModel wallet;
-  final NostrService nostrService;
   final EventRepository eventRepo;
 
   @override
@@ -70,7 +68,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _onLocalPostsChanged,
       );
       await _loadPersistedPosts();
-      await widget.nostrService.connect();
       _sub = _repo
           .subscribeToAuthorPosts(widget.wallet.publicKeyHex)
           .listen(_onEvent);
@@ -162,8 +159,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
     try {
-      // Publish revocation event (kind-5) with content hash (spec v1.4 §12)
-      await widget.nostrService.deletePost(
+      await MetadataService.instance.deletePost(
         post.nostrEventId,
         post.contentHash,
         widget.wallet,
@@ -198,7 +194,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final published = await PostPublishService.instance.publishDraft(
         draft: post,
         wallet: widget.wallet,
-        nostrService: widget.nostrService,
         eventRepo: _repo,
         replaceLocalPostId: post.id,
       );
@@ -231,8 +226,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _reportPost(MediaPost post) async {
     try {
-      await widget.nostrService.reportContent(
-        eventId: post.nostrEventId,
+      await MetadataService.instance.reportContent(
+        postId: post.nostrEventId,
         contentHash: post.contentHash,
         reason: 'harmful',
         wallet: widget.wallet,
@@ -249,12 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _openSettings() {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => SettingsScreen(
-          wallet: widget.wallet,
-          nostrService: widget.nostrService,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => SettingsScreen(wallet: widget.wallet)),
     );
   }
 
@@ -355,7 +345,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               rootPostId: post.nostrEventId,
                               initialPosts: _posts,
                               wallet: widget.wallet,
-                              nostrService: widget.nostrService,
                               eventRepo: _repo,
                             ),
                           ),
@@ -368,7 +357,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           : () => showPostComposer(
                               ctx,
                               wallet: widget.wallet,
-                              nostrService: widget.nostrService,
                               eventRepo: _repo,
                               replyToPost: post,
                             ),

@@ -85,10 +85,36 @@ class Witness {
     );
   }
 
+  static Witness? fromSupabaseRow(
+    Map<String, dynamic> row, {
+    required String fallbackUserId,
+    String? legacyPubkey,
+    double weight = 0.5,
+  }) {
+    final type = _parseType(row['witness_type']?.toString() ?? '');
+    final hashtag = row['event_hashtag']?.toString();
+    final id = row['id']?.toString();
+    final createdAt = row['created_at']?.toString();
+    if (type == null || hashtag == null || id == null || createdAt == null) {
+      return null;
+    }
+
+    return Witness(
+      id: id,
+      eventId: hashtag,
+      userId: legacyPubkey?.isNotEmpty == true ? legacyPubkey! : fallbackUserId,
+      type: type,
+      lat: (row['latitude'] as num?)?.toDouble(),
+      lon: (row['longitude'] as num?)?.toDouble(),
+      timestamp: DateTime.parse(createdAt).toUtc(),
+      weight: weight,
+    );
+  }
+
   static WitnessType? _parseType(String value) => switch (value) {
-        'seen' => WitnessType.seen,
-        'confirm' => WitnessType.confirm,
-        'deny' => WitnessType.deny,
-        _ => null,
-      };
+    'seen' => WitnessType.seen,
+    'confirm' => WitnessType.confirm,
+    'deny' => WitnessType.deny,
+    _ => null,
+  };
 }

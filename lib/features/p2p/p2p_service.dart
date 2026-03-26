@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -8,26 +7,20 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'package:mobile/core/encryption.dart';
-import 'package:mobile/core/wallet.dart';
-import 'package:mobile/features/nostr/nostr_models.dart';
-import 'package:mobile/features/nostr/nostr_service.dart';
-import 'package:mobile/models/event_model.dart';
+import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/asset_transport_policy.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 
-const _peerAnnouncementKind = 30315;
-const _peerAnnouncementDTagPrefix = 'spot-p2p-endpoint';
 const _peerProtocol = 'spot-p2p-http-v1';
-const _peerDiscoveryTimeout = Duration(seconds: 3);
 const _mediaFetchTimeout = Duration(seconds: 8);
 const _endpointCacheTtl = Duration(minutes: 2);
 const _mediaHeaderFileName = 'x-spot-file-name';
 
 /// Lightweight P2P media transport.
 ///
-/// This implementation uses Nostr only for peer endpoint advertisement. Raw
+/// This implementation uses Supabase metadata only for peer endpoint discovery. Raw
 /// media bytes are served directly from device to device over HTTP.
 ///
 /// It does not attempt NAT traversal. Peers must be online and reachable from
@@ -84,18 +77,13 @@ class P2PService {
   bool _started = false;
   int _seedingCount = 0;
   HttpServer? _server;
-  NostrService? _nostrService;
   WalletModel? _wallet;
   List<Uri> _localEndpoints = const [];
   StreamSubscription<void>? _connectivitySubscription;
   final Map<String, ({DateTime fetchedAt, List<Uri> endpoints})>
   _peerEndpointCache = {};
 
-  void configure({
-    required NostrService nostrService,
-    required WalletModel wallet,
-  }) {
-    _nostrService = nostrService;
+  void configure({required WalletModel wallet}) {
     _wallet = wallet;
     _connectivitySubscription ??= _connectivityChanges.listen((_) {
       unawaited(refreshTransportAvailability());
@@ -143,9 +131,13 @@ class P2PService {
     _seedingCount = 0;
     final server = _server;
     _server = null;
+    final wallet = _wallet;
     _localEndpoints = const [];
     if (server != null) {
       await server.close(force: true);
+    }
+    if (wallet != null) {
+      unawaited(MetadataService.instance.clearPeerEndpoints(wallet));
     }
   }
 
@@ -216,59 +208,16 @@ class P2PService {
   // ── Private: endpoint publication/discovery ──────────────────────────────
 
   Future<void> _publishPeerAnnouncement() async {
-    final nostr = _nostrService;
     final wallet = _wallet;
-    if (nostr == null || wallet == null || _localEndpoints.isEmpty) return;
-
-    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final content = jsonEncode({
-      'deviceId': wallet.deviceId,
-      'protocol': _peerProtocol,
-      'endpoints': _localEndpoints
-          .map((endpoint) => endpoint.toString())
-          .toList(),
-    });
-    final placeholder = NostrEvent(
-      id: '',
-      pubkey: wallet.publicKeyHex,
-      createdAt: now,
-      kind: _peerAnnouncementKind,
-      tags: [
-        ['d', '$_peerAnnouncementDTagPrefix:${wallet.deviceId}'],
-        ['app', spotEventOrigin],
-        ['proto', _peerProtocol],
-        ['device', wallet.deviceId],
-        for (final endpoint in _localEndpoints)
-          ['endpoint', endpoint.toString()],
-      ],
-      content: content,
-      sig: '',
-    );
-    final id = WalletService.computeEventId(placeholder);
-    final unsigned = NostrEvent(
-      id: id,
-      pubkey: placeholder.pubkey,
-      createdAt: placeholder.createdAt,
-      kind: placeholder.kind,
-      tags: placeholder.tags,
-      content: placeholder.content,
-      sig: '',
-    );
-    final signed = NostrEvent(
-      id: id,
-      pubkey: unsigned.pubkey,
-      createdAt: unsigned.createdAt,
-      kind: unsigned.kind,
-      tags: unsigned.tags,
-      content: unsigned.content,
-      sig: WalletService.signNostrEvent(unsigned, wallet.privateKeyHex),
-    );
+    if (wallet == null || _localEndpoints.isEmpty) return;
 
     try {
-      await nostr.publishEvent(signed);
-    } catch (_) {
-      // Keep serving locally even if relay publication fails.
-    }
+      await MetadataService.instance.publishPeerEndpoints(
+        _localEndpoints,
+        wallet,
+        protocol: _peerProtocol,
+      );
+    } catch (_) {}
   }
 
   Future<List<Uri>> _resolvePeerEndpoints(String pubkey) async {
@@ -280,70 +229,13 @@ class P2PService {
 
     final endpoints = _peerEndpointResolver != null
         ? await _peerEndpointResolver(pubkey)
-        : await _fetchPeerEndpointsFromRelays(pubkey);
+        : await MetadataService.instance.resolvePeerEndpoints(pubkey);
 
     _peerEndpointCache[pubkey] = (
       fetchedAt: DateTime.now(),
       endpoints: endpoints,
     );
     return endpoints;
-  }
-
-  Future<List<Uri>> _fetchPeerEndpointsFromRelays(String pubkey) async {
-    final nostr = _nostrService;
-    if (nostr == null) return const [];
-
-    await nostr.connect();
-
-    final endpoints = <Uri>{};
-    final subId = nostr.subscribe(
-      [
-        NostrFilter(
-          kinds: [_peerAnnouncementKind],
-          authors: [pubkey],
-          limit: 20,
-        ),
-      ],
-      (event) {
-        endpoints.addAll(_peerEndpointsFromEvent(event));
-      },
-    );
-
-    try {
-      await Future<void>.delayed(_peerDiscoveryTimeout);
-    } finally {
-      nostr.unsubscribe(subId);
-    }
-
-    return endpoints.toList(growable: false);
-  }
-
-  List<Uri> _peerEndpointsFromEvent(NostrEvent event) {
-    if (event.kind != _peerAnnouncementKind) return const [];
-
-    final endpoints = <Uri>[];
-    for (final raw in event.getAllTagValues('endpoint')) {
-      final endpoint = Uri.tryParse(raw);
-      if (endpoint != null && endpoint.hasScheme && endpoint.host.isNotEmpty) {
-        endpoints.add(endpoint);
-      }
-    }
-
-    if (endpoints.isNotEmpty) return endpoints;
-
-    try {
-      final decoded = jsonDecode(event.content);
-      if (decoded is! Map<String, dynamic>) return const [];
-      final rawEndpoints = decoded['endpoints'];
-      if (rawEndpoints is! List) return const [];
-      return rawEndpoints
-          .map((value) => Uri.tryParse(value.toString()))
-          .whereType<Uri>()
-          .where((endpoint) => endpoint.hasScheme && endpoint.host.isNotEmpty)
-          .toList(growable: false);
-    } catch (_) {
-      return const [];
-    }
   }
 
   Future<List<Uri>> _discoverLocalEndpoints(int port) async {

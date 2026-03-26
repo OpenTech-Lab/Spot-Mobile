@@ -87,7 +87,7 @@ class MediaPost {
   /// The full Nostr event ID for this post (same as [id], kept for clarity)
   final String nostrEventId;
 
-  /// Whether this post was accepted by relays or is still only stored locally.
+  /// Whether this post was published remotely or is still only stored locally.
   final PostDeliveryState deliveryState;
 
   /// Last publish error shown to the local author for retryable failures.

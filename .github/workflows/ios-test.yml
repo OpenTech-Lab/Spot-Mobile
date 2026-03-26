@@ -5,21 +5,12 @@ on:
 
 jobs:
   build-ios-ipa:
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 60
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -27,11 +18,55 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Build iOS IPA (release, no codesign)
-        run: |
-          cd apps/mobile
-          flutter build ipa --release --no-codesign
+      - name: Install Flutter dependencies
+        run: flutter pub get
 
+      - name: Install CocoaPods dependencies
+        working-directory: ios
+        run: |
+          pod deintegrate
+          pod install
+
+      - name: Validate required runtime secrets
+        run: |
+          required=(
+            SUPABASE_URL
+            SUPABASE_ANON_KEY
+          )
+
+          for name in "${required[@]}"; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required secret: $name"
+              exit 1
+            fi
+          done
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+
+      - name: Write runtime .env asset
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          cat > .env <<EOF
+          SUPABASE_URL=$SUPABASE_URL
+          SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+          EOF
+
+      - name: Build iOS IPA (release, no codesign)
+        env:
+          CDN_BASE_URL: ${{ secrets.CDN_BASE_URL }}
+          CDN_PRESIGN_URL: ${{ secrets.CDN_PRESIGN_URL }}
+        run: |
+          build_cmd=(flutter build ipa --release --no-codesign)
+          if [ -n "$CDN_BASE_URL" ]; then
+            build_cmd+=("--dart-define=CDN_BASE_URL=$CDN_BASE_URL")
+          fi
+          if [ -n "$CDN_PRESIGN_URL" ]; then
+            build_cmd+=("--dart-define=CDN_PRESIGN_URL=$CDN_PRESIGN_URL")
+          fi
+          "${build_cmd[@]}"
 
       - name: Upload iOS build artifacts
         uses: actions/upload-artifact@v4
@@ -40,6 +75,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
           path: |
-            apps/mobile/build/ios/ipa/*.ipa
-            apps/mobile/build/ios/archive/*.xcarchive
-            apps/mobile/build/ios/**/*.xcarchive
+            build/ios/ipa/*.ipa
+            build/ios/archive/*.xcarchive
+            build/ios/**/*.xcarchive

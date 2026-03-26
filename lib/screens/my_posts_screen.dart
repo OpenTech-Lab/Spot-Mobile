@@ -4,7 +4,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
-import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -17,14 +16,9 @@ import 'package:mobile/widgets/post_thread_row.dart';
 
 /// Shows only the posts authored by the current wallet owner.
 class MyPostsScreen extends StatefulWidget {
-  const MyPostsScreen({
-    super.key,
-    required this.wallet,
-    required this.nostrService,
-  });
+  const MyPostsScreen({super.key, required this.wallet});
 
   final WalletModel wallet;
-  final NostrService nostrService;
 
   @override
   State<MyPostsScreen> createState() => _MyPostsScreenState();
@@ -41,7 +35,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
   @override
   void initState() {
     super.initState();
-    _repo = EventRepository(nostrService: widget.nostrService);
+    _repo = EventRepository();
     _initFeed();
   }
 
@@ -59,7 +53,6 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
     });
     try {
       await _loadPersistedPosts();
-      await widget.nostrService.connect();
       _sub = _repo.subscribeToEvents().listen(_onEvent);
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());

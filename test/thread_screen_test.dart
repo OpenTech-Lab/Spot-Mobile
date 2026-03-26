@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/thread_screen.dart';
@@ -14,7 +13,6 @@ void main() {
       rootPostId: 'post-id',
       initialPosts: [_post()],
       wallet: _wallet(),
-      nostrService: NostrService(relayUrls: const []),
     );
 
     expect(route, isA<CupertinoPageRoute<void>>());

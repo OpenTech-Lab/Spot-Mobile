@@ -4,7 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
-import 'package:mobile/features/nostr/nostr_service.dart';
+import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -42,14 +42,8 @@ List<MediaPost> visibleFollowingPosts(
 }
 
 class FeedScreen extends StatefulWidget {
-  const FeedScreen({
-    super.key,
-    required this.nostrService,
-    required this.wallet,
-    required this.eventRepo,
-  });
+  const FeedScreen({super.key, required this.wallet, required this.eventRepo});
 
-  final NostrService nostrService;
   final WalletModel wallet;
   final EventRepository eventRepo;
 
@@ -101,7 +95,9 @@ class FeedScreenState extends State<FeedScreen>
     setState(() {
       _posts = _mergePosts(_posts, [post]);
     });
-    debugPrint('[FeedScreen] Total posts after showPublishedPost: ${_posts.length}');
+    debugPrint(
+      '[FeedScreen] Total posts after showPublishedPost: ${_posts.length}',
+    );
     if (_tabController.index != 0) {
       _tabController.animateTo(0);
     }
@@ -116,7 +112,6 @@ class FeedScreenState extends State<FeedScreen>
     });
     try {
       await _loadPersistedPosts();
-      await widget.nostrService.connect();
       _sub = _repo.subscribeToEvents().listen(_onEvent);
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -127,7 +122,9 @@ class FeedScreenState extends State<FeedScreen>
 
   void _onEvent(CivicEvent event) {
     if (!mounted) return;
-    debugPrint('[FeedScreen] Received CivicEvent: ${event.hashtag}, ${event.posts.length} posts');
+    debugPrint(
+      '[FeedScreen] Received CivicEvent: ${event.hashtag}, ${event.posts.length} posts',
+    );
     setState(() {
       _posts = _mergePosts(_posts, event.posts);
     });
@@ -159,40 +156,19 @@ class FeedScreenState extends State<FeedScreen>
   Future<void> _loadMorePosts() async {
     if (_isFetchingMore || _posts.isEmpty) return;
 
-    final cursor =
+    final cursorSeconds =
         _oldestTimestamp ??
         (_posts.last.capturedAt.millisecondsSinceEpoch ~/ 1000) - 1;
+    final cursor = DateTime.fromMillisecondsSinceEpoch(
+      cursorSeconds * 1000,
+      isUtc: true,
+    );
 
     setState(() => _isFetchingMore = true);
     try {
-      final completer = Completer<void>();
-      Timer? timeout;
-
-      final subId = widget.nostrService.subscribe(
-        EventRepository.buildSpotPostFilters(
-          until: cursor,
-          limit: 20,
-          includeGenericFallback: true,
-        ),
-        (event) {
-          if (!EventRepository.isSpotEvent(event)) return;
-          _repo.addPost(EventRepository.nostrEventToPost(event));
-        },
-      );
-
-      timeout = Timer(const Duration(seconds: 5), () {
-        widget.nostrService.unsubscribe(subId);
-        if (!completer.isCompleted) completer.complete();
-      });
-
-      await completer.future;
-      timeout.cancel();
-      widget.nostrService.unsubscribe(subId);
-
+      final olderPosts = await _repo.fetchPostsPage(before: cursor, limit: 20);
       if (mounted) {
-        final allPosts = _repo.getAllEvents().expand((e) => e.posts).toList()
-          ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
-        final merged = _mergePosts(_posts, allPosts);
+        final merged = _mergePosts(_posts, olderPosts);
         if (merged.isNotEmpty) {
           _oldestTimestamp =
               (merged.last.capturedAt.millisecondsSinceEpoch ~/ 1000) - 1;
@@ -208,11 +184,17 @@ class FeedScreenState extends State<FeedScreen>
     List<MediaPost> current,
     Iterable<MediaPost> incoming,
   ) {
-    debugPrint('[FeedScreen] _mergePosts: ${current.length} current + ${incoming.length} incoming');
+    debugPrint(
+      '[FeedScreen] _mergePosts: ${current.length} current + ${incoming.length} incoming',
+    );
     for (final post in incoming) {
-      debugPrint('[FeedScreen] Incoming post: ${post.id}, tags: ${post.eventTags}');
+      debugPrint(
+        '[FeedScreen] Incoming post: ${post.id}, tags: ${post.eventTags}',
+      );
       final isBlocked = CacheManager.instance.isBlocked(post.contentHash);
-      debugPrint('[FeedScreen] Post ${post.id} blocked: $isBlocked, contentHash: ${post.contentHash}');
+      debugPrint(
+        '[FeedScreen] Post ${post.id} blocked: $isBlocked, contentHash: ${post.contentHash}',
+      );
     }
     final result = mergePostsPreservingLocalState(
       current,
@@ -246,7 +228,7 @@ class FeedScreenState extends State<FeedScreen>
       await P2PService.instance.startSwarm();
       final sync = MediaSyncService(fetchMedia: MediaResolver.instance.resolve);
       final hydrated = await sync.hydratePost(post);
-      
+
       if (!mounted) return;
       _updateMediaPost(hydrated);
     } catch (_) {
@@ -258,8 +240,8 @@ class FeedScreenState extends State<FeedScreen>
 
   Future<void> _reportPost(MediaPost post) async {
     try {
-      await widget.nostrService.reportContent(
-        eventId: post.nostrEventId,
+      await MetadataService.instance.reportContent(
+        postId: post.nostrEventId,
         contentHash: post.contentHash,
         reason: 'harmful',
         wallet: widget.wallet,
@@ -291,11 +273,8 @@ class FeedScreenState extends State<FeedScreen>
     if (pubkey == widget.wallet.publicKeyHex) return;
     Navigator.of(ctx).push(
       MaterialPageRoute(
-        builder: (_) => UserProfileScreen(
-          pubkey: pubkey,
-          wallet: widget.wallet,
-          nostrService: widget.nostrService,
-        ),
+        builder: (_) =>
+            UserProfileScreen(pubkey: pubkey, wallet: widget.wallet),
       ),
     );
   }
@@ -309,9 +288,13 @@ class FeedScreenState extends State<FeedScreen>
       followedPubkeys: FollowService.instance.following.toSet(),
       followedTags: FollowService.instance.followedTags.toSet(),
     );
-    debugPrint('[FeedScreen] Following filter: ${_posts.length} total → ${filtered.length} visible');
+    debugPrint(
+      '[FeedScreen] Following filter: ${_posts.length} total → ${filtered.length} visible',
+    );
     debugPrint('[FeedScreen] selfPubkey: ${widget.wallet.publicKeyHex}');
-    debugPrint('[FeedScreen] followedTags: ${FollowService.instance.followedTags}');
+    debugPrint(
+      '[FeedScreen] followedTags: ${FollowService.instance.followedTags}',
+    );
     return filtered;
   }
 
@@ -340,7 +323,6 @@ class FeedScreenState extends State<FeedScreen>
                 onMediaUpdated: _hydrateMediaPost,
                 onAvatarTap: _openUserProfile,
                 wallet: widget.wallet,
-                nostrService: widget.nostrService,
                 eventRepo: _repo,
               ),
               _FollowingTab(
@@ -354,7 +336,6 @@ class FeedScreenState extends State<FeedScreen>
                 onMediaUpdated: _hydrateMediaPost,
                 onAvatarTap: _openUserProfile,
                 wallet: widget.wallet,
-                nostrService: widget.nostrService,
                 eventRepo: _repo,
               ),
             ],
@@ -398,7 +379,6 @@ class _LatestTab extends StatefulWidget {
     required this.onMediaUpdated,
     required this.onAvatarTap,
     required this.wallet,
-    required this.nostrService,
     required this.eventRepo,
   });
 
@@ -415,7 +395,6 @@ class _LatestTab extends StatefulWidget {
   final void Function(MediaPost) onMediaUpdated;
   final void Function(BuildContext, String) onAvatarTap;
   final WalletModel wallet;
-  final NostrService nostrService;
   final EventRepository eventRepo;
 
   @override
@@ -497,7 +476,6 @@ class _LatestTabState extends State<_LatestTab> {
                     rootPostId: post.nostrEventId,
                     initialPosts: widget.allPosts,
                     wallet: widget.wallet,
-                    nostrService: widget.nostrService,
                     eventRepo: widget.eventRepo,
                   ),
                 ),
@@ -512,7 +490,6 @@ class _LatestTabState extends State<_LatestTab> {
                   onReply: () => showPostComposer(
                     ctx,
                     wallet: widget.wallet,
-                    nostrService: widget.nostrService,
                     eventRepo: widget.eventRepo,
                     replyToPost: post,
                   ),
@@ -570,7 +547,7 @@ class _LatestTabState extends State<_LatestTab> {
                   ),
                   const SizedBox(height: SpotSpacing.xl),
                   const Text(
-                    'Could not connect to relays',
+                    'Could not load posts',
                     style: SpotType.bodySecondary,
                   ),
                   const SizedBox(height: SpotSpacing.xl),
@@ -651,7 +628,6 @@ class _FollowingTab extends StatelessWidget {
     required this.onMediaUpdated,
     required this.onAvatarTap,
     required this.wallet,
-    required this.nostrService,
     required this.eventRepo,
   });
 
@@ -665,7 +641,6 @@ class _FollowingTab extends StatelessWidget {
   final void Function(MediaPost) onMediaUpdated;
   final void Function(BuildContext, String) onAvatarTap;
   final WalletModel wallet;
-  final NostrService nostrService;
   final EventRepository eventRepo;
 
   @override
@@ -758,7 +733,6 @@ class _FollowingTab extends StatelessWidget {
                     rootPostId: post.nostrEventId,
                     initialPosts: allPosts,
                     wallet: wallet,
-                    nostrService: nostrService,
                     eventRepo: eventRepo,
                   ),
                 ),
@@ -773,7 +747,6 @@ class _FollowingTab extends StatelessWidget {
                   onReply: () => showPostComposer(
                     ctx,
                     wallet: wallet,
-                    nostrService: nostrService,
                     eventRepo: eventRepo,
                     replyToPost: post,
                   ),

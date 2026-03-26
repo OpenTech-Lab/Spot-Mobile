@@ -1,5 +1,6 @@
 # env
 .env
+**/node_modules/
 
 # ios certificates and provisioning profiles
 scripts/ios/**/*.p8

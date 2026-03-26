@@ -1,11 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/asset_transport_policy.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/asset_transport_settings_screen.dart';
-import 'package:mobile/screens/relay_list_screen.dart';
 import 'package:mobile/screens/wallet_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/local_post_store.dart';
@@ -13,14 +11,9 @@ import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({
-    super.key,
-    required this.wallet,
-    required this.nostrService,
-  });
+  const SettingsScreen({super.key, required this.wallet});
 
   final WalletModel wallet;
-  final NostrService nostrService;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -60,7 +53,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('Clear', style: SpotType.body.copyWith(color: SpotColors.danger)),
+            child: Text(
+              'Clear',
+              style: SpotType.body.copyWith(color: SpotColors.danger),
+            ),
           ),
         ],
       ),
@@ -69,9 +65,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (confirmed == true && mounted) {
       await CacheManager.instance.purgeAll();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cache cleared')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Cache cleared')));
       }
     }
   }
@@ -91,7 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           '• Saved posts\n'
           '• Blocklist\n\n'
           'Your identity will NOT be deleted. '
-          'Posts will re-sync from relays.',
+          'Metadata will re-sync from Supabase.',
           style: SpotType.bodySecondary,
         ),
         actions: [
@@ -101,7 +97,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('Clear All', style: SpotType.body.copyWith(color: SpotColors.danger)),
+            child: Text(
+              'Clear All',
+              style: SpotType.body.copyWith(color: SpotColors.danger),
+            ),
           ),
         ],
       ),
@@ -115,7 +114,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ]);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('All data cleared. Restart app to re-sync.')),
+          const SnackBar(
+            content: Text('All data cleared. Restart app to re-sync.'),
+          ),
         );
       }
     }
@@ -135,17 +136,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           vertical: SpotSpacing.lg,
         ),
         children: [
-          _SettingsRow(
-            icon: CupertinoIcons.antenna_radiowaves_left_right,
-            label: 'Relay List',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) =>
-                    RelayListScreen(nostrService: widget.nostrService),
-              ),
-            ),
-          ),
-          const SizedBox(height: SpotSpacing.sm),
           _SettingsRow(
             icon: CupertinoIcons.wifi,
             label: 'Asset Transport',

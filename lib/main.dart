@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:mobile/core/app_config.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/altcha_gate_screen.dart';
 import 'package:mobile/screens/onboarding_screen.dart';
@@ -13,6 +16,12 @@ import 'package:mobile/theme/spot_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await dotenv.load(fileName: '.env');
+  await Supabase.initialize(
+    url: AppConfig.supabaseUrl,
+    anonKey: AppConfig.supabaseAnonKey,
+  );
 
   // Initialise cache manager early so eviction & blocklist are ready before
   // any media or feed content loads (spec v1.4 §6 & §12.B).
@@ -27,9 +36,9 @@ Future<void> main() async {
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
-      statusBarColor:                    Colors.transparent,
-      statusBarIconBrightness:           Brightness.light,
-      systemNavigationBarColor:          SpotColors.bg,
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: SpotColors.bg,
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );

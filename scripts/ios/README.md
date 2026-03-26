@@ -14,5 +14,7 @@ This guide explains how to set up GitHub Actions deployment to TestFlight using:
 ## How to use
 1. Create/Download appstore.mobileprovision
 2. Copy/setup vars.env
+   Include `SUPABASE_URL` and `SUPABASE_ANON_KEY` because the app now loads them from `.env` during CI builds.
+   Add `CDN_BASE_URL` and `CDN_PRESIGN_URL` if you want CDN enabled in release/test builds.
 3. run `01-prepare-ci-secrets-from-input.sh`
 4. run `output/apply-secrets-with-gh.sh`

@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:mobile/core/encryption.dart';
-import 'package:mobile/features/nostr/nostr_service.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/cache_manager.dart';
@@ -20,15 +19,9 @@ import 'package:mobile/theme/spot_theme.dart';
 /// Full-screen camera UI.
 /// Tap = photo · Hold = video · Shield = Danger Mode
 class CameraScreen extends StatefulWidget {
-  const CameraScreen({
-    super.key,
-    required this.wallet,
-    required this.nostrService,
-    this.replyToPost,
-  });
+  const CameraScreen({super.key, required this.wallet, this.replyToPost});
 
   final WalletModel wallet;
-  final NostrService nostrService;
 
   /// When set, this post is being composed as a reply to [replyToPost].
   final MediaPost? replyToPost;
@@ -225,8 +218,6 @@ class _CameraScreenState extends State<CameraScreen>
       await PostPublishService.instance.publishDraft(
         draft: post,
         wallet: widget.wallet,
-        nostrService: widget.nostrService,
-        eventRepo: widget.eventRepo,
       );
       if (mounted) {
         Navigator.of(context).pop();
