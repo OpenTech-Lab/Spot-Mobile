@@ -92,6 +92,20 @@ class LocalPostStore {
     });
   }
 
+  Future<void> removeMatchingPost(MediaPost target) async {
+    final contentHashes = target.contentHashes.toSet();
+    await _enqueue(() async {
+      final posts = await _readPosts();
+      posts.removeWhere(
+        (post) =>
+            post.id == target.id ||
+            post.nostrEventId == target.nostrEventId ||
+            post.contentHashes.any(contentHashes.contains),
+      );
+      await _writePosts(posts);
+    });
+  }
+
   Future<void> clearAll() async {
     await _enqueue(() async {
       await _writePosts([]);

@@ -86,6 +86,36 @@ void main() {
       expect(posts.single.lastPublishError, isNull);
     },
   );
+
+  test(
+    'removeMatchingPost removes duplicate local variants for the same post',
+    () async {
+      final legacyLocal = _post(
+        id: 'legacy-local-id',
+        nostrEventId: 'legacy-local-id',
+      );
+      final remoteVariant = _post(
+        id: 'remote-uuid',
+        nostrEventId: 'remote-uuid',
+      ).copyWith(contentHashes: legacyLocal.contentHashes);
+      final unrelated = _post(id: 'other-post');
+
+      await LocalPostStore.instance.savePosts([
+        legacyLocal,
+        remoteVariant,
+        unrelated,
+      ]);
+
+      await LocalPostStore.instance.removeMatchingPost(remoteVariant);
+
+      final posts = await LocalPostStore.instance.loadPosts(
+        authorPubkey: 'author-a',
+        includeFailedToSend: true,
+      );
+
+      expect(posts.map((post) => post.id), ['other-post']);
+    },
+  );
 }
 
 MediaPost _post({

@@ -200,6 +200,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     unawaited(LocalPostStore.instance.savePost(post));
   }
 
+  Future<void> _purgePostCache(MediaPost post) async {
+    for (final contentHash in post.contentHashes) {
+      await CacheManager.instance.purgeCached(contentHash);
+    }
+  }
+
   void _openProfileThread(BuildContext context, MediaPost post) {
     final rootPostId = post.replyToId == null
         ? post.nostrEventId
@@ -216,9 +222,19 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Future<void> _deletePost(MediaPost post) async {
     // Optimistic removal from UI
-    setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
-    await LocalPostStore.instance.removePost(post.id);
+    setState(() {
+      _posts = _posts
+          .where(
+            (candidate) =>
+                candidate.id != post.id &&
+                candidate.nostrEventId != post.nostrEventId &&
+                !candidate.contentHashes.any(post.contentHashes.contains),
+          )
+          .toList();
+    });
+    await LocalPostStore.instance.removeMatchingPost(post);
     if (post.isPendingRetry) {
+      await _purgePostCache(post);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Removed local unsent post')),
@@ -232,6 +248,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         post.contentHash,
         widget.wallet,
       );
+      await _purgePostCache(post);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -244,6 +261,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     } catch (e) {
       await LocalPostStore.instance.savePost(post);
       // Restore post on failure
+      debugPrint(
+        '[ProfileScreen] Failed to delete post ${post.nostrEventId}: $e',
+      );
       if (mounted) {
         setState(() {
           _posts = _mergePosts(_posts, [post]);
