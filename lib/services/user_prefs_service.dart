@@ -81,14 +81,16 @@ class UserPrefsService {
 
   // ── CDN acceleration ──────────────────────────────────────────────────────
 
-  /// Whether CDN fetch/upload is enabled (default: false — opt-in).
-  /// Users must explicitly enable CDN in settings to preserve the
-  /// decentralized-first philosophy of the platform.
-  bool get cdnEnabled => _data['cdn_enabled'] as bool? ?? false;
+  /// Whether CDN fetch/upload is enabled.
+  ///
+  /// Defaults to true until the user explicitly changes the setting.
+  bool get cdnEnabled => _data['cdn_enabled'] as bool? ?? true;
 
-  /// Whether CDN upload specifically is enabled (default: false — opt-in).
+  /// Whether CDN upload specifically is enabled.
+  ///
+  /// Defaults to true until the user explicitly changes the setting.
   /// Has no effect when [cdnEnabled] is false.
-  bool get cdnUploadEnabled => _data['cdn_upload_enabled'] as bool? ?? false;
+  bool get cdnUploadEnabled => _data['cdn_upload_enabled'] as bool? ?? true;
 
   Future<void> saveCdnEnabled(bool enabled) async {
     _data = {..._data, 'cdn_enabled': enabled};

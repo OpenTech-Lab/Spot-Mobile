@@ -121,7 +121,8 @@ class _AssetTransportSettingsScreenState
           Text(
             'Use a content delivery network for faster media loading. '
             'Media is cached on CDN servers by content hash. '
-            'Disable to use only peer-to-peer transport.',
+            'CDN fetch and upload are enabled by default; disable them here to '
+            'use only peer-to-peer transport.',
             style: SpotType.bodySecondary.copyWith(
               color: SpotColors.textSecondary,
             ),
