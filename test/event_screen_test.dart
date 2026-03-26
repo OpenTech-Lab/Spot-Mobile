@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:mobile/features/event/event_screen.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
+import 'package:mobile/models/witness_model.dart';
 
 void main() {
   test(
@@ -127,6 +128,97 @@ void main() {
       greaterThan(snapshot.recentThreadCount),
     );
   });
+
+  test(
+    'selectedWitnessTypeForUsers picks the latest witness for the actor',
+    () {
+      final selected = selectedWitnessTypeForUsers(
+        [
+          _witness(
+            id: 'w1',
+            userId: 'pubkey-self',
+            type: WitnessType.seen,
+            timestamp: DateTime.utc(2026, 3, 26, 9),
+          ),
+          _witness(
+            id: 'w2',
+            userId: 'supabase-self',
+            type: WitnessType.confirm,
+            timestamp: DateTime.utc(2026, 3, 26, 10),
+          ),
+          _witness(
+            id: 'w3',
+            userId: 'other',
+            type: WitnessType.deny,
+            timestamp: DateTime.utc(2026, 3, 26, 11),
+          ),
+        ],
+        const ['pubkey-self', 'supabase-self'],
+      );
+
+      expect(selected, WitnessType.confirm);
+    },
+  );
+
+  test(
+    'eventWithToggledWitness removes the current user signal on repeat tap',
+    () {
+      final updated = eventWithToggledWitness(
+        event: _eventWithWitnesses([
+          _witness(
+            id: 'mine',
+            userId: 'pubkey-self',
+            type: WitnessType.confirm,
+            timestamp: DateTime.utc(2026, 3, 26, 10),
+          ),
+        ]),
+        userIds: const ['pubkey-self'],
+        canonicalUserId: 'pubkey-self',
+        tappedType: WitnessType.confirm,
+        timestamp: DateTime.utc(2026, 3, 26, 12),
+      );
+
+      expect(updated.witnesses, isEmpty);
+      expect(
+        selectedWitnessTypeForUsers(updated.witnesses, const ['pubkey-self']),
+        isNull,
+      );
+    },
+  );
+
+  test(
+    'eventWithToggledWitness replaces the current user signal with the new one',
+    () {
+      final updated = eventWithToggledWitness(
+        event: _eventWithWitnesses([
+          _witness(
+            id: 'mine',
+            userId: 'pubkey-self',
+            type: WitnessType.seen,
+            timestamp: DateTime.utc(2026, 3, 26, 10),
+          ),
+          _witness(
+            id: 'other',
+            userId: 'other-user',
+            type: WitnessType.confirm,
+            timestamp: DateTime.utc(2026, 3, 26, 11),
+          ),
+        ]),
+        userIds: const ['pubkey-self'],
+        canonicalUserId: 'pubkey-self',
+        tappedType: WitnessType.deny,
+        timestamp: DateTime.utc(2026, 3, 26, 12),
+      );
+
+      expect(updated.confirmCount, 1);
+      expect(updated.seenCount, 0);
+      expect(updated.denyCount, 1);
+      expect(
+        selectedWitnessTypeForUsers(updated.witnesses, const ['pubkey-self']),
+        WitnessType.deny,
+      );
+    },
+  );
 }
 
 MediaPost _post({
@@ -147,4 +239,30 @@ MediaPost _post({
   replyToId: replyToId,
   eventTags: const ['tokyo'],
   nostrEventId: 'event-$id',
+);
+
+Witness _witness({
+  required String id,
+  required String userId,
+  required WitnessType type,
+  required DateTime timestamp,
+}) => Witness(
+  id: id,
+  eventId: 'tokyo',
+  userId: userId,
+  type: type,
+  timestamp: timestamp,
+  weight: 0.5,
+);
+
+CivicEvent _eventWithWitnesses(List<Witness> witnesses) => CivicEvent(
+  hashtag: 'tokyo',
+  title: '#tokyo',
+  posts: [
+    _post(id: 'root-a', capturedAt: DateTime.utc(2026, 3, 26, 8)),
+    _post(id: 'root-b', capturedAt: DateTime.utc(2026, 3, 26, 9)),
+  ],
+  firstSeen: DateTime.utc(2026, 3, 26, 8),
+  participantCount: 2,
+  witnesses: witnesses,
 );

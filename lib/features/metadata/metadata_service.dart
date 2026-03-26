@@ -262,14 +262,15 @@ class MetadataService {
       },
     );
 
-    await client.from('witness_signals').upsert({
-      'event_hashtag': normalizedHashtag,
-      'user_id': user.id,
-      'witness_type': witnessType,
-      'latitude': lat,
-      'longitude': lon,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }, onConflict: 'event_hashtag,user_id,witness_type');
+    await client.rpc(
+      'set_witness_signal',
+      params: {
+        'p_event_hashtag': normalizedHashtag,
+        'p_witness_type': witnessType,
+        'p_latitude': lat,
+        'p_longitude': lon,
+      },
+    );
   }
 
   Future<void> publishPeerEndpoints(

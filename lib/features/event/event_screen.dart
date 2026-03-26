@@ -7,10 +7,12 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'package:mobile/features/ebes/trust_service.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/models/witness_model.dart';
 import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
@@ -299,6 +301,71 @@ String _formatEventTrendAxisLabel(
   return DateFormat('MMM d').format(localValue);
 }
 
+Witness? latestWitnessForUsers(
+  Iterable<Witness> witnesses,
+  Iterable<String> userIds,
+) {
+  final identities = userIds.where((id) => id.isNotEmpty).toSet();
+  if (identities.isEmpty) return null;
+
+  final matches =
+      witnesses
+          .where((witness) => identities.contains(witness.userId))
+          .toList(growable: false)
+        ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+  return matches.isEmpty ? null : matches.first;
+}
+
+WitnessType? selectedWitnessTypeForUsers(
+  Iterable<Witness> witnesses,
+  Iterable<String> userIds,
+) => latestWitnessForUsers(witnesses, userIds)?.type;
+
+CivicEvent eventWithToggledWitness({
+  required CivicEvent event,
+  required Iterable<String> userIds,
+  required String canonicalUserId,
+  required WitnessType tappedType,
+  DateTime? timestamp,
+  double? lat,
+  double? lon,
+}) {
+  final identities = userIds.where((id) => id.isNotEmpty).toSet();
+  final currentType = selectedWitnessTypeForUsers(event.witnesses, identities);
+  final nextType = currentType == tappedType ? null : tappedType;
+
+  final retainedWitnesses = event.witnesses
+      .where((witness) => !identities.contains(witness.userId))
+      .toList(growable: true);
+
+  if (nextType != null) {
+    retainedWitnesses.add(
+      Witness(
+        id: 'local-${event.hashtag}-$canonicalUserId-${nextType.name}',
+        eventId: event.hashtag,
+        userId: canonicalUserId,
+        type: nextType,
+        lat: lat,
+        lon: lon,
+        timestamp: timestamp ?? DateTime.now().toUtc(),
+        weight: 0.5,
+      ),
+    );
+  }
+
+  final updatedEvent = event.copyWith(witnesses: retainedWitnesses);
+  final trust = const TrustService();
+  final score = trust.computeEventTrust(updatedEvent, retainedWitnesses);
+  final status = trust.statusFromScore(score, retainedWitnesses);
+
+  return updatedEvent.copyWith(
+    witnesses: retainedWitnesses,
+    trustScore: score,
+    status: status,
+  );
+}
+
 class EventScreen extends StatefulWidget {
   const EventScreen({super.key, required this.event, required this.wallet});
 
@@ -312,6 +379,7 @@ class EventScreen extends StatefulWidget {
 class _EventScreenState extends State<EventScreen> {
   late CivicEvent _event;
   bool _isFollowingTag = false;
+  bool _isSubmittingWitness = false;
 
   @override
   void initState() {
@@ -338,19 +406,63 @@ class _EventScreenState extends State<EventScreen> {
     if (mounted) setState(() => _isFollowingTag = !_isFollowingTag);
   }
 
-  Future<void> _submitWitness(String type) async {
+  Set<String> get _witnessActorIds {
+    final identities = <String>{};
+    if (widget.wallet.publicKeyHex.isNotEmpty) {
+      identities.add(widget.wallet.publicKeyHex);
+    }
+    final authUserId = MetadataService.instance.client.auth.currentUser?.id;
+    if (authUserId != null && authUserId.isNotEmpty) {
+      identities.add(authUserId);
+    }
+    return identities;
+  }
+
+  String get _canonicalWitnessUserId {
+    if (widget.wallet.publicKeyHex.isNotEmpty) {
+      return widget.wallet.publicKeyHex;
+    }
+    return MetadataService.instance.client.auth.currentUser?.id ?? 'local-user';
+  }
+
+  Future<void> _submitWitness(WitnessType type) async {
+    if (_isSubmittingWitness) return;
+
+    final previousEvent = _event;
+    final updatedEvent = eventWithToggledWitness(
+      event: _event,
+      userIds: _witnessActorIds,
+      canonicalUserId: _canonicalWitnessUserId,
+      tappedType: type,
+      lat: _event.centerLat,
+      lon: _event.centerLon,
+    );
+
+    setState(() {
+      _isSubmittingWitness = true;
+      _event = updatedEvent;
+    });
+
     try {
       await MetadataService.instance.publishWitness(
         hashtag: _event.hashtag,
-        witnessType: type,
+        witnessType: type.name,
         wallet: widget.wallet,
+        lat: _event.centerLat,
+        lon: _event.centerLon,
       );
+    } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Signal "$type" sent.')));
+        setState(() => _event = previousEvent);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not update witness signal.')),
+        );
       }
-    } catch (_) {}
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmittingWitness = false);
+      }
+    }
   }
 
   @override
@@ -401,7 +513,15 @@ class _EventScreenState extends State<EventScreen> {
         slivers: [
           SliverToBoxAdapter(child: _EventHeader(event: _event)),
           SliverToBoxAdapter(
-            child: _WitnessSummary(event: _event, onWitness: _submitWitness),
+            child: _WitnessSummary(
+              event: _event,
+              selectedType: selectedWitnessTypeForUsers(
+                _event.witnesses,
+                _witnessActorIds,
+              ),
+              isSubmitting: _isSubmittingWitness,
+              onWitness: _submitWitness,
+            ),
           ),
           SliverToBoxAdapter(child: _EventTrendPanel(event: _event)),
           SliverToBoxAdapter(
@@ -1083,12 +1203,19 @@ class _TrustBadge extends StatelessWidget {
 
 /// Shows seen / confirm / deny counts and lets the user submit a signal.
 class _WitnessSummary extends StatelessWidget {
-  const _WitnessSummary({required this.event, this.onWitness});
+  const _WitnessSummary({
+    required this.event,
+    this.selectedType,
+    this.isSubmitting = false,
+    this.onWitness,
+  });
 
   final CivicEvent event;
+  final WitnessType? selectedType;
+  final bool isSubmitting;
 
   /// Called with the witness type string when user taps a button.
-  final void Function(String type)? onWitness;
+  final void Function(WitnessType type)? onWitness;
 
   @override
   Widget build(BuildContext context) {
@@ -1112,56 +1239,50 @@ class _WitnessSummary extends StatelessWidget {
               Text('$totalWitnesses total', style: SpotType.caption),
             ],
           ),
-          const SizedBox(height: SpotSpacing.md),
-          Row(
-            children: [
-              _WitnessCount(
-                label: 'Seen',
-                count: event.seenCount,
-                color: SpotColors.textSecondary,
-              ),
-              const SizedBox(width: SpotSpacing.md),
-              _WitnessCount(
-                label: 'Confirm',
-                count: event.confirmCount,
-                color: SpotColors.success,
-              ),
-              const SizedBox(width: SpotSpacing.md),
-              _WitnessCount(
-                label: 'Deny',
-                count: event.denyCount,
-                color: SpotColors.danger,
-              ),
-            ],
-          ),
           if (onWitness != null) ...[
-            const SizedBox(height: SpotSpacing.lg),
-            Text('SUBMIT SIGNAL', style: SpotType.label),
-            const SizedBox(height: SpotSpacing.sm),
+            const SizedBox(height: SpotSpacing.md),
             Row(
               children: [
                 _WitnessButton(
                   label: 'Seen',
                   icon: CupertinoIcons.eye,
+                  count: event.seenCount,
+                  isSelected: selectedType == WitnessType.seen,
+                  isSubmitting: isSubmitting,
                   color: SpotColors.textSecondary,
-                  onTap: () => onWitness!('seen'),
+                  onTap: () => onWitness!(WitnessType.seen),
                 ),
                 const SizedBox(width: SpotSpacing.sm),
                 _WitnessButton(
                   label: 'Confirm',
                   icon: CupertinoIcons.checkmark_circle,
+                  count: event.confirmCount,
+                  isSelected: selectedType == WitnessType.confirm,
+                  isSubmitting: isSubmitting,
                   color: SpotColors.success,
-                  onTap: () => onWitness!('confirm'),
+                  onTap: () => onWitness!(WitnessType.confirm),
                 ),
                 const SizedBox(width: SpotSpacing.sm),
                 _WitnessButton(
                   label: 'Deny',
                   icon: CupertinoIcons.xmark_circle,
+                  count: event.denyCount,
+                  isSelected: selectedType == WitnessType.deny,
+                  isSubmitting: isSubmitting,
                   color: SpotColors.danger,
-                  onTap: () => onWitness!('deny'),
+                  onTap: () => onWitness!(WitnessType.deny),
                 ),
               ],
             ),
+            if (selectedType != null) ...[
+              const SizedBox(height: SpotSpacing.sm),
+              Text(
+                'Tap your selected signal again to remove it.',
+                style: SpotType.caption.copyWith(
+                  color: SpotColors.textSecondary,
+                ),
+              ),
+            ],
           ],
         ],
       ),
@@ -1169,55 +1290,63 @@ class _WitnessSummary extends StatelessWidget {
   }
 }
 
-class _WitnessCount extends StatelessWidget {
-  const _WitnessCount({
-    required this.label,
-    required this.count,
-    required this.color,
-  });
-
-  final String label;
-  final int count;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Text(count.toString(), style: SpotType.subheading.copyWith(color: color)),
-      Text(label, style: SpotType.caption),
-    ],
-  );
-}
-
 class _WitnessButton extends StatelessWidget {
   const _WitnessButton({
     required this.label,
     required this.icon,
+    required this.count,
+    required this.isSelected,
+    required this.isSubmitting,
     required this.color,
     required this.onTap,
   });
 
   final String label;
   final IconData icon;
+  final int count;
+  final bool isSelected;
+  final bool isSubmitting;
   final Color color;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) => Expanded(
     child: GestureDetector(
-      onTap: onTap,
-      child: Container(
+      onTap: isSubmitting ? null : onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(vertical: SpotSpacing.sm),
         decoration: BoxDecoration(
-          color: color.withAlpha(20),
+          color: isSelected
+              ? color.withValues(alpha: 0.22)
+              : color.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(SpotRadius.sm),
-          border: Border.all(color: color.withAlpha(60), width: 0.5),
+          border: Border.all(
+            color: isSelected
+                ? color.withValues(alpha: 0.85)
+                : color.withValues(alpha: 0.35),
+            width: isSelected ? 1 : 0.5,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.18),
+                    blurRadius: 12,
+                    spreadRadius: 0.5,
+                  ),
+                ]
+              : const [],
         ),
         child: Column(
           children: [
             Icon(icon, color: color, size: 16),
             const SizedBox(height: 3),
             Text(label, style: SpotType.caption.copyWith(color: color)),
+            const SizedBox(height: 4),
+            Text(
+              count.toString(),
+              style: SpotType.subheading.copyWith(color: color),
+            ),
           ],
         ),
       ),
