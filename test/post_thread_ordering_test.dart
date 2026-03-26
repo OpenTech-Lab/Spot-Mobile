@@ -86,6 +86,54 @@ void main() {
     },
   );
 
+  test('replyPosts returns only replies ordered newest first', () {
+    final root = _post(id: 'root', capturedAt: DateTime.utc(2026, 3, 23, 10));
+    final olderReply = _post(
+      id: 'older-reply',
+      capturedAt: DateTime.utc(2026, 3, 23, 11),
+      replyToId: root.nostrEventId,
+    );
+    final newerReply = _post(
+      id: 'newer-reply',
+      capturedAt: DateTime.utc(2026, 3, 23, 12),
+      replyToId: root.nostrEventId,
+    );
+
+    final replies = replyPosts([root, olderReply, newerReply]);
+
+    expect(replies.map((post) => post.nostrEventId).toList(), [
+      'newer-reply',
+      'older-reply',
+    ]);
+  });
+
+  test('visibleThreadRootIdForPost returns the thread root when visible', () {
+    final root = _post(id: 'root', capturedAt: DateTime.utc(2026, 3, 23, 10));
+    final reply = _post(
+      id: 'reply',
+      capturedAt: DateTime.utc(2026, 3, 23, 11),
+      replyToId: root.nostrEventId,
+    );
+
+    expect(
+      visibleThreadRootIdForPost([root, reply], reply.nostrEventId),
+      root.nostrEventId,
+    );
+  });
+
+  test('visibleThreadRootIdForPost falls back to the post id when missing', () {
+    final reply = _post(
+      id: 'reply',
+      capturedAt: DateTime.utc(2026, 3, 23, 11),
+      replyToId: 'missing-root',
+    );
+
+    expect(
+      visibleThreadRootIdForPost([reply], reply.nostrEventId),
+      reply.nostrEventId,
+    );
+  });
+
   test('threadEntriesForRoot returns only the selected thread subtree', () {
     final root = _post(id: 'root', capturedAt: DateTime.utc(2026, 3, 23, 10));
     final child = _post(

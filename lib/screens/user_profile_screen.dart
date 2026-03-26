@@ -20,6 +20,7 @@ import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/profile_avatar.dart';
 import 'package:mobile/widgets/profile_stats_row.dart';
+import 'package:mobile/widgets/profile_thread_tab_bar.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
 /// Profile screen for any user other than the local account.
@@ -39,9 +40,11 @@ class UserProfileScreen extends StatefulWidget {
   State<UserProfileScreen> createState() => _UserProfileScreenState();
 }
 
-class _UserProfileScreenState extends State<UserProfileScreen> {
+class _UserProfileScreenState extends State<UserProfileScreen>
+    with SingleTickerProviderStateMixin {
   late final EventRepository _repo;
   StreamSubscription<CivicEvent>? _sub;
+  late final TabController _contentTabController;
 
   List<MediaPost> _posts = [];
   bool _isLoading = true;
@@ -54,6 +57,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   void initState() {
     super.initState();
     _repo = EventRepository();
+    _contentTabController = TabController(length: 2, vsync: this)
+      ..addListener(() {
+        if (mounted) setState(() {});
+      });
     _initFeed();
     _loadProfile();
   }
@@ -61,6 +68,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   @override
   void dispose() {
     _sub?.cancel();
+    _contentTabController.dispose();
     _repo.dispose();
     super.dispose();
   }
@@ -140,6 +148,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   void _updateMediaPost(MediaPost post) {
     setState(() => _posts = replacePostsById(_posts, [post]));
     unawaited(LocalPostStore.instance.savePost(post));
+  }
+
+  void _openProfileThread(BuildContext context, MediaPost post) {
+    final rootPostId = post.replyToId == null
+        ? post.nostrEventId
+        : visibleThreadRootIdForPost(_posts, post.nostrEventId);
+    Navigator.of(context).push(
+      buildThreadScreenRoute(
+        rootPostId: rootPostId,
+        initialPosts: _posts,
+        wallet: widget.wallet,
+      ),
+    );
   }
 
   // ── Follow ────────────────────────────────────────────────────────────────
@@ -333,7 +354,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final roots = topLevelThreadPosts(_posts);
+    final threads = topLevelThreadPosts(_posts);
+    final replies = replyPosts(_posts);
+    final showReplies = _contentTabController.index == 1;
+    final visiblePosts = showReplies ? replies : threads;
+    final emptyTitle = showReplies ? 'No replies yet' : 'No threads yet';
     return Scaffold(
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
@@ -374,7 +399,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               ),
             ),
             const SliverToBoxAdapter(child: Divider(height: 1, thickness: 0.5)),
-            if (_isLoading && _posts.isEmpty)
+            SliverToBoxAdapter(
+              child: ProfileThreadTabBar(controller: _contentTabController),
+            ),
+            if (_isLoading && visiblePosts.isEmpty)
               const SliverFillRemaining(
                 child: Center(
                   child: SizedBox(
@@ -387,19 +415,26 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   ),
                 ),
               )
-            else if (_posts.isEmpty)
-              const SliverFillRemaining(
+            else if (visiblePosts.isEmpty)
+              SliverFillRemaining(
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
+                      const Icon(
                         CupertinoIcons.camera,
                         color: SpotColors.overlay,
                         size: 32,
                       ),
-                      SizedBox(height: SpotSpacing.lg),
-                      Text('No posts yet', style: SpotType.bodySecondary),
+                      const SizedBox(height: SpotSpacing.lg),
+                      Text(emptyTitle, style: SpotType.bodySecondary),
+                      const SizedBox(height: SpotSpacing.xs),
+                      Text(
+                        showReplies
+                            ? 'Replies from this account will appear here'
+                            : 'No top-level threads from this account yet',
+                        style: SpotType.caption,
+                      ),
                     ],
                   ),
                 ),
@@ -407,15 +442,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             else
               SliverList(
                 delegate: SliverChildBuilderDelegate((ctx, i) {
-                  final post = roots[i];
+                  final post = visiblePosts[i];
                   return InkWell(
-                    onTap: () => Navigator.of(ctx).push(
-                      buildThreadScreenRoute(
-                        rootPostId: post.nostrEventId,
-                        initialPosts: _posts,
-                        wallet: widget.wallet,
-                      ),
-                    ),
+                    onTap: () => _openProfileThread(ctx, post),
                     child: PostThreadRow(
                       post: post,
                       isLast: true,
@@ -434,7 +463,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       ),
                     ),
                   );
-                }, childCount: roots.length),
+                }, childCount: visiblePosts.length),
               ),
           ],
         ),

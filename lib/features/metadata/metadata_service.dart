@@ -9,6 +9,38 @@ import 'package:mobile/models/profile_model.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/models/witness_model.dart';
 
+final _uuidLikeRegExp = RegExp(
+  r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+);
+
+String? resolveDeleteTargetPostId({
+  required String requestedPostId,
+  required String contentHash,
+  required List<Map<String, dynamic>> ownedRows,
+}) {
+  final normalizedPostId = requestedPostId.trim();
+  final normalizedHash = contentHash.trim();
+
+  if (_uuidLikeRegExp.hasMatch(normalizedPostId)) {
+    return normalizedPostId;
+  }
+
+  for (final row in ownedRows) {
+    final rowId = row['id']?.toString();
+    if (rowId == null || rowId.isEmpty) continue;
+    if (rowId == normalizedPostId) return rowId;
+
+    final hashes = row['content_hashes'];
+    if (hashes is! List) continue;
+    final hasMatch = hashes.any(
+      (value) => value?.toString().trim() == normalizedHash,
+    );
+    if (hasMatch) return rowId;
+  }
+
+  return null;
+}
+
 /// Supabase-backed metadata service for posts, events, reports, and witnesses.
 ///
 /// The old Nostr wallet identity is still synced into `profiles.legacy_pubkey`
@@ -283,10 +315,27 @@ class MetadataService {
     WalletModel wallet,
   ) async {
     await syncLegacyProfile(wallet);
+    final user = client.auth.currentUser;
+    if (user == null) {
+      throw StateError('Missing Supabase user after profile sync');
+    }
+
+    final resolvedPostId = _uuidLikeRegExp.hasMatch(postId.trim())
+        ? postId.trim()
+        : await _resolveOwnedDeleteTargetPostId(
+            requestedPostId: postId,
+            contentHash: contentHash,
+            userId: user.id,
+          );
+
+    if (resolvedPostId == null) {
+      throw StateError('Post not found for deletion');
+    }
+
     await client
         .from('posts')
         .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
-        .eq('id', postId);
+        .eq('id', resolvedPostId);
   }
 
   Future<void> reportContent({
@@ -601,6 +650,28 @@ class MetadataService {
     );
     if (rows.isEmpty) return null;
     return ProfileModel.fromRow(rows.first);
+  }
+
+  Future<String?> _resolveOwnedDeleteTargetPostId({
+    required String requestedPostId,
+    required String contentHash,
+    required String userId,
+  }) async {
+    final rows = List<Map<String, dynamic>>.from(
+      await client
+          .from('posts')
+          .select('id, content_hashes')
+          .eq('user_id', userId)
+          .isFilter('deleted_at', null)
+          .order('created_at', ascending: false)
+          .limit(500),
+    );
+
+    return resolveDeleteTargetPostId(
+      requestedPostId: requestedPostId,
+      contentHash: contentHash,
+      ownedRows: rows,
+    );
   }
 
   String _defaultDisplayNameForWallet(WalletModel wallet) =>

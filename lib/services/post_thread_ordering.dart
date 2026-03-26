@@ -113,6 +113,19 @@ List<MediaPost> topLevelThreadPosts(Iterable<MediaPost> posts) {
   return roots;
 }
 
+List<MediaPost> replyPosts(Iterable<MediaPost> posts) {
+  final replies = posts.where((post) => post.replyToId != null).toList();
+  replies.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+  return replies;
+}
+
+String visibleThreadRootIdForPost(Iterable<MediaPost> posts, String postId) {
+  for (final entry in buildThreadedPostEntries(posts)) {
+    if (entry.post.nostrEventId == postId) return entry.rootId;
+  }
+  return postId;
+}
+
 List<ThreadedPostEntry> threadEntriesForRoot(
   Iterable<MediaPost> posts,
   String rootId,

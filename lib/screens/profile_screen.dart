@@ -30,6 +30,7 @@ import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/profile_avatar.dart';
 import 'package:mobile/widgets/profile_stats_row.dart';
+import 'package:mobile/widgets/profile_thread_tab_bar.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
 /// Profile screen — shows identity summary and the user's own posts.
@@ -47,11 +48,13 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin {
   EventRepository get _repo => widget.eventRepo;
   StreamSubscription<CivicEvent>? _sub;
   StreamSubscription<List<MediaPost>>? _localSub;
   StreamSubscription<void>? _followSub;
+  late final TabController _contentTabController;
 
   List<MediaPost> _posts = [];
   bool _isLoading = true;
@@ -64,6 +67,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _contentTabController = TabController(length: 2, vsync: this)
+      ..addListener(() {
+        if (mounted) setState(() {});
+      });
     _initFeed();
   }
 
@@ -72,6 +79,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _sub?.cancel();
     _localSub?.cancel();
     _followSub?.cancel();
+    _contentTabController.dispose();
     super.dispose();
   }
 
@@ -190,6 +198,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _updateMediaPost(MediaPost post) {
     setState(() => _posts = replacePostsById(_posts, [post]));
     unawaited(LocalPostStore.instance.savePost(post));
+  }
+
+  void _openProfileThread(BuildContext context, MediaPost post) {
+    final rootPostId = post.replyToId == null
+        ? post.nostrEventId
+        : visibleThreadRootIdForPost(_posts, post.nostrEventId);
+    Navigator.of(context).push(
+      buildThreadScreenRoute(
+        rootPostId: rootPostId,
+        initialPosts: _posts,
+        wallet: widget.wallet,
+        eventRepo: _repo,
+      ),
+    );
   }
 
   Future<void> _deletePost(MediaPost post) async {
@@ -481,7 +503,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final roots = topLevelThreadPosts(_posts);
+    final threads = topLevelThreadPosts(_posts);
+    final replies = replyPosts(_posts);
+    final showReplies = _contentTabController.index == 1;
+    final visiblePosts = showReplies ? replies : threads;
+    final emptyTitle = showReplies ? 'No replies yet' : 'No threads yet';
+    final emptySubtitle = showReplies
+        ? 'Replies you posted will appear here'
+        : 'Capture a moment to see it here';
     return Scaffold(
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
@@ -518,8 +547,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // ── Divider ────────────────────────────────────────────────────
             const SliverToBoxAdapter(child: Divider(height: 1, thickness: 0.5)),
 
+            SliverToBoxAdapter(
+              child: ProfileThreadTabBar(controller: _contentTabController),
+            ),
+
             // ── Posts ──────────────────────────────────────────────────────
-            if (_isLoading && _posts.isEmpty)
+            if (_isLoading && visiblePosts.isEmpty)
               const SliverFillRemaining(
                 child: Center(
                   child: SizedBox(
@@ -532,7 +565,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               )
-            else if (_error != null && _posts.isEmpty)
+            else if (_error != null && visiblePosts.isEmpty)
               SliverFillRemaining(
                 child: Center(
                   child: Text(
@@ -541,7 +574,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               )
-            else if (_posts.isEmpty)
+            else if (visiblePosts.isEmpty)
               SliverFillRemaining(
                 child: Center(
                   child: Column(
@@ -554,16 +587,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(height: SpotSpacing.lg),
                       Text(
-                        'No posts yet',
+                        emptyTitle,
                         style: SpotType.bodySecondary.copyWith(
                           fontWeight: FontWeight.w300,
                         ),
                       ),
                       const SizedBox(height: SpotSpacing.xs),
-                      const Text(
-                        'Capture a moment to see it here',
-                        style: SpotType.caption,
-                      ),
+                      Text(emptySubtitle, style: SpotType.caption),
                     ],
                   ),
                 ),
@@ -571,18 +601,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             else
               SliverList(
                 delegate: SliverChildBuilderDelegate((ctx, i) {
-                  final post = roots[i];
+                  final post = visiblePosts[i];
                   return InkWell(
                     onTap: post.isPendingRetry
                         ? null
-                        : () => Navigator.of(ctx).push(
-                            buildThreadScreenRoute(
-                              rootPostId: post.nostrEventId,
-                              initialPosts: _posts,
-                              wallet: widget.wallet,
-                              eventRepo: _repo,
-                            ),
-                          ),
+                        : () => _openProfileThread(ctx, post),
                     child: PostThreadRow(
                       post: post,
                       isLast: true,
@@ -607,7 +630,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       isRetrying: _retryingPostIds.contains(post.id),
                     ),
                   );
-                }, childCount: roots.length),
+                }, childCount: visiblePosts.length),
               ),
           ],
         ),
