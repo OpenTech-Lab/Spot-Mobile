@@ -1,6 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
 
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/event_model.dart';
@@ -10,6 +14,83 @@ import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
 /// Event detail — wiki-like timeline for a [CivicEvent] with EBES trust data.
+class EventLocationSpot {
+  const EventLocationSpot({
+    required this.latitude,
+    required this.longitude,
+    required this.label,
+  });
+
+  final double latitude;
+  final double longitude;
+  final String label;
+}
+
+List<EventLocationSpot> eventLocationSpots(Iterable<MediaPost> posts) {
+  return posts
+      .where((post) => post.hasGps)
+      .map(
+        (post) => EventLocationSpot(
+          latitude: post.latitude!,
+          longitude: post.longitude!,
+          label: post.spotName?.trim().isNotEmpty == true
+              ? post.spotName!.trim()
+              : (post.eventTag?.isNotEmpty == true
+                    ? '#${post.eventTag}'
+                    : 'Pinned post'),
+        ),
+      )
+      .toList(growable: false);
+}
+
+LatLng eventLocationCenter(Iterable<EventLocationSpot> spots) {
+  final points = spots.toList(growable: false);
+  if (points.isEmpty) return const LatLng(0, 0);
+  final latAverage =
+      points.map((spot) => spot.latitude).reduce((a, b) => a + b) /
+      points.length;
+  final lonAverage =
+      points.map((spot) => spot.longitude).reduce((a, b) => a + b) /
+      points.length;
+  return LatLng(latAverage, lonAverage);
+}
+
+double eventLocationZoom(Iterable<EventLocationSpot> spots) {
+  final points = spots.toList(growable: false);
+  if (points.length <= 1) return 15;
+
+  final latitudes = points.map((spot) => spot.latitude);
+  final longitudes = points.map((spot) => spot.longitude);
+  final latSpan = latitudes.reduce(math.max) - latitudes.reduce(math.min);
+  final lonSpan = longitudes.reduce(math.max) - longitudes.reduce(math.min);
+  final span = math.max(latSpan, lonSpan);
+
+  if (span < 0.0025) return 15;
+  if (span < 0.01) return 14;
+  if (span < 0.03) return 13;
+  if (span < 0.08) return 12;
+  if (span < 0.2) return 11;
+  if (span < 0.5) return 10;
+  if (span < 1.5) return 8.5;
+  if (span < 4) return 7;
+  return 5.5;
+}
+
+String eventLocationSummary(CivicEvent event) {
+  final spots = eventLocationSpots(event.posts);
+  if (spots.isEmpty || event.centerLat == null || event.centerLon == null) {
+    return 'Hidden';
+  }
+
+  if (spots.length == 1) {
+    return '${event.centerLat!.toStringAsFixed(4)}, ${event.centerLon!.toStringAsFixed(4)}';
+  }
+
+  return '${spots.length} spots · '
+      '${event.centerLat!.toStringAsFixed(4)}, '
+      '${event.centerLon!.toStringAsFixed(4)}';
+}
+
 class EventScreen extends StatefulWidget {
   const EventScreen({super.key, required this.event, required this.wallet});
 
@@ -174,52 +255,149 @@ class _EventHeader extends StatelessWidget {
           ),
           const SizedBox(height: SpotSpacing.xs),
           _StatRow(label: 'Confidence', value: '${event.trustPercent}%'),
-
-          if (event.centerLat != null) ...[
-            const SizedBox(height: SpotSpacing.xs),
-            _StatRow(
-              label: 'Location',
-              value:
-                  '${event.centerLat!.toStringAsFixed(4)}, '
-                  '${event.centerLon!.toStringAsFixed(4)}',
-            ),
-          ] else ...[
-            const SizedBox(height: SpotSpacing.xs),
-            const _StatRow(label: 'Location', value: 'Hidden'),
-          ],
+          const SizedBox(height: SpotSpacing.xs),
+          _StatRow(label: 'Location', value: eventLocationSummary(event)),
 
           const SizedBox(height: SpotSpacing.lg),
+          _EventLocationMap(event: event),
+        ],
+      ),
+    );
+  }
+}
 
-          // Location card (placeholder for flutter_map integration)
-          Container(
-            height: 100,
-            decoration: BoxDecoration(
-              color: SpotColors.bg,
-              borderRadius: BorderRadius.circular(SpotRadius.sm),
-              border: Border.all(color: SpotColors.border, width: 0.5),
-            ),
-            child: Center(
-              child: event.centerLat != null
-                  ? Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          CupertinoIcons.location,
-                          color: SpotColors.textTertiary,
-                          size: 20,
-                        ),
-                        const SizedBox(height: SpotSpacing.xs),
-                        Text(
-                          '${event.centerLat!.toStringAsFixed(4)}, '
-                          '${event.centerLon!.toStringAsFixed(4)}',
-                          style: SpotType.caption,
-                        ),
+class _EventLocationMap extends StatelessWidget {
+  const _EventLocationMap({required this.event});
+
+  final CivicEvent event;
+
+  static const _tileUrl =
+      'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
+
+  @override
+  Widget build(BuildContext context) {
+    final spots = eventLocationSpots(event.posts);
+    if (spots.isEmpty) {
+      return Container(
+        height: 108,
+        decoration: BoxDecoration(
+          color: SpotColors.bg,
+          borderRadius: BorderRadius.circular(SpotRadius.sm),
+          border: Border.all(color: SpotColors.border, width: 0.5),
+        ),
+        child: const Center(
+          child: Text('Location hidden', style: SpotType.caption),
+        ),
+      );
+    }
+
+    final center = eventLocationCenter(spots);
+    final zoom = eventLocationZoom(spots);
+    final coordinates = spots
+        .map((spot) => LatLng(spot.latitude, spot.longitude))
+        .toList(growable: false);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 184,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(SpotRadius.sm),
+            child: Stack(
+              children: [
+                FlutterMap(
+                  options: MapOptions(
+                    initialCenter: center,
+                    initialZoom: zoom,
+                    initialCameraFit: coordinates.length > 1
+                        ? CameraFit.coordinates(
+                            coordinates: coordinates,
+                            padding: const EdgeInsets.all(28),
+                            maxZoom: 15,
+                            minZoom: 5.5,
+                          )
+                        : null,
+                    backgroundColor: SpotColors.bg,
+                    interactionOptions: const InteractionOptions(
+                      flags:
+                          InteractiveFlag.drag |
+                          InteractiveFlag.pinchZoom |
+                          InteractiveFlag.doubleTapZoom,
+                    ),
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: _tileUrl,
+                      userAgentPackageName: 'com.icyanstudio.spot',
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        for (final spot in spots)
+                          Marker(
+                            point: LatLng(spot.latitude, spot.longitude),
+                            width: 34,
+                            height: 34,
+                            child: Tooltip(
+                              message: spot.label,
+                              child: const _EventLocationMarker(),
+                            ),
+                          ),
                       ],
-                    )
-                  : const Text('Location hidden', style: SpotType.caption),
+                    ),
+                  ],
+                ),
+                Positioned(
+                  top: SpotSpacing.sm,
+                  right: SpotSpacing.sm,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpotSpacing.sm,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: SpotColors.bg.withValues(alpha: 0.86),
+                      borderRadius: BorderRadius.circular(SpotRadius.full),
+                      border: Border.all(color: SpotColors.border, width: 0.5),
+                    ),
+                    child: Text(
+                      '${spots.length} spot${spots.length == 1 ? '' : 's'}',
+                      style: SpotType.caption.copyWith(
+                        color: SpotColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
+        const SizedBox(height: SpotSpacing.xs),
+        Text(
+          'Map tiles: OpenStreetMap / CARTO',
+          style: SpotType.caption.copyWith(color: SpotColors.textTertiary),
+        ),
+      ],
+    );
+  }
+}
+
+class _EventLocationMarker extends StatelessWidget {
+  const _EventLocationMarker();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Transform.translate(
+        offset: const Offset(0, -4),
+        child: Icon(
+          Icons.location_on,
+          color: SpotColors.accent,
+          size: 26,
+          shadows: [
+            Shadow(color: SpotColors.bg.withValues(alpha: 0.7), blurRadius: 6),
+          ],
+        ),
       ),
     );
   }
