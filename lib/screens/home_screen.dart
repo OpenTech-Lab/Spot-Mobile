@@ -34,9 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _eventRepo = EventRepository();
     unawaited(MetadataService.instance.syncLegacyProfile(widget.wallet));
-    P2PService.instance.configure(
-      wallet: widget.wallet,
-    );
+    P2PService.instance.configure(wallet: widget.wallet);
     unawaited(P2PService.instance.refreshTransportAvailability());
   }
 
@@ -49,20 +47,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Tabs built once and preserved via IndexedStack
   late final List<Widget> _tabs = [
-    FeedScreen(
-      key: _feedKey,
-      wallet: widget.wallet,
-      eventRepo: _eventRepo,
-    ),
+    FeedScreen(key: _feedKey, wallet: widget.wallet, eventRepo: _eventRepo),
     DiscoverScreen(wallet: widget.wallet),
-    _EventsListTab(
-      eventRepo: _eventRepo,
-      wallet: widget.wallet,
-    ),
-    ProfileScreen(
-      wallet: widget.wallet,
-      eventRepo: _eventRepo,
-    ),
+    _EventsListTab(eventRepo: _eventRepo, wallet: widget.wallet),
+    ProfileScreen(wallet: widget.wallet, eventRepo: _eventRepo),
   ];
 
   void _openComposer() {
@@ -95,10 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             )
           : _selectedTab == 1
-          ? AppBar(
-              backgroundColor: SpotColors.bg,
-              title: const Text('Discover', style: SpotType.subheading),
-            )
+          ? null
           : AppBar(
               backgroundColor: SpotColors.bg,
               title: const Text('Events', style: SpotType.subheading),
@@ -334,10 +319,7 @@ class _NavItemState extends State<_NavItem>
 // ── Events list tab ────────────────────────────────────────────────────────────
 
 class _EventsListTab extends StatelessWidget {
-  const _EventsListTab({
-    required this.eventRepo,
-    required this.wallet,
-  });
+  const _EventsListTab({required this.eventRepo, required this.wallet});
 
   final EventRepository eventRepo;
   final WalletModel wallet;
@@ -380,10 +362,7 @@ class _EventsListTab extends StatelessWidget {
         return InkWell(
           onTap: () => Navigator.of(ctx).push(
             MaterialPageRoute(
-              builder: (_) => EventScreen(
-                event: event,
-                wallet: wallet,
-              ),
+              builder: (_) => EventScreen(event: event, wallet: wallet),
             ),
           ),
           borderRadius: BorderRadius.circular(SpotRadius.sm),

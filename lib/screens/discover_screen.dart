@@ -28,6 +28,60 @@ import 'package:mobile/widgets/post_thread_row.dart';
 ///
 /// Shows algorithmically ranked and geo-filtered content.
 /// Moving discovery tabs here keeps the home feed focused on chronology.
+String normalizeDiscoverSearchQuery(String query) => query.trim().toLowerCase();
+
+bool discoverThreadPostMatchesQuery(MediaPost post, String query) {
+  final normalizedQuery = normalizeDiscoverSearchQuery(query);
+  if (normalizedQuery.isEmpty) return true;
+
+  final isTagQuery = normalizedQuery.startsWith('#');
+  final effectiveQuery = isTagQuery
+      ? normalizedQuery.substring(1).trim()
+      : normalizedQuery;
+  if (effectiveQuery.isEmpty) return true;
+
+  final normalizedTags = [
+    ...post.eventTags.map((tag) => tag.toLowerCase()),
+    ...post.tags.map((tag) => tag.toLowerCase()),
+  ];
+  final tagMatches = normalizedTags.any((tag) => tag.contains(effectiveQuery));
+  if (isTagQuery) return tagMatches;
+
+  final searchableText = [
+    post.caption,
+    post.spotName,
+    ...post.eventTags,
+    ...post.tags,
+  ].whereType<String>().join(' ').toLowerCase();
+  return tagMatches || searchableText.contains(effectiveQuery);
+}
+
+List<MediaPost> visibleDiscoverThreads(
+  Iterable<MediaPost> posts, {
+  String query = '',
+}) {
+  final roots = topLevelThreadPosts(posts);
+  final normalizedQuery = normalizeDiscoverSearchQuery(query);
+  if (normalizedQuery.isEmpty) return roots;
+
+  final entriesByRoot = <String, List<ThreadedPostEntry>>{};
+  for (final entry in buildThreadedPostEntries(posts)) {
+    entriesByRoot
+        .putIfAbsent(entry.rootId, () => <ThreadedPostEntry>[])
+        .add(entry);
+  }
+
+  return roots
+      .where((root) {
+        final threadEntries = entriesByRoot[root.nostrEventId] ?? const [];
+        return threadEntries.any(
+          (entry) =>
+              discoverThreadPostMatchesQuery(entry.post, normalizedQuery),
+        );
+      })
+      .toList(growable: false);
+}
+
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key, required this.wallet});
 
@@ -42,10 +96,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   late final TabController _tabController;
   late final EventRepository _repo;
   StreamSubscription<CivicEvent>? _sub;
+  final TextEditingController _searchController = TextEditingController();
 
   List<MediaPost> _posts = [];
   bool _isLoading = true;
   final Set<String> _loadingMediaPostIds = {};
+  String _searchQuery = '';
 
   double? _userLat;
   double? _userLon;
@@ -68,6 +124,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     _tabController.dispose();
     _sub?.cancel();
     _repo.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -235,28 +292,59 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _buildTabBar(),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _buildScoredList(
-                posts: _trendingPosts,
-                emptyLabel: 'Nothing trending in the last 48 h',
-              ),
-              _buildScoredList(
-                posts: _forYouPosts,
-                emptyLabel: UserPrefsService.instance.hasSetInterests
-                    ? 'No recommended posts yet'
-                    : 'Set your interests to see personalised content',
-              ),
-              _buildNearbyList(),
-            ],
+    return SafeArea(
+      bottom: false,
+      child: Column(
+        children: [
+          _buildHeader(),
+          _buildTabBar(),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildScoredList(
+                  posts: _trendingPosts,
+                  emptyLabel: 'Nothing trending in the last 48 h',
+                ),
+                _buildScoredList(
+                  posts: _forYouPosts,
+                  emptyLabel: UserPrefsService.instance.hasSetInterests
+                      ? 'No recommended posts yet'
+                      : 'Set your interests to see personalised content',
+                ),
+                _buildNearbyList(),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        SpotSpacing.lg,
+        SpotSpacing.sm,
+        SpotSpacing.lg,
+        SpotSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          const Text('Discover', style: SpotType.subheading),
+          const SizedBox(width: SpotSpacing.md),
+          Expanded(
+            child: CupertinoSearchTextField(
+              controller: _searchController,
+              placeholder: 'Search threads or #tags',
+              backgroundColor: SpotColors.surface,
+              itemColor: SpotColors.textSecondary,
+              style: SpotType.body.copyWith(color: SpotColors.textPrimary),
+              onChanged: (value) => setState(() => _searchQuery = value),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -281,7 +369,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     required List<MediaPost> posts,
     required String emptyLabel,
   }) {
-    if (_isLoading && posts.isEmpty) {
+    final roots = visibleDiscoverThreads(posts, query: _searchQuery);
+    if (_isLoading && roots.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -304,12 +393,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         ),
       );
     }
-    if (posts.isEmpty) {
+    if (roots.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(SpotSpacing.xxxl),
           child: Text(
-            emptyLabel,
+            normalizeDiscoverSearchQuery(_searchQuery).isNotEmpty
+                ? 'No threads found for "${_searchQuery.trim()}"'
+                : emptyLabel,
             style: SpotType.bodySecondary,
             textAlign: TextAlign.center,
           ),
@@ -324,7 +415,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       onRefresh: _refresh,
       child: Builder(
         builder: (ctx) {
-          final roots = topLevelThreadPosts(posts);
           return ListView.builder(
             padding: const EdgeInsets.only(
               top: SpotSpacing.sm,
