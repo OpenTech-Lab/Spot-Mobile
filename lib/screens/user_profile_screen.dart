@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/event_model.dart';
+import 'package:mobile/models/follow_stats.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/profile_model.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -18,6 +19,7 @@ import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/profile_avatar.dart';
+import 'package:mobile/widgets/profile_stats_row.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
 /// Profile screen for any user other than the local account.
@@ -44,13 +46,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   List<MediaPost> _posts = [];
   bool _isLoading = true;
   bool _isFollowing = false;
+  bool _isTogglingFollow = false;
   ProfileModel? _profile;
+  FollowStats _followStats = const FollowStats.empty();
 
   @override
   void initState() {
     super.initState();
     _repo = EventRepository();
-    _isFollowing = FollowService.instance.isFollowing(widget.pubkey);
     _initFeed();
     _loadProfile();
   }
@@ -90,6 +93,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     _repo.reset();
     setState(() => _posts = []);
     await _initFeed();
+    await _loadProfile();
   }
 
   List<MediaPost> _mergePosts(
@@ -107,11 +111,21 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   Future<void> _loadProfile() async {
     try {
+      await FollowService.instance.init();
       final profile = await MetadataService.instance.fetchProfileByPubkey(
         widget.pubkey,
       );
+      final stats = await MetadataService.instance.fetchFollowStatsByPubkey(
+        widget.pubkey,
+      );
       if (!mounted) return;
-      setState(() => _profile = profile);
+      setState(() {
+        _profile = profile;
+        _followStats = stats ?? const FollowStats.empty();
+        _isFollowing =
+            stats?.isFollowingByMe ??
+            FollowService.instance.isFollowing(widget.pubkey);
+      });
     } catch (e) {
       debugPrint('[UserProfileScreen] Failed to load profile: $e');
     }
@@ -131,12 +145,35 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   // ── Follow ────────────────────────────────────────────────────────────────
 
   Future<void> _toggleFollow() async {
-    if (_isFollowing) {
-      await FollowService.instance.unfollow(widget.pubkey);
-    } else {
-      await FollowService.instance.follow(widget.pubkey);
+    if (_isTogglingFollow) return;
+    setState(() => _isTogglingFollow = true);
+    final shouldFollow = !_isFollowing;
+    try {
+      final stats = await MetadataService.instance.setFollowingForPubkey(
+        targetPubkey: widget.pubkey,
+        shouldFollow: shouldFollow,
+        wallet: widget.wallet,
+      );
+      if (shouldFollow) {
+        await FollowService.instance.follow(widget.pubkey);
+      } else {
+        await FollowService.instance.unfollow(widget.pubkey);
+      }
+      if (!mounted) return;
+      setState(() {
+        _isFollowing = shouldFollow;
+        _followStats = stats;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Follow update failed: $e')));
+    } finally {
+      if (mounted) {
+        setState(() => _isTogglingFollow = false);
+      }
     }
-    if (mounted) setState(() => _isFollowing = !_isFollowing);
   }
 
   // ── Post action ───────────────────────────────────────────────────────────
@@ -329,7 +366,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               child: _UserProfileHeader(
                 pubkey: widget.pubkey,
                 postCount: _posts.length,
+                followStats: _followStats,
                 isFollowing: _isFollowing,
+                isTogglingFollow: _isTogglingFollow,
                 onFollowTap: _toggleFollow,
                 profile: _profile,
               ),
@@ -410,14 +449,18 @@ class _UserProfileHeader extends StatelessWidget {
   const _UserProfileHeader({
     required this.pubkey,
     required this.postCount,
+    required this.followStats,
     required this.isFollowing,
+    required this.isTogglingFollow,
     required this.onFollowTap,
     required this.profile,
   });
 
   final String pubkey;
   final int postCount;
+  final FollowStats followStats;
   final bool isFollowing;
+  final bool isTogglingFollow;
   final VoidCallback onFollowTap;
   final ProfileModel? profile;
 
@@ -434,23 +477,21 @@ class _UserProfileHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               ProfileAvatar(
                 pubkey: pubkey,
                 avatarContentHash: profile?.avatarContentHash,
                 size: 72,
               ),
-              const Spacer(),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text('$postCount', style: SpotType.subheading),
-                  const SizedBox(height: 2),
-                  const Text('Posts', style: SpotType.caption),
-                ],
+              const SizedBox(width: SpotSpacing.lg),
+              Expanded(
+                child: ProfileStatsRow(
+                  postCount: postCount,
+                  followingCount: followStats.followingCount,
+                  followerCount: followStats.followerCount,
+                ),
               ),
-              const SizedBox(width: SpotSpacing.xl),
             ],
           ),
           const SizedBox(height: SpotSpacing.md),
@@ -469,12 +510,12 @@ class _UserProfileHeader extends StatelessWidget {
             width: double.infinity,
             child: isFollowing
                 ? OutlinedButton(
-                    onPressed: onFollowTap,
-                    child: const Text('Following'),
+                    onPressed: isTogglingFollow ? null : onFollowTap,
+                    child: Text(isTogglingFollow ? 'Updating…' : 'Following'),
                   )
                 : FilledButton(
-                    onPressed: onFollowTap,
-                    child: const Text('Follow'),
+                    onPressed: isTogglingFollow ? null : onFollowTap,
+                    child: Text(isTogglingFollow ? 'Updating…' : 'Follow'),
                   ),
           ),
         ],

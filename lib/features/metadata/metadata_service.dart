@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/features/metadata/metadata_post_mapper.dart';
+import 'package:mobile/models/follow_stats.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/profile_model.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -161,6 +162,79 @@ class MetadataService {
 
     await client.from('profiles').delete().eq('id', user.id);
     await client.auth.signOut();
+  }
+
+  Future<FollowStats> fetchCurrentFollowStats(WalletModel wallet) async {
+    await syncLegacyProfile(wallet);
+    final user = client.auth.currentUser;
+    if (user == null) {
+      throw StateError('Missing Supabase user after profile sync');
+    }
+    return fetchFollowStatsForProfileId(user.id);
+  }
+
+  Future<FollowStats?> fetchFollowStatsByPubkey(String pubkey) async {
+    final authorIds = await resolveAuthorIds(pubkey);
+    if (authorIds.isEmpty) return null;
+    return fetchFollowStatsForProfileId(authorIds.first);
+  }
+
+  Future<FollowStats> fetchFollowStatsForProfileId(String profileId) async {
+    try {
+      final response = await client.rpc(
+        'get_follow_stats',
+        params: {'p_profile_id': profileId},
+      );
+
+      if (response is List && response.isNotEmpty && response.first is Map) {
+        return FollowStats.fromRpcRow(
+          Map<String, dynamic>.from(response.first as Map),
+        );
+      }
+      if (response is Map) {
+        return FollowStats.fromRpcRow(Map<String, dynamic>.from(response));
+      }
+    } catch (e) {
+      debugPrint('[MetadataService] Failed to fetch follow stats: $e');
+    }
+    return const FollowStats.empty();
+  }
+
+  Future<FollowStats> setFollowingForPubkey({
+    required String targetPubkey,
+    required bool shouldFollow,
+    required WalletModel wallet,
+  }) async {
+    await syncLegacyProfile(wallet);
+    final user = client.auth.currentUser;
+    if (user == null) {
+      throw StateError('Missing Supabase user after profile sync');
+    }
+
+    final authorIds = await resolveAuthorIds(targetPubkey);
+    if (authorIds.isEmpty) {
+      throw StateError('Target profile is unavailable for follow actions');
+    }
+
+    final targetProfileId = authorIds.first;
+    if (targetProfileId == user.id) {
+      return fetchFollowStatsForProfileId(targetProfileId);
+    }
+
+    if (shouldFollow) {
+      await client.from('follows').upsert({
+        'follower_id': user.id,
+        'followed_profile_id': targetProfileId,
+      }, onConflict: 'follower_id,followed_profile_id');
+    } else {
+      await client
+          .from('follows')
+          .delete()
+          .eq('follower_id', user.id)
+          .eq('followed_profile_id', targetProfileId);
+    }
+
+    return fetchFollowStatsForProfileId(targetProfileId);
   }
 
   Future<MediaPost> publishPost(MediaPost draft, WalletModel wallet) async {

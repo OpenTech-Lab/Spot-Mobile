@@ -11,6 +11,7 @@ import 'package:mobile/core/wallet.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/event_model.dart';
+import 'package:mobile/models/follow_stats.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/profile_model.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -20,6 +21,7 @@ import 'package:mobile/screens/settings_screen.dart';
 import 'package:mobile/screens/thread_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/cdn_media_service.dart';
+import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/media_processing_service.dart';
 import 'package:mobile/services/post_publish_service.dart';
@@ -27,6 +29,7 @@ import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/profile_avatar.dart';
+import 'package:mobile/widgets/profile_stats_row.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
 /// Profile screen — shows identity summary and the user's own posts.
@@ -48,12 +51,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   EventRepository get _repo => widget.eventRepo;
   StreamSubscription<CivicEvent>? _sub;
   StreamSubscription<List<MediaPost>>? _localSub;
+  StreamSubscription<void>? _followSub;
 
   List<MediaPost> _posts = [];
   bool _isLoading = true;
   String? _error;
   final Set<String> _retryingPostIds = {};
   ProfileModel? _profile;
+  FollowStats _followStats = const FollowStats.empty();
   bool _isSavingProfile = false;
 
   @override
@@ -66,6 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void dispose() {
     _sub?.cancel();
     _localSub?.cancel();
+    _followSub?.cancel();
     super.dispose();
   }
 
@@ -78,8 +84,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _localSub ??= LocalPostStore.instance.changes.listen(
         _onLocalPostsChanged,
       );
+      _followSub ??= FollowService.instance.changes.listen((_) {
+        unawaited(_loadFollowStats());
+      });
       await _loadPersistedPosts();
       await _loadProfile();
+      await _loadFollowStats();
       _sub = _repo
           .subscribeToAuthorPosts(widget.wallet.publicKeyHex)
           .listen(_onEvent);
@@ -127,6 +137,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() => _profile = profile);
     } catch (e) {
       debugPrint('[ProfileScreen] Failed to load profile: $e');
+    }
+  }
+
+  Future<void> _loadFollowStats() async {
+    try {
+      final stats = await MetadataService.instance.fetchCurrentFollowStats(
+        widget.wallet,
+      );
+      if (!mounted) return;
+      setState(() => _followStats = stats);
+    } catch (e) {
+      debugPrint('[ProfileScreen] Failed to load follow stats: $e');
     }
   }
 
@@ -486,6 +508,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: _ProfileHeader(
                 wallet: widget.wallet,
                 postCount: _posts.length,
+                followStats: _followStats,
                 profile: _profile,
                 onEdit: _editProfile,
                 isSavingProfile: _isSavingProfile,
@@ -599,6 +622,7 @@ class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader({
     required this.wallet,
     required this.postCount,
+    required this.followStats,
     required this.profile,
     required this.onEdit,
     required this.isSavingProfile,
@@ -606,6 +630,7 @@ class _ProfileHeader extends StatelessWidget {
 
   final WalletModel wallet;
   final int postCount;
+  final FollowStats followStats;
   final ProfileModel? profile;
   final VoidCallback onEdit;
   final bool isSavingProfile;
@@ -623,9 +648,8 @@ class _ProfileHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Avatar
               GestureDetector(
                 onTap: isSavingProfile ? null : onEdit,
                 child: ProfileAvatar(
@@ -634,17 +658,14 @@ class _ProfileHeader extends StatelessWidget {
                   size: 72,
                 ),
               ),
-              const Spacer(),
-              // Post count
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text('$postCount', style: SpotType.subheading),
-                  const SizedBox(height: 2),
-                  const Text('Posts', style: SpotType.caption),
-                ],
+              const SizedBox(width: SpotSpacing.lg),
+              Expanded(
+                child: ProfileStatsRow(
+                  postCount: postCount,
+                  followingCount: followStats.followingCount,
+                  followerCount: followStats.followerCount,
+                ),
               ),
-              const SizedBox(width: SpotSpacing.xl),
             ],
           ),
           const SizedBox(height: SpotSpacing.md),

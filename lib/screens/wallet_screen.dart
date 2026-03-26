@@ -1,8 +1,5 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
-import 'package:mobile/core/wallet.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/altcha_gate_screen.dart';
@@ -14,7 +11,7 @@ import 'package:mobile/services/storage_service.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
-/// Account screen for device and migration controls.
+/// Account screen for device and account controls.
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key, required this.wallet});
 
@@ -25,31 +22,7 @@ class WalletScreen extends StatefulWidget {
 }
 
 class _WalletScreenState extends State<WalletScreen> {
-  bool _migrationQrVisible = false;
-  bool _isGeneratingQr = false;
   bool _isDeletingAccount = false;
-  String? _migrationPayload;
-
-  Future<void> _showMigrationQr() async {
-    setState(() => _isGeneratingQr = true);
-    try {
-      final payload = await WalletService.createMigrationPayload(widget.wallet);
-      if (mounted) {
-        setState(() {
-          _migrationPayload = payload;
-          _migrationQrVisible = true;
-          _isGeneratingQr = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isGeneratingQr = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed: $e')));
-      }
-    }
-  }
 
   Future<void> _confirmDeleteAccount() async {
     if (_isDeletingAccount) return;
@@ -132,30 +105,6 @@ class _WalletScreenState extends State<WalletScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (wallet.isRevoked)
-              Container(
-                padding: const EdgeInsets.all(SpotSpacing.md),
-                margin: const EdgeInsets.only(bottom: SpotSpacing.lg),
-                decoration: SpotDecoration.danger(),
-                child: Row(
-                  children: [
-                    const Icon(
-                      CupertinoIcons.info,
-                      color: SpotColors.danger,
-                      size: 16,
-                    ),
-                    const SizedBox(width: SpotSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        'This account was migrated to a new device.',
-                        style: SpotType.caption.copyWith(
-                          color: SpotColors.danger,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             Center(child: _Avatar(pubkeyHex: wallet.publicKeyHex)),
             const SizedBox(height: SpotSpacing.lg),
             _Section(
@@ -182,64 +131,6 @@ class _WalletScreenState extends State<WalletScreen> {
                       16,
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: SpotSpacing.lg),
-            _Section(
-              title: 'Move to new device',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    '1. Generate a migration code on this device.\n'
-                    '2. On the new device, choose "Import existing".\n'
-                    '3. Scan the QR. Your account transfers automatically.\n'
-                    '4. This device revokes itself.',
-                    style: SpotType.bodySecondary.copyWith(height: 1.7),
-                  ),
-                  const SizedBox(height: SpotSpacing.md),
-                  if (!_migrationQrVisible)
-                    OutlinedButton(
-                      onPressed: wallet.isRevoked || _isGeneratingQr
-                          ? null
-                          : _showMigrationQr,
-                      child: _isGeneratingQr
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 1,
-                                color: SpotColors.accent,
-                              ),
-                            )
-                          : const Text('Generate migration QR'),
-                    )
-                  else if (_migrationPayload != null) ...[
-                    Center(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(SpotRadius.sm),
-                        child: QrImageView(
-                          data: _migrationPayload!,
-                          version: QrVersions.auto,
-                          size: 180,
-                          backgroundColor: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: SpotSpacing.sm),
-                    const Text(
-                      'Scan with your new device',
-                      textAlign: TextAlign.center,
-                      style: SpotType.caption,
-                    ),
-                    const SizedBox(height: SpotSpacing.sm),
-                    TextButton(
-                      onPressed: () =>
-                          setState(() => _migrationQrVisible = false),
-                      child: const Text('Hide'),
-                    ),
-                  ],
                 ],
               ),
             ),

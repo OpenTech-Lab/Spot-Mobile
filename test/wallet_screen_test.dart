@@ -6,7 +6,7 @@ import 'package:mobile/screens/wallet_screen.dart';
 
 void main() {
   testWidgets(
-    'account screen hides Nostr identity details and shows delete action',
+    'account screen hides legacy migration details and shows delete action',
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(home: WalletScreen(wallet: _wallet())),
@@ -15,6 +15,8 @@ void main() {
       expect(find.text('Account'), findsOneWidget);
       expect(find.text('Public key'), findsNothing);
       expect(find.text('Recovery phrase'), findsNothing);
+      expect(find.text('Move to new device'), findsNothing);
+      expect(find.text('Generate migration QR'), findsNothing);
       expect(find.text('Delete this account'), findsOneWidget);
     },
   );

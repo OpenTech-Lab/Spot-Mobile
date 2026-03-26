@@ -7,6 +7,7 @@ import 'package:mobile/screens/asset_transport_settings_screen.dart';
 import 'package:mobile/screens/interests_screen.dart';
 import 'package:mobile/screens/wallet_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
+import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
@@ -111,14 +112,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(SpotRadius.md),
         ),
-        title: const Text('Clear All Data', style: SpotType.subheading),
+        title: const Text('Clear Local Data', style: SpotType.subheading),
         content: const Text(
           'This will delete ALL local data including:\n'
           '• Cached media\n'
           '• Saved posts\n'
+          '• Favorite tags and preferences\n'
           '• Blocklist\n\n'
-          'Your identity will NOT be deleted. '
-          'Metadata will re-sync from Supabase.',
+          'Your account will NOT be deleted. '
+          'Remote data will re-sync from Supabase.',
           style: SpotType.bodySecondary,
         ),
         actions: [
@@ -142,11 +144,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         CacheManager.instance.purgeAll(),
         CacheManager.instance.clearBlocklist(),
         LocalPostStore.instance.clearAll(),
+        FollowService.instance.clearAll(),
+        UserPrefsService.instance.clearAll(),
       ]);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('All data cleared. Restart app to re-sync.'),
+            content: Text('Local data cleared. Restart app to re-sync.'),
           ),
         );
       }
@@ -203,7 +207,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: SpotSpacing.sm),
           _SettingsRow(
             icon: CupertinoIcons.delete,
-            label: 'Clear All Data',
+            label: 'Clear Local Data',
             onTap: _clearAllData,
           ),
         ],
