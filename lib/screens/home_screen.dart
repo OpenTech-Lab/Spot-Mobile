@@ -60,6 +60,21 @@ CivicEvent? eventForFavoriteTag(Iterable<CivicEvent> events, String tag) {
   return null;
 }
 
+List<CivicEvent> eventsForFollowedTags({
+  required Iterable<CivicEvent> events,
+  required Iterable<String> followedTags,
+}) {
+  final normalizedTags = followedTags
+      .map(normalizeTag)
+      .where((tag) => tag.isNotEmpty)
+      .toSet();
+  if (normalizedTags.isEmpty) return const <CivicEvent>[];
+
+  return events
+      .where((event) => normalizedTags.contains(normalizeTag(event.hashtag)))
+      .toList(growable: false);
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.wallet});
 
@@ -373,14 +388,17 @@ class _EventsListTab extends StatefulWidget {
   State<_EventsListTab> createState() => _EventsListTabState();
 }
 
-class _EventsListTabState extends State<_EventsListTab> {
+class _EventsListTabState extends State<_EventsListTab>
+    with SingleTickerProviderStateMixin {
   StreamSubscription<CivicEvent>? _eventsSub;
   StreamSubscription<void>? _followSub;
+  late final TabController _tabController;
   bool _followReady = false;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _eventsSub = widget.eventRepo.subscribeToEvents().listen((_) {
       if (mounted) setState(() {});
     });
@@ -391,6 +409,7 @@ class _EventsListTabState extends State<_EventsListTab> {
   void dispose() {
     _eventsSub?.cancel();
     _followSub?.cancel();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -429,6 +448,12 @@ class _EventsListTabState extends State<_EventsListTab> {
   @override
   Widget build(BuildContext context) {
     final events = widget.eventRepo.getAllEvents();
+    final followedEvents = _followReady
+        ? eventsForFollowedTags(
+            events: events,
+            followedTags: FollowService.instance.followedTags,
+          )
+        : const <CivicEvent>[];
     final favoriteTags = _followReady
         ? orderedFavoriteEventTags(
             followedTags: FollowService.instance.followedTags,
@@ -436,6 +461,73 @@ class _EventsListTabState extends State<_EventsListTab> {
           )
         : const <String>[];
 
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            SpotSpacing.lg,
+            SpotSpacing.xs,
+            SpotSpacing.lg,
+            0,
+          ),
+          child: TabBar(
+            controller: _tabController,
+            labelColor: SpotColors.accent,
+            unselectedLabelColor: SpotColors.textTertiary,
+            indicatorColor: SpotColors.accent,
+            indicatorWeight: 1.5,
+            dividerColor: Colors.transparent,
+            labelStyle: SpotType.caption.copyWith(
+              letterSpacing: 0.8,
+              fontSize: 11,
+            ),
+            tabs: const [
+              Tab(text: 'ALL'),
+              Tab(text: 'FOLLOWING'),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _AllEventsTabContent(
+                events: events,
+                favoriteTags: favoriteTags,
+                onOpenEvent: (event) => _openEvent(context, event),
+                onOpenFavoriteTag: (tag) => _openFavoriteTag(context, tag),
+              ),
+              _FollowingEventsTabContent(
+                isFollowReady: _followReady,
+                followedEvents: followedEvents,
+                hasFollowedTags: _followReady
+                    ? FollowService.instance.followedTags.isNotEmpty
+                    : false,
+                onOpenEvent: (event) => _openEvent(context, event),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AllEventsTabContent extends StatelessWidget {
+  const _AllEventsTabContent({
+    required this.events,
+    required this.favoriteTags,
+    required this.onOpenEvent,
+    required this.onOpenFavoriteTag,
+  });
+
+  final List<CivicEvent> events;
+  final List<String> favoriteTags;
+  final ValueChanged<CivicEvent> onOpenEvent;
+  final ValueChanged<String> onOpenFavoriteTag;
+
+  @override
+  Widget build(BuildContext context) {
     if (events.isEmpty && favoriteTags.isEmpty) {
       return const _EventsEmptyState();
     }
@@ -450,7 +542,7 @@ class _EventsListTabState extends State<_EventsListTab> {
           _FavoriteTagsSection(
             tags: favoriteTags,
             events: events,
-            onTap: (tag) => _openFavoriteTag(context, tag),
+            onTap: onOpenFavoriteTag,
           ),
           const SizedBox(height: SpotSpacing.xl),
         ],
@@ -483,13 +575,58 @@ class _EventsListTabState extends State<_EventsListTab> {
             ),
           for (int i = 0; i < events.length; i++) ...[
             if (i > 0) const SizedBox(height: SpotSpacing.xs),
-            _EventRow(
-              event: events[i],
-              onTap: () => _openEvent(context, events[i]),
-            ),
+            _EventRow(event: events[i], onTap: () => onOpenEvent(events[i])),
           ],
         ],
       ],
+    );
+  }
+}
+
+class _FollowingEventsTabContent extends StatelessWidget {
+  const _FollowingEventsTabContent({
+    required this.isFollowReady,
+    required this.followedEvents,
+    required this.hasFollowedTags,
+    required this.onOpenEvent,
+  });
+
+  final bool isFollowReady;
+  final List<CivicEvent> followedEvents;
+  final bool hasFollowedTags;
+  final ValueChanged<CivicEvent> onOpenEvent;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isFollowReady) {
+      return const Center(
+        child: SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(
+            color: SpotColors.accent,
+            strokeWidth: 1,
+          ),
+        ),
+      );
+    }
+
+    if (followedEvents.isEmpty) {
+      return _FollowingEventsEmptyState(hasFollowedTags: hasFollowedTags);
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpotSpacing.lg,
+        vertical: SpotSpacing.lg,
+      ),
+      itemBuilder: (context, index) => _EventRow(
+        event: followedEvents[index],
+        onTap: () => onOpenEvent(followedEvents[index]),
+      ),
+      separatorBuilder: (context, index) =>
+          const SizedBox(height: SpotSpacing.xs),
+      itemCount: followedEvents.length,
     );
   }
 }
@@ -658,6 +795,52 @@ class _EventsEmptyState extends StatelessWidget {
             style: SpotType.bodySecondary.copyWith(fontWeight: FontWeight.w300),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FollowingEventsEmptyState extends StatelessWidget {
+  const _FollowingEventsEmptyState({required this.hasFollowedTags});
+
+  final bool hasFollowedTags;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = hasFollowedTags
+        ? 'No followed events live'
+        : 'No followed tags yet';
+    final body = hasFollowedTags
+        ? 'Followed tags will show up here when matching live events appear.'
+        : 'Follow a tag from Discover or an event detail screen to see it here.';
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(SpotSpacing.xxxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              CupertinoIcons.star,
+              color: SpotColors.overlay,
+              size: 36,
+            ),
+            const SizedBox(height: SpotSpacing.lg),
+            Text(
+              title,
+              style: SpotType.bodySecondary.copyWith(
+                fontWeight: FontWeight.w300,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: SpotSpacing.xs),
+            Text(
+              body,
+              style: SpotType.caption.copyWith(color: SpotColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -5,6 +5,7 @@ import 'package:mobile/features/event/event_screen.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/witness_model.dart';
+import 'package:mobile/theme/spot_theme.dart';
 
 void main() {
   test(
@@ -56,6 +57,78 @@ void main() {
     ]);
 
     expect(tightZoom, greaterThan(wideZoom));
+  });
+
+  test('eventLocationZoom can zoom out to world scale for global events', () {
+    final worldZoom = eventLocationZoom(const [
+      EventLocationSpot(latitude: 37.7749, longitude: -122.4194, label: 'A'),
+      EventLocationSpot(latitude: 51.5072, longitude: -0.1276, label: 'B'),
+      EventLocationSpot(latitude: -33.8688, longitude: 151.2093, label: 'C'),
+    ]);
+
+    expect(worldZoom, eventLocationMinZoom);
+  });
+
+  test(
+    'stepEventLocationZoom clamps manual zooming within supported bounds',
+    () {
+      expect(
+        stepEventLocationZoom(eventLocationMaxZoom, eventLocationZoomStep),
+        eventLocationMaxZoom,
+      );
+      expect(
+        stepEventLocationZoom(eventLocationMinZoom, -eventLocationZoomStep),
+        eventLocationMinZoom,
+      );
+    },
+  );
+
+  test(
+    'witnessCooldownRemainingForUsers returns remaining time for a recent witness',
+    () {
+      final remaining = witnessCooldownRemainingForUsers(
+        [
+          _witness(
+            id: 'w1',
+            userId: 'pubkey-self',
+            type: WitnessType.confirm,
+            timestamp: DateTime.utc(2026, 3, 26, 12, 0, 0),
+          ),
+        ],
+        const ['pubkey-self'],
+        now: DateTime.utc(2026, 3, 26, 12, 0, 30),
+      );
+
+      expect(remaining, isNotNull);
+      expect(remaining!.inSeconds, 30);
+    },
+  );
+
+  test('witnessCooldownRemainingForUsers expires after one minute', () {
+    final remaining = witnessCooldownRemainingForUsers(
+      [
+        _witness(
+          id: 'w1',
+          userId: 'pubkey-self',
+          type: WitnessType.confirm,
+          timestamp: DateTime.utc(2026, 3, 26, 12, 0, 0),
+        ),
+      ],
+      const ['pubkey-self'],
+      now: DateTime.utc(2026, 3, 26, 12, 1, 1),
+    );
+
+    expect(remaining, isNull);
+  });
+
+  test('formatWitnessCooldown renders minute-second countdown text', () {
+    expect(formatWitnessCooldown(const Duration(seconds: 59)), '0:59');
+    expect(formatWitnessCooldown(const Duration(seconds: 60)), '1:00');
+  });
+
+  test('eventLocationMarkerColor highlights the first spot distinctly', () {
+    expect(eventLocationMarkerColor(0), SpotColors.warning);
+    expect(eventLocationMarkerColor(1), SpotColors.accent);
   });
 
   test(

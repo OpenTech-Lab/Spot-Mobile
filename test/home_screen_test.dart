@@ -32,6 +32,22 @@ void main() {
 
     expect(matched, same(event));
   });
+
+  test(
+    'eventsForFollowedTags keeps only followed-tag events in input order',
+    () {
+      final followed = eventsForFollowedTags(
+        events: [
+          _event(hashtag: 'tokyo', firstSeen: DateTime.utc(2026, 3, 26, 10)),
+          _event(hashtag: 'osaka', firstSeen: DateTime.utc(2026, 3, 26, 9)),
+          _event(hashtag: 'kyoto', firstSeen: DateTime.utc(2026, 3, 26, 8)),
+        ],
+        followedTags: const ['KYOTO', 'tokyo'],
+      );
+
+      expect(followed.map((event) => event.hashtag), ['tokyo', 'kyoto']);
+    },
+  );
 }
 
 CivicEvent _event({
