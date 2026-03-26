@@ -1,6 +1,7 @@
 # env
 .env
 **/node_modules/
+terraform.tfvars
 
 # ios certificates and provisioning profiles
 scripts/ios/**/*.p8

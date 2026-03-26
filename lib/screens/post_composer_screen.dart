@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:mobile/core/encryption.dart';
+import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/core/wallet.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/models/media_post.dart';
@@ -117,11 +118,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
   }
 
   void _addTag(String raw) {
-    final tag = raw
-        .trim()
-        .replaceAll('#', '')
-        .replaceAll(',', '')
-        .toLowerCase();
+    final tag = normalizeTag(raw);
     if (tag.isEmpty || _tags.contains(tag)) {
       _tagInputCtrl.clear();
       return;
@@ -138,14 +135,12 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
   void _removeTag(String tag) => setState(() => _tags.remove(tag));
 
-  bool get _canCreateCategoryTag => _tagInputCtrl.text
-      .trim()
-      .replaceAll('#', '')
-      .replaceAll(',', '')
-      .isNotEmpty;
+  String get _pendingTagInput => normalizeTag(_tagInputCtrl.text);
 
-  void _createCategoryTag() {
-    if (!_canCreateCategoryTag) return;
+  bool get _canCreatePendingTag => _pendingTagInput.isNotEmpty;
+
+  void _createPendingTag() {
+    if (!_canCreatePendingTag) return;
     _addTag(_tagInputCtrl.text);
   }
 
@@ -293,11 +288,11 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
       }
 
       // Commit any tag that's still in the input field
-      final pendingTag = _tagInputCtrl.text.trim().replaceAll('#', '').trim();
-      final effectiveTags = [
+      final pendingTag = normalizeTag(_tagInputCtrl.text);
+      final effectiveTags = normalizeUniqueTags([
         ..._tags,
-        if (pendingTag.isNotEmpty && !_tags.contains(pendingTag)) pendingTag,
-      ];
+        if (pendingTag.isNotEmpty) pendingTag,
+      ]);
 
       final caption = _captionCtrl.text.trim();
 
@@ -403,12 +398,6 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
   // ── Tag section ──────────────────────────────────────────────────────────
 
-  void _onTagFieldChanged(String v) {
-    if (v.endsWith(' ') || v.endsWith(',')) {
-      _addTag(v.replaceAll(',', ''));
-    }
-  }
-
   Widget _buildTagSection() {
     final hasCategory = _tags.isNotEmpty;
     final categoryTag = hasCategory ? _tags[0] : null;
@@ -480,16 +469,14 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                 if (!hasCategory) ...[
                   const SizedBox(width: SpotSpacing.xs),
                   IconButton(
-                    onPressed: _canCreateCategoryTag
-                        ? _createCategoryTag
-                        : null,
+                    onPressed: _canCreatePendingTag ? _createPendingTag : null,
                     tooltip: 'Create category tag',
                     splashRadius: 18,
                     visualDensity: VisualDensity.compact,
                     icon: Icon(
                       CupertinoIcons.plus_circle_fill,
                       size: 20,
-                      color: _canCreateCategoryTag
+                      color: _canCreatePendingTag
                           ? SpotColors.accent
                           : SpotColors.textTertiary,
                     ),
@@ -508,47 +495,81 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                 horizontal: SpotSpacing.md,
                 vertical: SpotSpacing.sm,
               ),
-              child: Wrap(
-                spacing: SpotSpacing.sm,
-                runSpacing: SpotSpacing.sm,
-                crossAxisAlignment: WrapCrossAlignment.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    CupertinoIcons.number,
-                    size: 14,
-                    color: SpotColors.textTertiary,
-                  ),
-                  for (int i = 0; i < extraTags.length; i++)
-                    _TagChip(
-                      tag: extraTags[i],
-                      isCategory: false,
-                      canRemove: true,
-                      onRemove: () => _removeTag(extraTags[i]),
-                    ),
-                  IntrinsicWidth(
-                    child: TextField(
-                      controller: _tagInputCtrl,
-                      focusNode: _tagFocus,
-                      style: SpotType.bodySecondary.copyWith(
-                        color: SpotColors.textSecondary,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Add more tags…',
-                        hintStyle: SpotType.bodySecondary.copyWith(
+                  if (extraTags.isNotEmpty) ...[
+                    Wrap(
+                      spacing: SpotSpacing.sm,
+                      runSpacing: SpotSpacing.sm,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        const Icon(
+                          CupertinoIcons.number,
+                          size: 14,
                           color: SpotColors.textTertiary,
                         ),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: SpotSpacing.sm,
-                          vertical: SpotSpacing.sm,
-                        ),
-                        isDense: true,
-                      ),
-                      textInputAction: TextInputAction.done,
-                      onTapOutside: (_) => _dismissKeyboard(),
-                      onSubmitted: _addTag,
-                      onChanged: _onTagFieldChanged,
+                        for (int i = 0; i < extraTags.length; i++)
+                          _TagChip(
+                            tag: extraTags[i],
+                            isCategory: false,
+                            canRemove: true,
+                            onRemove: () => _removeTag(extraTags[i]),
+                          ),
+                      ],
                     ),
+                    const SizedBox(height: SpotSpacing.sm),
+                  ],
+                  Row(
+                    children: [
+                      const Icon(
+                        CupertinoIcons.number,
+                        size: 14,
+                        color: SpotColors.textTertiary,
+                      ),
+                      const SizedBox(width: SpotSpacing.sm),
+                      Expanded(
+                        child: TextField(
+                          controller: _tagInputCtrl,
+                          focusNode: _tagFocus,
+                          style: SpotType.bodySecondary.copyWith(
+                            color: SpotColors.textSecondary,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Add more tags…',
+                            hintStyle: SpotType.bodySecondary.copyWith(
+                              color: SpotColors.textTertiary,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: SpotSpacing.sm,
+                              vertical: SpotSpacing.sm,
+                            ),
+                            isDense: true,
+                          ),
+                          textInputAction: TextInputAction.done,
+                          onTapOutside: (_) => _dismissKeyboard(),
+                          onSubmitted: _addTag,
+                        ),
+                      ),
+                      const SizedBox(width: SpotSpacing.xs),
+                      IconButton(
+                        onPressed: _canCreatePendingTag
+                            ? _createPendingTag
+                            : null,
+                        tooltip: 'Create tag',
+                        splashRadius: 18,
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(
+                          CupertinoIcons.plus_circle_fill,
+                          size: 20,
+                          color: _canCreatePendingTag
+                              ? SpotColors.accent
+                              : SpotColors.textTertiary,
+                        ),
+                        disabledColor: SpotColors.textTertiary,
+                      ),
+                    ],
                   ),
                 ],
               ),

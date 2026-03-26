@@ -12,6 +12,7 @@ import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/thread_screen.dart';
 import 'package:mobile/screens/user_profile_screen.dart';
+import 'package:mobile/services/discover_feed_service.dart';
 import 'package:mobile/services/feed_scoring_service.dart';
 import 'package:mobile/services/location_service.dart';
 import 'package:mobile/services/local_post_store.dart';
@@ -192,27 +193,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   // ── Scoring ───────────────────────────────────────────────────────────────
 
   List<MediaPost> get _trendingPosts {
-    final events = _repo.getAllEvents();
-    final scored =
-        events
-            .where((e) => DateTime.now().difference(e.firstSeen).inHours <= 48)
-            .toList()
-          ..sort(
-            (a, b) =>
-                _scoring.trendingScore(b).compareTo(_scoring.trendingScore(a)),
-          );
-
-    final result = <MediaPost>[];
-    for (final event in scored) {
-      result.addAll(event.postsByNewest);
-    }
-    final untagged = _posts.where(
-      (p) => p.eventTag == null || p.eventTag == '_unsorted',
+    return visibleTrendingPosts(
+      localPosts: _posts,
+      events: _repo.getAllEvents(),
+      scoring: _scoring,
     );
-    result.addAll(untagged);
-
-    final seen = <String>{};
-    return result.where((p) => seen.add(p.id)).toList();
   }
 
   List<MediaPost> get _forYouPosts {

@@ -35,6 +35,24 @@ terraform plan
 terraform apply
 ```
 
+### Run SQL without Terraform
+
+If you only want to apply the metadata SQL, you can keep a local config file next to the script:
+
+```bash
+cd /home/toyofumi/Project/Spot/mobile/infra/metadata/scripts
+cp apply_sql.env.example apply_sql.env
+```
+
+Set `DATABASE_URL` in `apply_sql.env`, then run:
+
+```bash
+./apply_sql.sh ../sql
+```
+
+The script always reads `scripts/apply_sql.env` and ignores any inherited `DATABASE_URL` from the shell, so the file is the single source of truth.
+Use the exact pooler host, port, and `postgres.<project-ref>` username shown in the Supabase dashboard for your project.
+
 ## Notes
 
 - The official Supabase Terraform provider manages platform resources and settings, not table/RLS DDL. The SQL files in `./sql` cover the database schema side.

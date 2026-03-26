@@ -24,39 +24,54 @@ class PostPublishService {
       '[PostPublish] eventRepo is ${eventRepo == null ? "NULL" : "present"}',
     );
 
-    final published = await MetadataService.instance.publishPost(draft, wallet);
-
-    if (replaceLocalPostId != null) {
-      await LocalPostStore.instance.replacePost(replaceLocalPostId, published);
-      debugPrint(
-        '[PostPublish] Replaced local post $replaceLocalPostId with ${published.id}',
+    try {
+      final published = await MetadataService.instance.publishPost(
+        draft,
+        wallet,
       );
-    } else {
-      await LocalPostStore.instance.savePost(published);
-      debugPrint('[PostPublish] Saved to LocalPostStore: ${published.id}');
+
+      if (replaceLocalPostId != null) {
+        await LocalPostStore.instance.replacePost(
+          replaceLocalPostId,
+          published,
+        );
+        debugPrint(
+          '[PostPublish] Replaced local post $replaceLocalPostId with ${published.id}',
+        );
+      } else {
+        await LocalPostStore.instance.savePost(published);
+        debugPrint('[PostPublish] Saved to LocalPostStore: ${published.id}');
+      }
+
+      if (eventRepo != null) {
+        eventRepo.addPost(published);
+        debugPrint(
+          '[PostPublish] Added to EventRepository: ${published.id}, tags: ${published.eventTags}',
+        );
+      } else {
+        debugPrint(
+          '[PostPublish] WARNING: eventRepo is null, post will not appear in feed!',
+        );
+      }
+
+      for (var i = 0; i < draft.contentHashes.length; i++) {
+        if (i >= draft.mediaPaths.length) break;
+        await P2PService.instance.seedMedia(
+          draft.mediaPaths[i],
+          draft.contentHashes[i],
+        );
+      }
+
+      debugPrint('[PostPublish] Publish complete for ${published.id}');
+      return published;
+    } catch (error, stackTrace) {
+      debugPrint('[PostPublish] Failed for ${draft.id}: $error');
+      debugPrintStack(
+        label: '[PostPublish] Stack for ${draft.id}',
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
-
-    if (eventRepo != null) {
-      eventRepo.addPost(published);
-      debugPrint(
-        '[PostPublish] Added to EventRepository: ${published.id}, tags: ${published.eventTags}',
-      );
-    } else {
-      debugPrint(
-        '[PostPublish] WARNING: eventRepo is null, post will not appear in feed!',
-      );
-    }
-
-    for (var i = 0; i < draft.contentHashes.length; i++) {
-      if (i >= draft.mediaPaths.length) break;
-      await P2PService.instance.seedMedia(
-        draft.mediaPaths[i],
-        draft.contentHashes[i],
-      );
-    }
-
-    debugPrint('[PostPublish] Publish complete for ${published.id}');
-    return published;
   }
 
   Future<MediaPost> saveFailedPublish(MediaPost draft, Object error) async {

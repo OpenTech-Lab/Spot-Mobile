@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/features/metadata/metadata_post_mapper.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -21,8 +23,18 @@ class MetadataService {
     final current = client.auth.currentUser;
     if (current != null) return current;
 
-    final response = await client.auth.signInAnonymously();
-    return response.user;
+    try {
+      final response = await client.auth.signInAnonymously();
+      return response.user;
+    } on AuthException catch (error) {
+      debugPrint(
+        '[MetadataService] Anonymous sign-in failed: ${error.message}',
+      );
+      throw StateError(
+        'Supabase anonymous sign-in failed. Enable Anonymous Auth and verify '
+        'SUPABASE_URL/SUPABASE_ANON_KEY. ${error.message}',
+      );
+    }
   }
 
   Future<void> syncLegacyProfile(WalletModel wallet) async {
@@ -31,28 +43,51 @@ class MetadataService {
       throw StateError('Unable to create a Supabase auth session');
     }
 
-    await client.from('profiles').upsert({
-      'id': user.id,
-      'display_name': 'citizen-${wallet.publicKeyHex.substring(0, 8)}',
-      'legacy_pubkey': wallet.publicKeyHex,
-      'legacy_npub': wallet.npub,
-      'device_id': wallet.deviceId,
-      'avatar_seed': wallet.publicKeyHex.substring(0, 12),
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }, onConflict: 'id');
+    debugPrint('[MetadataService] Syncing profile for ${user.id}');
+    try {
+      await client.from('profiles').upsert({
+        'id': user.id,
+        'display_name': 'citizen-${wallet.publicKeyHex.substring(0, 8)}',
+        'legacy_pubkey': wallet.publicKeyHex,
+        'legacy_npub': wallet.npub,
+        'device_id': wallet.deviceId,
+        'avatar_seed': wallet.publicKeyHex.substring(0, 12),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'id');
+      debugPrint('[MetadataService] Profile sync complete for ${user.id}');
+    } on PostgrestException catch (error, stackTrace) {
+      debugPrint(
+        '[MetadataService] Profile sync failed for ${user.id}: '
+        'message=${error.message} code=${error.code} '
+        'details=${error.details} hint=${error.hint}',
+      );
+      debugPrintStack(
+        label: '[MetadataService] Profile sync stack for ${user.id}',
+        stackTrace: stackTrace,
+      );
+      throw StateError(
+        'Supabase profile sync failed. Check profiles table/RLS setup. '
+        '${error.message}'
+        '${error.details != null ? ' details=${error.details}' : ''}'
+        '${error.hint != null ? ' hint=${error.hint}' : ''}',
+      );
+    }
   }
 
   Future<MediaPost> publishPost(MediaPost draft, WalletModel wallet) async {
+    final normalizedDraft = draft.copyWith(
+      eventTags: normalizeUniqueTags(draft.eventTags),
+    );
     await syncLegacyProfile(wallet);
 
-    for (final tag in draft.eventTags.toSet()) {
+    for (final tag in normalizedDraft.eventTags.toSet()) {
       await client.rpc(
         'ensure_event_exists',
         params: {
           'p_hashtag': tag,
           'p_title': '#$tag',
-          'p_latitude': draft.latitude,
-          'p_longitude': draft.longitude,
+          'p_latitude': normalizedDraft.latitude,
+          'p_longitude': normalizedDraft.longitude,
         },
       );
     }
@@ -64,13 +99,16 @@ class MetadataService {
 
     final inserted = await client
         .from('posts')
-        .insert({...MetadataPostMapper.toInsertRow(draft), 'user_id': user.id})
+        .insert({
+          ...MetadataPostMapper.toInsertRow(normalizedDraft),
+          'user_id': user.id,
+        })
         .select()
         .single();
 
     final mapped = (await mapPostRows([inserted])).single;
     return mapped.copyWith(
-      mediaPaths: draft.mediaPaths,
+      mediaPaths: normalizedDraft.mediaPaths,
       deliveryState: PostDeliveryState.sent,
       lastPublishError: null,
     );
@@ -115,6 +153,10 @@ class MetadataService {
     double? lat,
     double? lon,
   }) async {
+    final normalizedHashtag = normalizeTag(hashtag);
+    if (normalizedHashtag.isEmpty) {
+      throw StateError('Witness hashtag is required');
+    }
     await syncLegacyProfile(wallet);
     final user = client.auth.currentUser;
     if (user == null) {
@@ -124,15 +166,15 @@ class MetadataService {
     await client.rpc(
       'ensure_event_exists',
       params: {
-        'p_hashtag': hashtag,
-        'p_title': '#$hashtag',
+        'p_hashtag': normalizedHashtag,
+        'p_title': '#$normalizedHashtag',
         'p_latitude': lat,
         'p_longitude': lon,
       },
     );
 
     await client.from('witness_signals').upsert({
-      'event_hashtag': hashtag,
+      'event_hashtag': normalizedHashtag,
       'user_id': user.id,
       'witness_type': witnessType,
       'latitude': lat,

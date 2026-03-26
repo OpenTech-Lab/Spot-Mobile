@@ -34,9 +34,9 @@ List<MediaPost> visibleFollowingPosts(
   return posts
       .where(
         (post) =>
-            post.pubkey == selfPubkey ||
-            followedPubkeys.contains(post.pubkey) ||
-            post.eventTags.any(followedTags.contains),
+            post.pubkey != selfPubkey &&
+            (followedPubkeys.contains(post.pubkey) ||
+                post.eventTags.any(followedTags.contains)),
       )
       .toList(growable: false);
 }

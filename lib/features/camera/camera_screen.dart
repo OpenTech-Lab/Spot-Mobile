@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:mobile/core/encryption.dart';
+import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/cache_manager.dart';
@@ -175,9 +176,11 @@ class _CameraScreenState extends State<CameraScreen>
     }
 
     // Inherit event tag from parent post when replying
-    final effectiveTag = _eventTag.isNotEmpty
-        ? _eventTag
-        : widget.replyToPost?.eventTag;
+    final enteredTag = normalizeTag(_eventTag);
+    final inheritedTag = normalizeTag(widget.replyToPost?.eventTag ?? '');
+    final effectiveTag = enteredTag.isNotEmpty
+        ? enteredTag
+        : (inheritedTag.isNotEmpty ? inheritedTag : null);
 
     // Use first hash as primary event ID
     final primaryHash = hashes.first;
@@ -289,8 +292,8 @@ class _CameraScreenState extends State<CameraScreen>
         isDangerMode: _isDangerMode,
         isVirtualMode: _isVirtualMode,
         gpsLock: _gpsLock,
-        eventTag: _eventTag.isNotEmpty
-            ? _eventTag
+        eventTag: normalizeTag(_eventTag).isNotEmpty
+            ? normalizeTag(_eventTag)
             : widget.replyToPost?.eventTag,
         replyToPost: widget.replyToPost,
         spotName: _spotName,
@@ -388,7 +391,7 @@ class _CameraScreenState extends State<CameraScreen>
                 _isVirtualMode = !_isVirtualMode;
                 if (_isVirtualMode) _isDangerMode = false;
               }),
-              onTagChanged: (v) => _eventTag = v.replaceAll('#', '').trim(),
+              onTagChanged: (v) => _eventTag = normalizeTag(v),
               onTap: _capturePhoto,
               onLongPressStart: (_) => _startRecording(),
               onLongPressEnd: (_) => _stopRecording(),

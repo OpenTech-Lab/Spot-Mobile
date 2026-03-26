@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="$SCRIPT_DIR/apply_sql.env"
 SQL_DIR="${1:-}"
 
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  echo "Missing $CONFIG_FILE. Copy apply_sql.env.example to apply_sql.env first." >&2
+  exit 1
+fi
+
+unset DATABASE_URL
+# shellcheck disable=SC1090
+source "$CONFIG_FILE"
+
 if [[ -z "${DATABASE_URL:-}" ]]; then
-  echo "DATABASE_URL is required." >&2
+  echo "DATABASE_URL must be set in $CONFIG_FILE" >&2
   exit 1
 fi
 

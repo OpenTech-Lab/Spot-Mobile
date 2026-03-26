@@ -167,7 +167,7 @@ void main() {
 
       expect(find.text('#tokyo'), findsNothing);
 
-      await tester.tap(find.byIcon(CupertinoIcons.plus_circle_fill));
+      await tester.tap(find.byTooltip('Create category tag'));
       await tester.pump();
 
       expect(find.text('#tokyo'), findsOneWidget);
@@ -180,6 +180,57 @@ void main() {
       await tester.pump();
 
       expect(find.text('#shibuya'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'add more tags uses the same trailing create button and enter path',
+    (tester) async {
+      final wallet = _wallet();
+
+      await tester.pumpWidget(_ComposerHarness(wallet: wallet));
+
+      await tester.tap(find.text('Compose'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      final categoryField = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.hintText ==
+                'Category tag (e.g. AWSSummitTokyo2026)',
+      );
+
+      await tester.enterText(categoryField, 'tokyo');
+      await tester.pump();
+      await tester.tap(find.byTooltip('Create category tag'));
+      await tester.pump();
+
+      expect(find.text('#tokyo'), findsOneWidget);
+
+      final extraTagsField = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.hintText == 'Add more tags…',
+      );
+
+      expect(extraTagsField, findsOneWidget);
+
+      await tester.enterText(extraTagsField, 'alert,');
+      await tester.pump();
+
+      expect(find.text('#alert'), findsNothing);
+
+      await tester.tap(find.byTooltip('Create tag'));
+      await tester.pump();
+
+      expect(find.text('#alert'), findsOneWidget);
+
+      await tester.enterText(extraTagsField, 'breaking');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      expect(find.text('#breaking'), findsOneWidget);
     },
   );
 }
