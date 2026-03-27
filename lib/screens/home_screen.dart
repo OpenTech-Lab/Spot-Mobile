@@ -16,6 +16,7 @@ import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/profile_screen.dart';
 import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
+import 'package:mobile/widgets/tabbed_screen_chrome.dart';
 
 /// Main app shell with bottom navigation.
 List<String> orderedFavoriteEventTags({
@@ -130,24 +131,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SpotColors.bg,
-      appBar: _selectedTab == 3
-          ? null // ProfileScreen provides its own AppBar with settings button
-          : _selectedTab == 0
-          ? AppBar(
-              backgroundColor: SpotColors.bg,
-              centerTitle: true,
-              title: Image.asset(
-                'assets/logo_transparent.png',
-                height: 28,
-                fit: BoxFit.contain,
-              ),
-            )
-          : _selectedTab == 1
-          ? null
-          : AppBar(
-              backgroundColor: SpotColors.bg,
-              title: const Text('Events', style: SpotType.subheading),
-            ),
       body: Stack(
         children: [
           for (int i = 0; i < _tabs.length; i++)
@@ -461,54 +444,46 @@ class _EventsListTabState extends State<_EventsListTab>
           )
         : const <String>[];
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            SpotSpacing.lg,
-            SpotSpacing.xs,
-            SpotSpacing.lg,
-            0,
-          ),
-          child: TabBar(
-            controller: _tabController,
-            labelColor: SpotColors.accent,
-            unselectedLabelColor: SpotColors.textTertiary,
-            indicatorColor: SpotColors.accent,
-            indicatorWeight: 1.5,
-            dividerColor: Colors.transparent,
-            labelStyle: SpotType.caption.copyWith(
-              letterSpacing: 0.8,
-              fontSize: 11,
+    return SafeArea(
+      bottom: false,
+      child: Column(
+        children: [
+          const SpotTabbedScreenHeader(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Events', style: SpotType.subheading),
             ),
+          ),
+          SpotTabbedScreenTabBar(
+            controller: _tabController,
             tabs: const [
               Tab(text: 'ALL'),
               Tab(text: 'FOLLOWING'),
             ],
           ),
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _AllEventsTabContent(
-                events: events,
-                favoriteTags: favoriteTags,
-                onOpenEvent: (event) => _openEvent(context, event),
-                onOpenFavoriteTag: (tag) => _openFavoriteTag(context, tag),
-              ),
-              _FollowingEventsTabContent(
-                isFollowReady: _followReady,
-                followedEvents: followedEvents,
-                hasFollowedTags: _followReady
-                    ? FollowService.instance.followedTags.isNotEmpty
-                    : false,
-                onOpenEvent: (event) => _openEvent(context, event),
-              ),
-            ],
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _AllEventsTabContent(
+                  events: events,
+                  favoriteTags: favoriteTags,
+                  onOpenEvent: (event) => _openEvent(context, event),
+                  onOpenFavoriteTag: (tag) => _openFavoriteTag(context, tag),
+                ),
+                _FollowingEventsTabContent(
+                  isFollowReady: _followReady,
+                  followedEvents: followedEvents,
+                  hasFollowedTags: _followReady
+                      ? FollowService.instance.followedTags.isNotEmpty
+                      : false,
+                  onOpenEvent: (event) => _openEvent(context, event),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

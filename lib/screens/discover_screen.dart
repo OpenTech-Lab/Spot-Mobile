@@ -24,6 +24,7 @@ import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
+import 'package:mobile/widgets/tabbed_screen_chrome.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
 /// Discover screen — TRENDING / FOR YOU / NEARBY.
@@ -413,42 +414,42 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   Widget _buildHeader() {
     final currentSearchTag = _currentSearchTag;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        SpotSpacing.lg,
-        SpotSpacing.sm,
-        SpotSpacing.lg,
-        SpotSpacing.sm,
-      ),
+      padding: spotTabbedScreenHeaderPadding,
       child: Column(
         children: [
-          Row(
-            children: [
-              if (widget.showBackButton) ...[
-                IconButton(
-                  onPressed: () => Navigator.of(context).maybePop(),
-                  icon: const Icon(CupertinoIcons.back, size: 20),
-                  color: SpotColors.textSecondary,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 28,
-                    height: 28,
+          SizedBox(
+            height: spotTabbedScreenHeaderRowHeight,
+            child: Row(
+              children: [
+                if (widget.showBackButton) ...[
+                  IconButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: const Icon(CupertinoIcons.back, size: 20),
+                    color: SpotColors.textSecondary,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 28,
+                      height: 28,
+                    ),
+                  ),
+                  const SizedBox(width: SpotSpacing.sm),
+                ],
+                const Text('Discover', style: SpotType.subheading),
+                const SizedBox(width: SpotSpacing.md),
+                Expanded(
+                  child: CupertinoSearchTextField(
+                    controller: _searchController,
+                    placeholder: 'Search threads or #tags',
+                    backgroundColor: SpotColors.surface,
+                    itemColor: SpotColors.textSecondary,
+                    style: SpotType.body.copyWith(
+                      color: SpotColors.textPrimary,
+                    ),
+                    onChanged: _onSearchChanged,
                   ),
                 ),
-                const SizedBox(width: SpotSpacing.sm),
               ],
-              const Text('Discover', style: SpotType.subheading),
-              const SizedBox(width: SpotSpacing.md),
-              Expanded(
-                child: CupertinoSearchTextField(
-                  controller: _searchController,
-                  placeholder: 'Search threads or #tags',
-                  backgroundColor: SpotColors.surface,
-                  itemColor: SpotColors.textSecondary,
-                  style: SpotType.body.copyWith(color: SpotColors.textPrimary),
-                  onChanged: _onSearchChanged,
-                ),
-              ),
-            ],
+            ),
           ),
           if (currentSearchTag != null) ...[
             const SizedBox(height: SpotSpacing.xs),
@@ -479,14 +480,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   }
 
   Widget _buildTabBar() {
-    return TabBar(
+    return SpotTabbedScreenTabBar(
       controller: _tabController,
-      labelColor: SpotColors.accent,
-      unselectedLabelColor: SpotColors.textTertiary,
-      indicatorColor: SpotColors.accent,
-      indicatorWeight: 1.5,
-      dividerColor: Colors.transparent,
-      labelStyle: SpotType.caption.copyWith(letterSpacing: 0.8, fontSize: 11),
       tabs: const [
         Tab(text: 'TRENDING'),
         Tab(text: 'FOR YOU'),

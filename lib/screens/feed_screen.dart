@@ -24,6 +24,7 @@ import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
+import 'package:mobile/widgets/tabbed_screen_chrome.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
 /// Home feed — LATEST (real-time) and FOLLOWING (people you follow).
@@ -319,60 +320,67 @@ class FeedScreenState extends State<FeedScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _buildTabBar(),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _LatestTab(
-                posts: _posts,
-                allPosts: _posts,
-                isLoading: _isLoading,
-                error: _error,
-                isFetchingMore: _isFetchingMore,
-                loadingMediaPostIds: _loadingMediaPostIds,
-                onRefresh: _refresh,
-                onLoadMore: _loadMorePosts,
-                onReport: _reportPost,
-                onLike: _toggleLike,
-                onMediaUpdated: _hydrateMediaPost,
-                onAvatarTap: _openUserProfile,
-                onTagTap: _openDiscoverTag,
-                wallet: widget.wallet,
-                eventRepo: _repo,
+    return SafeArea(
+      bottom: false,
+      child: Column(
+        children: [
+          SpotTabbedScreenHeader(
+            child: Align(
+              alignment: Alignment.center,
+              child: Image.asset(
+                'assets/logo_transparent.png',
+                height: 28,
+                fit: BoxFit.contain,
               ),
-              _FollowingTab(
-                posts: _followingPosts,
-                allPosts: _posts,
-                isLoading: _isLoading,
-                loadingMediaPostIds: _loadingMediaPostIds,
-                onRefresh: _refresh,
-                onReport: _reportPost,
-                onLike: _toggleLike,
-                onMediaUpdated: _hydrateMediaPost,
-                onAvatarTap: _openUserProfile,
-                onTagTap: _openDiscoverTag,
-                wallet: widget.wallet,
-                eventRepo: _repo,
-              ),
-            ],
+            ),
           ),
-        ),
-      ],
+          _buildTabBar(),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _LatestTab(
+                  posts: _posts,
+                  allPosts: _posts,
+                  isLoading: _isLoading,
+                  error: _error,
+                  isFetchingMore: _isFetchingMore,
+                  loadingMediaPostIds: _loadingMediaPostIds,
+                  onRefresh: _refresh,
+                  onLoadMore: _loadMorePosts,
+                  onReport: _reportPost,
+                  onLike: _toggleLike,
+                  onMediaUpdated: _hydrateMediaPost,
+                  onAvatarTap: _openUserProfile,
+                  onTagTap: _openDiscoverTag,
+                  wallet: widget.wallet,
+                  eventRepo: _repo,
+                ),
+                _FollowingTab(
+                  posts: _followingPosts,
+                  allPosts: _posts,
+                  isLoading: _isLoading,
+                  loadingMediaPostIds: _loadingMediaPostIds,
+                  onRefresh: _refresh,
+                  onReport: _reportPost,
+                  onLike: _toggleLike,
+                  onMediaUpdated: _hydrateMediaPost,
+                  onAvatarTap: _openUserProfile,
+                  onTagTap: _openDiscoverTag,
+                  wallet: widget.wallet,
+                  eventRepo: _repo,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildTabBar() {
-    return TabBar(
+    return SpotTabbedScreenTabBar(
       controller: _tabController,
-      labelColor: SpotColors.accent,
-      unselectedLabelColor: SpotColors.textTertiary,
-      indicatorColor: SpotColors.accent,
-      indicatorWeight: 1.5,
-      dividerColor: Colors.transparent,
-      labelStyle: SpotType.caption.copyWith(letterSpacing: 0.8, fontSize: 11),
       tabs: const [
         Tab(text: 'LATEST'),
         Tab(text: 'FOLLOWING'),
