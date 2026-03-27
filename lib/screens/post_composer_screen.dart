@@ -211,8 +211,16 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
   bool get _canPost =>
       _captionCtrl.text.trim().isNotEmpty || _mediaFiles.isNotEmpty;
 
+  bool get _hasCategoryTagForPublish =>
+      _tags.isNotEmpty || (_tags.isEmpty && _pendingTagInput.isNotEmpty);
+
   Future<void> _onPost() async {
     if (!_canPost || _isPublishing) return;
+    if (widget.replyToPost == null && !_hasCategoryTagForPublish) {
+      _showSnack('Add a category tag before posting a new thread.');
+      _tagFocus.requestFocus();
+      return;
+    }
     final confirmed = await _showLegalCheck();
     if (!confirmed) return;
     await _publish();

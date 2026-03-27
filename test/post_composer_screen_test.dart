@@ -233,6 +233,36 @@ void main() {
       expect(find.text('#breaking'), findsOneWidget);
     },
   );
+
+  testWidgets('new thread requires a category tag before posting', (
+    tester,
+  ) async {
+    final wallet = _wallet();
+
+    await tester.pumpWidget(_ComposerHarness(wallet: wallet));
+
+    await tester.tap(find.text('Compose'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final captionField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.hintText == "What's happening?",
+    );
+
+    await tester.enterText(captionField, 'Smoke near the station');
+    await tester.pump();
+
+    await tester.tap(find.text('Post'));
+    await tester.pump();
+
+    expect(
+      find.text('Add a category tag before posting a new thread.'),
+      findsOneWidget,
+    );
+    expect(find.text('Confirm & Post'), findsNothing);
+  });
 }
 
 class _ComposerHarness extends StatelessWidget {
