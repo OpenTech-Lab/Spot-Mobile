@@ -414,21 +414,6 @@ class _EventsListTabState extends State<_EventsListTab>
     );
   }
 
-  void _openFavoriteTag(BuildContext context, String tag) {
-    final event = eventForFavoriteTag(widget.eventRepo.getAllEvents(), tag);
-    if (event != null) {
-      _openEvent(context, event);
-      return;
-    }
-
-    Navigator.of(context).push(
-      buildDiscoverScreenRoute(
-        wallet: widget.wallet,
-        initialSearchQuery: '#$tag',
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final events = widget.eventRepo.getAllEvents();
@@ -438,12 +423,6 @@ class _EventsListTabState extends State<_EventsListTab>
             followedTags: FollowService.instance.followedTags,
           )
         : const <CivicEvent>[];
-    final favoriteTags = _followReady
-        ? orderedFavoriteEventTags(
-            followedTags: FollowService.instance.followedTags,
-            events: events,
-          )
-        : const <String>[];
 
     return SafeArea(
       bottom: false,
@@ -468,9 +447,7 @@ class _EventsListTabState extends State<_EventsListTab>
               children: [
                 _AllEventsTabContent(
                   events: events,
-                  favoriteTags: favoriteTags,
                   onOpenEvent: (event) => _openEvent(context, event),
-                  onOpenFavoriteTag: (tag) => _openFavoriteTag(context, tag),
                 ),
                 _FollowingEventsTabContent(
                   isFollowReady: _followReady,
@@ -490,71 +467,29 @@ class _EventsListTabState extends State<_EventsListTab>
 }
 
 class _AllEventsTabContent extends StatelessWidget {
-  const _AllEventsTabContent({
-    required this.events,
-    required this.favoriteTags,
-    required this.onOpenEvent,
-    required this.onOpenFavoriteTag,
-  });
+  const _AllEventsTabContent({required this.events, required this.onOpenEvent});
 
   final List<CivicEvent> events;
-  final List<String> favoriteTags;
   final ValueChanged<CivicEvent> onOpenEvent;
-  final ValueChanged<String> onOpenFavoriteTag;
 
   @override
   Widget build(BuildContext context) {
-    if (events.isEmpty && favoriteTags.isEmpty) {
+    if (events.isEmpty) {
       return const _EventsEmptyState();
     }
 
-    return ListView(
+    return ListView.separated(
       padding: const EdgeInsets.symmetric(
         horizontal: SpotSpacing.lg,
         vertical: SpotSpacing.lg,
       ),
-      children: [
-        if (favoriteTags.isNotEmpty) ...[
-          _FavoriteTagsSection(
-            tags: favoriteTags,
-            events: events,
-            onTap: onOpenFavoriteTag,
-          ),
-          const SizedBox(height: SpotSpacing.xl),
-        ],
-        if (events.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(SpotSpacing.lg),
-            decoration: SpotDecoration.card(radius: SpotRadius.sm),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('No live events yet', style: SpotType.body),
-                const SizedBox(height: SpotSpacing.xs),
-                Text(
-                  'Tap a favorite tag above to browse matching threads in Discover.',
-                  style: SpotType.caption.copyWith(
-                    color: SpotColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          )
-        else ...[
-          if (favoriteTags.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: SpotSpacing.sm),
-              child: Text(
-                'Live Events',
-                style: SpotType.label.copyWith(color: SpotColors.textSecondary),
-              ),
-            ),
-          for (int i = 0; i < events.length; i++) ...[
-            if (i > 0) const SizedBox(height: SpotSpacing.xs),
-            _EventRow(event: events[i], onTap: () => onOpenEvent(events[i])),
-          ],
-        ],
-      ],
+      itemBuilder: (context, index) => _EventRow(
+        event: events[index],
+        onTap: () => onOpenEvent(events[index]),
+      ),
+      separatorBuilder: (context, index) =>
+          const SizedBox(height: SpotSpacing.xs),
+      itemCount: events.length,
     );
   }
 }
@@ -603,106 +538,6 @@ class _FollowingEventsTabContent extends StatelessWidget {
       separatorBuilder: (context, index) =>
           const SizedBox(height: SpotSpacing.xs),
       itemCount: followedEvents.length,
-    );
-  }
-}
-
-class _FavoriteTagsSection extends StatelessWidget {
-  const _FavoriteTagsSection({
-    required this.tags,
-    required this.events,
-    required this.onTap,
-  });
-
-  final List<String> tags;
-  final List<CivicEvent> events;
-  final ValueChanged<String> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Favorite Tags',
-          style: SpotType.label.copyWith(color: SpotColors.textSecondary),
-        ),
-        const SizedBox(height: SpotSpacing.xs),
-        Text(
-          'Tap a tag to open its live event or search matching threads.',
-          style: SpotType.caption.copyWith(color: SpotColors.textTertiary),
-        ),
-        const SizedBox(height: SpotSpacing.md),
-        Wrap(
-          spacing: SpotSpacing.sm,
-          runSpacing: SpotSpacing.sm,
-          children: [
-            for (final tag in tags)
-              _FavoriteTagChip(
-                tag: tag,
-                event: eventForFavoriteTag(events, tag),
-                onTap: () => onTap(tag),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _FavoriteTagChip extends StatelessWidget {
-  const _FavoriteTagChip({
-    required this.tag,
-    required this.event,
-    required this.onTap,
-  });
-
-  final String tag;
-  final CivicEvent? event;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasLiveEvent = event != null;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: SpotSpacing.md,
-          vertical: SpotSpacing.sm,
-        ),
-        decoration: BoxDecoration(
-          color: hasLiveEvent
-              ? SpotColors.accent.withValues(alpha: 0.12)
-              : SpotColors.surface,
-          borderRadius: BorderRadius.circular(SpotRadius.full),
-          border: Border.all(
-            color: hasLiveEvent ? SpotColors.accent : SpotColors.border,
-            width: 0.5,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '#$tag',
-              style: SpotType.label.copyWith(
-                color: hasLiveEvent
-                    ? SpotColors.accent
-                    : SpotColors.textPrimary,
-              ),
-            ),
-            if (hasLiveEvent) ...[
-              const SizedBox(width: SpotSpacing.xs),
-              Text(
-                'Live',
-                style: SpotType.caption.copyWith(color: SpotColors.accent),
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 }

@@ -138,6 +138,65 @@ class MetadataService {
     return ProfileModel.fromRow(rows.first);
   }
 
+  Future<List<ProfileModel>> searchProfiles(
+    String query, {
+    int limit = 20,
+  }) async {
+    final trimmedQuery = query.trim();
+    if (trimmedQuery.isEmpty) return const [];
+
+    final pattern = '%${_escapeLikePattern(trimmedQuery)}%';
+    final seenIds = <String>{};
+    final matches = <ProfileModel>[];
+
+    Future<void> collectMatches(
+      PostgrestFilterBuilder<List<Map<String, dynamic>>> builder,
+    ) async {
+      if (matches.length >= limit) return;
+
+      final rows = List<Map<String, dynamic>>.from(await builder.limit(limit));
+      for (final row in rows) {
+        final profile = ProfileModel.fromRow(row);
+        final pubkey = profile.legacyPubkey?.trim();
+        if (pubkey == null || pubkey.isEmpty || !seenIds.add(profile.id)) {
+          continue;
+        }
+        matches.add(profile);
+        if (matches.length >= limit) return;
+      }
+    }
+
+    await collectMatches(
+      client
+          .from('profiles')
+          .select(
+            'id, created_at, display_name, description, legacy_pubkey, legacy_npub, device_id, '
+            'avatar_seed, avatar_content_hash',
+          )
+          .ilike('display_name', pattern),
+    );
+    await collectMatches(
+      client
+          .from('profiles')
+          .select(
+            'id, created_at, display_name, description, legacy_pubkey, legacy_npub, device_id, '
+            'avatar_seed, avatar_content_hash',
+          )
+          .ilike('description', pattern),
+    );
+    await collectMatches(
+      client
+          .from('profiles')
+          .select(
+            'id, created_at, display_name, description, legacy_pubkey, legacy_npub, device_id, '
+            'avatar_seed, avatar_content_hash',
+          )
+          .ilike('legacy_pubkey', pattern),
+    );
+
+    return matches;
+  }
+
   Future<ProfileModel> updateCurrentProfile({
     required WalletModel wallet,
     required String displayName,
@@ -642,6 +701,11 @@ class MetadataService {
     if (rows.isEmpty) return null;
     return ProfileModel.fromRow(rows.first);
   }
+
+  String _escapeLikePattern(String value) => value
+      .replaceAll(r'\', r'\\')
+      .replaceAll('%', r'\%')
+      .replaceAll('_', r'\_');
 
   String _defaultDisplayNameForWallet(WalletModel wallet) =>
       'citizen-${wallet.publicKeyHex.substring(0, 8)}';

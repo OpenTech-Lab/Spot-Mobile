@@ -1,12 +1,32 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
+import 'package:mobile/models/profile_model.dart';
+import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/discover_screen.dart';
 
 void main() {
   test('discoverFollowableTagForQuery normalizes hash-prefixed tags', () {
     expect(discoverFollowableTagForQuery('  #Test, '), 'test');
     expect(discoverFollowableTagForQuery('test'), isNull);
+  });
+
+  test('discoverSubmittedSearchQuery canonicalizes valid input', () {
+    expect(discoverSubmittedSearchQuery('  #Test, '), '#test');
+    expect(
+      discoverSubmittedSearchQuery(' Fire near station '),
+      'Fire near station',
+    );
+    expect(discoverSubmittedSearchQuery('   '), isNull);
+    expect(discoverSubmittedSearchQuery('#'), isNull);
+  });
+
+  test('discover search result tabs are only used for keyword queries', () {
+    expect(discoverSearchResultUsesTabbedLayout('smoke'), isTrue);
+    expect(discoverSearchResultUsesTabbedLayout('#smoke'), isFalse);
+    expect(discoverSearchResultUsesTabbedLayout('   '), isFalse);
   });
 
   test('discover search matches keyword in caption', () {
@@ -89,6 +109,87 @@ void main() {
       expect(visible.map((post) => post.id), ['root']);
     },
   );
+
+  testWidgets('keyword search results show threads and users tabs', (
+    tester,
+  ) async {
+    final root = _post(id: 'root', caption: 'Smoke near station');
+    final profile = ProfileModel(
+      id: 'user-1',
+      displayName: 'Citizen Jane',
+      description: 'Tracks station reports',
+      legacyPubkey:
+          '2222222222222222222222222222222222222222222222222222222222222222',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DiscoverSearchResultsScreen(
+            wallet: _wallet(),
+            initialQuery: 'smoke',
+            initialPosts: [root],
+            persistedPostsLoader: () async => const [],
+            profileSearch: (_) async => [profile],
+            eventStreamFactory: () => const Stream<CivicEvent>.empty(),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.byType(TabBar), findsOneWidget);
+    expect(find.text('THREADS'), findsOneWidget);
+    expect(find.text('USERS'), findsOneWidget);
+    expect(find.text('Smoke near station'), findsOneWidget);
+
+    await tester.tap(find.text('USERS'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text('Citizen Jane'), findsOneWidget);
+    expect(find.text('Tracks station reports'), findsOneWidget);
+  });
+
+  testWidgets('hashtag search results keep a single thread pane', (
+    tester,
+  ) async {
+    var profileSearchCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DiscoverSearchResultsScreen(
+            wallet: _wallet(),
+            initialQuery: '#fire',
+            initialPosts: [
+              _post(
+                id: 'root',
+                caption: 'Fire near station',
+                eventTags: const ['fire'],
+              ),
+            ],
+            persistedPostsLoader: () async => const [],
+            profileSearch: (_) async {
+              profileSearchCalls += 1;
+              return const [];
+            },
+            eventStreamFactory: () => const Stream<CivicEvent>.empty(),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.byType(TabBar), findsNothing);
+    expect(find.byType(TabBarView), findsNothing);
+    expect(find.text('Fire near station'), findsOneWidget);
+    expect(profileSearchCalls, 0);
+  });
 }
 
 MediaPost _post({
@@ -109,4 +210,16 @@ MediaPost _post({
   caption: caption,
   replyToId: replyToId,
   nostrEventId: nostrEventId ?? id,
+);
+
+WalletModel _wallet() => WalletModel(
+  privateKeyHex:
+      '0000000000000000000000000000000000000000000000000000000000000001',
+  publicKeyHex:
+      '1111111111111111111111111111111111111111111111111111111111111111',
+  npub: 'npub1test',
+  mnemonic: const ['test'],
+  deviceId: 'device-1',
+  isRevoked: false,
+  createdAt: DateTime.utc(2026, 3, 29),
 );
