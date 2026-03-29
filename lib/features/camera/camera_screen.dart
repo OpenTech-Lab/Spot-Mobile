@@ -516,6 +516,7 @@ class _ControlsPanel extends StatelessWidget {
           TextField(
             controller: tagController,
             onChanged: onTagChanged,
+            inputFormatters: const [CanonicalTagTextInputFormatter()],
             style: const TextStyle(color: Colors.white, fontSize: 13),
             decoration: InputDecoration(
               hintText: 'Event tag (optional)',

@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
@@ -67,10 +68,10 @@ class _InterestsScreenState extends State<InterestsScreen> {
   }
 
   void _addCustom() {
-    final raw = _customController.text.trim().replaceAll('#', '');
-    if (raw.isEmpty) return;
+    final tag = normalizeTag(_customController.text);
+    if (tag.isEmpty) return;
     setState(() {
-      _selected.add(raw.toLowerCase());
+      _selected.add(tag);
       _customController.clear();
     });
   }
@@ -175,6 +176,7 @@ class _InterestsScreenState extends State<InterestsScreen> {
                     decoration: SpotDecoration.input(),
                     child: TextField(
                       controller: _customController,
+                      inputFormatters: const [CanonicalTagTextInputFormatter()],
                       style: SpotType.body,
                       decoration: const InputDecoration(
                         hintText: 'Add custom hashtag',

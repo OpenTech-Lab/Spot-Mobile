@@ -184,6 +184,34 @@ void main() {
   );
 
   testWidgets(
+    'category input canonicalizes uppercase letters and spaces while typing',
+    (tester) async {
+      final wallet = _wallet();
+
+      await tester.pumpWidget(_ComposerHarness(wallet: wallet));
+
+      await tester.tap(find.text('Compose'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      final categoryField = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.hintText ==
+                'Category tag (e.g. AWSSummitTokyo2026)',
+      );
+
+      await tester.enterText(categoryField, '#AWS Summit Tokyo 2026');
+      await tester.pump();
+
+      expect(
+        tester.widget<TextField>(categoryField).controller?.text,
+        'awssummittokyo2026',
+      );
+    },
+  );
+
+  testWidgets(
     'add more tags uses the same trailing create button and enter path',
     (tester) async {
       final wallet = _wallet();
