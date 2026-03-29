@@ -140,6 +140,16 @@ void main() {
     expect(formatWitnessCooldown(const Duration(seconds: 60)), '1:00');
   });
 
+  test(
+    'eventScreenVisibleWitnessType only exposes seen on the Event screen',
+    () {
+      expect(eventScreenVisibleWitnessType(WitnessType.seen), WitnessType.seen);
+      expect(eventScreenVisibleWitnessType(WitnessType.confirm), isNull);
+      expect(eventScreenVisibleWitnessType(WitnessType.deny), isNull);
+      expect(eventScreenVisibleWitnessType(null), isNull);
+    },
+  );
+
   test('eventLocationMarkerColor highlights the first spot distinctly', () {
     expect(eventLocationMarkerColor(0), SpotColors.warning);
     expect(eventLocationMarkerColor(1), SpotColors.accent);

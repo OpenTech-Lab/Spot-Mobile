@@ -375,6 +375,9 @@ Duration? witnessCooldownRemainingForUsers(
   now: now,
 );
 
+WitnessType? eventScreenVisibleWitnessType(WitnessType? type) =>
+    type == WitnessType.seen ? type : null;
+
 String formatWitnessCooldown(Duration remaining) {
   final totalSeconds = math.max(0, remaining.inSeconds);
   final minutes = totalSeconds ~/ 60;
@@ -654,9 +657,11 @@ class _EventScreenState extends State<EventScreen> {
               ),
               child: _WitnessSummary(
                 event: _event,
-                selectedType: selectedWitnessTypeForUsers(
-                  _event.witnesses,
-                  _witnessActorIds,
+                selectedType: eventScreenVisibleWitnessType(
+                  selectedWitnessTypeForUsers(
+                    _event.witnesses,
+                    _witnessActorIds,
+                  ),
                 ),
                 cooldownRemaining: _witnessCooldownRemaining,
                 isSubmitting: _isSubmittingWitness,
@@ -1392,7 +1397,7 @@ class _TrustBadge extends StatelessWidget {
 
 // ── Witness summary ────────────────────────────────────────────────────────────
 
-/// Shows seen / confirm / deny counts and lets the user submit a signal.
+/// Shows the seen count and lets the user submit or clear a seen signal.
 class _WitnessSummary extends StatelessWidget {
   const _WitnessSummary({
     required this.event,
@@ -1412,8 +1417,6 @@ class _WitnessSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalWitnesses =
-        event.seenCount + event.confirmCount + event.denyCount;
     final buttonsDisabled = isSubmitting || cooldownRemaining != null;
     final cooldownLabel = cooldownRemaining == null
         ? null
@@ -1428,7 +1431,7 @@ class _WitnessSummary extends StatelessWidget {
             const Spacer(),
             Text(
               cooldownLabel == null
-                  ? '$totalWitnesses total'
+                  ? '${event.seenCount} seen'
                   : 'Locked $cooldownLabel',
               style: SpotType.caption.copyWith(
                 color: cooldownLabel == null
@@ -1451,38 +1454,18 @@ class _WitnessSummary extends StatelessWidget {
                 color: SpotColors.textSecondary,
                 onTap: () => onWitness!(WitnessType.seen),
               ),
-              const SizedBox(width: SpotSpacing.sm),
-              _WitnessButton(
-                label: 'Confirm',
-                icon: CupertinoIcons.checkmark_circle,
-                count: event.confirmCount,
-                isSelected: selectedType == WitnessType.confirm,
-                isDisabled: buttonsDisabled,
-                color: SpotColors.success,
-                onTap: () => onWitness!(WitnessType.confirm),
-              ),
-              const SizedBox(width: SpotSpacing.sm),
-              _WitnessButton(
-                label: 'Deny',
-                icon: CupertinoIcons.xmark_circle,
-                count: event.denyCount,
-                isSelected: selectedType == WitnessType.deny,
-                isDisabled: buttonsDisabled,
-                color: SpotColors.danger,
-                onTap: () => onWitness!(WitnessType.deny),
-              ),
             ],
           ),
           if (cooldownLabel != null) ...[
             const SizedBox(height: SpotSpacing.sm),
             Text(
-              'Wait $cooldownLabel before changing or cancelling your signal.',
+              'Wait $cooldownLabel before updating your seen signal.',
               style: SpotType.caption.copyWith(color: SpotColors.warning),
             ),
           ] else if (selectedType != null) ...[
             const SizedBox(height: SpotSpacing.sm),
             Text(
-              'Tap your selected signal again to remove it.',
+              'Tap Seen again to remove it.',
               style: SpotType.caption.copyWith(color: SpotColors.textSecondary),
             ),
           ],
