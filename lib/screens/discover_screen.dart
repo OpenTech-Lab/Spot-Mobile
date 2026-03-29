@@ -144,6 +144,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   final Set<String> _loadingMediaPostIds = {};
   String _searchQuery = '';
   bool _isFollowingSearchTag = false;
+  bool _showTopChrome = true;
 
   double? _userLat;
   double? _userLon;
@@ -386,30 +387,51 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   // ── Build ─────────────────────────────────────────────────────────────────
 
+  bool _handleScrollNotification(UserScrollNotification notification) {
+    final nextVisibility = tabbedScreenChromeVisibilityForScroll(
+      currentVisibility: _showTopChrome,
+      direction: notification.direction,
+      pixels: notification.metrics.pixels,
+      axisDirection: notification.metrics.axisDirection,
+    );
+    if (nextVisibility != _showTopChrome) {
+      setState(() => _showTopChrome = nextVisibility);
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       bottom: false,
       child: Column(
         children: [
-          _buildHeader(),
-          _buildTabBar(),
+          SpotCollapsibleTabbedScreenChrome(
+            visible: _showTopChrome,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [_buildHeader(), _buildTabBar()],
+            ),
+          ),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildScoredList(
-                  posts: _trendingPosts,
-                  emptyLabel: 'Nothing trending in the last 48 h',
-                ),
-                _buildScoredList(
-                  posts: _forYouPosts,
-                  emptyLabel: UserPrefsService.instance.hasSetInterests
-                      ? 'No recommended posts yet'
-                      : 'Set your interests to see personalised content',
-                ),
-                _buildNearbyList(),
-              ],
+            child: NotificationListener<UserScrollNotification>(
+              onNotification: _handleScrollNotification,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildScoredList(
+                    posts: _trendingPosts,
+                    emptyLabel: 'Nothing trending in the last 48 h',
+                  ),
+                  _buildScoredList(
+                    posts: _forYouPosts,
+                    emptyLabel: UserPrefsService.instance.hasSetInterests
+                        ? 'No recommended posts yet'
+                        : 'Set your interests to see personalised content',
+                  ),
+                  _buildNearbyList(),
+                ],
+              ),
             ),
           ),
         ],

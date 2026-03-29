@@ -70,6 +70,7 @@ class FeedScreenState extends State<FeedScreen>
   final Set<String> _loadingMediaPostIds = {};
   bool _isLoading = true;
   String? _error;
+  bool _showTopChrome = true;
 
   // Infinite scroll (Latest tab)
   bool _isFetchingMore = false;
@@ -318,59 +319,83 @@ class FeedScreenState extends State<FeedScreen>
 
   // ── Build ─────────────────────────────────────────────────────────────────
 
+  bool _handleScrollNotification(UserScrollNotification notification) {
+    final nextVisibility = tabbedScreenChromeVisibilityForScroll(
+      currentVisibility: _showTopChrome,
+      direction: notification.direction,
+      pixels: notification.metrics.pixels,
+      axisDirection: notification.metrics.axisDirection,
+    );
+    if (nextVisibility != _showTopChrome) {
+      setState(() => _showTopChrome = nextVisibility);
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       bottom: false,
       child: Column(
         children: [
-          SpotTabbedScreenHeader(
-            child: Align(
-              alignment: Alignment.center,
-              child: Image.asset(
-                'assets/logo_transparent.png',
-                height: 28,
-                fit: BoxFit.contain,
-              ),
+          SpotCollapsibleTabbedScreenChrome(
+            visible: _showTopChrome,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SpotTabbedScreenHeader(
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: Image.asset(
+                      'assets/logo_transparent.png',
+                      height: 28,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+                _buildTabBar(),
+              ],
             ),
           ),
-          _buildTabBar(),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _LatestTab(
-                  posts: _posts,
-                  allPosts: _posts,
-                  isLoading: _isLoading,
-                  error: _error,
-                  isFetchingMore: _isFetchingMore,
-                  loadingMediaPostIds: _loadingMediaPostIds,
-                  onRefresh: _refresh,
-                  onLoadMore: _loadMorePosts,
-                  onReport: _reportPost,
-                  onLike: _toggleLike,
-                  onMediaUpdated: _hydrateMediaPost,
-                  onAvatarTap: _openUserProfile,
-                  onTagTap: _openDiscoverTag,
-                  wallet: widget.wallet,
-                  eventRepo: _repo,
-                ),
-                _FollowingTab(
-                  posts: _followingPosts,
-                  allPosts: _posts,
-                  isLoading: _isLoading,
-                  loadingMediaPostIds: _loadingMediaPostIds,
-                  onRefresh: _refresh,
-                  onReport: _reportPost,
-                  onLike: _toggleLike,
-                  onMediaUpdated: _hydrateMediaPost,
-                  onAvatarTap: _openUserProfile,
-                  onTagTap: _openDiscoverTag,
-                  wallet: widget.wallet,
-                  eventRepo: _repo,
-                ),
-              ],
+            child: NotificationListener<UserScrollNotification>(
+              onNotification: _handleScrollNotification,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _LatestTab(
+                    posts: _posts,
+                    allPosts: _posts,
+                    isLoading: _isLoading,
+                    error: _error,
+                    isFetchingMore: _isFetchingMore,
+                    loadingMediaPostIds: _loadingMediaPostIds,
+                    onRefresh: _refresh,
+                    onLoadMore: _loadMorePosts,
+                    onReport: _reportPost,
+                    onLike: _toggleLike,
+                    onMediaUpdated: _hydrateMediaPost,
+                    onAvatarTap: _openUserProfile,
+                    onTagTap: _openDiscoverTag,
+                    wallet: widget.wallet,
+                    eventRepo: _repo,
+                  ),
+                  _FollowingTab(
+                    posts: _followingPosts,
+                    allPosts: _posts,
+                    isLoading: _isLoading,
+                    loadingMediaPostIds: _loadingMediaPostIds,
+                    onRefresh: _refresh,
+                    onReport: _reportPost,
+                    onLike: _toggleLike,
+                    onMediaUpdated: _hydrateMediaPost,
+                    onAvatarTap: _openUserProfile,
+                    onTagTap: _openDiscoverTag,
+                    wallet: widget.wallet,
+                    eventRepo: _repo,
+                  ),
+                ],
+              ),
             ),
           ),
         ],

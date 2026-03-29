@@ -1,3 +1,4 @@
+import 'package:flutter/rendering.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/theme/spot_theme.dart';
@@ -10,6 +11,32 @@ const EdgeInsets spotTabbedScreenHeaderPadding = EdgeInsets.fromLTRB(
 );
 
 const double spotTabbedScreenHeaderRowHeight = 36;
+const Duration spotTabbedScreenChromeAnimationDuration = Duration(
+  milliseconds: 180,
+);
+const double spotTabbedScreenChromeHideThreshold = 12;
+
+bool tabbedScreenChromeVisibilityForScroll({
+  required bool currentVisibility,
+  required ScrollDirection direction,
+  required double pixels,
+  required AxisDirection axisDirection,
+  double hideThreshold = spotTabbedScreenChromeHideThreshold,
+}) {
+  final isVertical =
+      axisDirection == AxisDirection.down || axisDirection == AxisDirection.up;
+  if (!isVertical) return currentVisibility;
+  if (pixels <= 0) return true;
+
+  switch (direction) {
+    case ScrollDirection.forward:
+      return true;
+    case ScrollDirection.reverse:
+      return pixels > hideThreshold ? false : currentVisibility;
+    case ScrollDirection.idle:
+      return currentVisibility;
+  }
+}
 
 class SpotTabbedScreenHeader extends StatelessWidget {
   const SpotTabbedScreenHeader({
@@ -26,6 +53,35 @@ class SpotTabbedScreenHeader extends StatelessWidget {
     return Padding(
       padding: padding,
       child: SizedBox(height: spotTabbedScreenHeaderRowHeight, child: child),
+    );
+  }
+}
+
+class SpotCollapsibleTabbedScreenChrome extends StatelessWidget {
+  const SpotCollapsibleTabbedScreenChrome({
+    super.key,
+    required this.visible,
+    required this.child,
+  });
+
+  final bool visible;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: AnimatedAlign(
+        duration: spotTabbedScreenChromeAnimationDuration,
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        heightFactor: visible ? 1 : 0,
+        child: AnimatedOpacity(
+          duration: spotTabbedScreenChromeAnimationDuration,
+          curve: Curves.easeOutCubic,
+          opacity: visible ? 1 : 0,
+          child: child,
+        ),
+      ),
     );
   }
 }
