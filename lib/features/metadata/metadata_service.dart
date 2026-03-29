@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:mobile/core/profile_description.dart';
 import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/features/metadata/metadata_post_mapper.dart';
 import 'package:mobile/models/follow_stats.dart';
@@ -78,6 +79,7 @@ class MetadataService {
       await client.from('profiles').upsert({
         'id': user.id,
         'display_name': displayName,
+        'description': existingProfile?.description,
         'legacy_pubkey': wallet.publicKeyHex,
         'legacy_npub': wallet.npub,
         'device_id': wallet.deviceId,
@@ -126,7 +128,7 @@ class MetadataService {
       await client
           .from('profiles')
           .select(
-            'id, created_at, display_name, legacy_pubkey, legacy_npub, device_id, '
+            'id, created_at, display_name, description, legacy_pubkey, legacy_npub, device_id, '
             'avatar_seed, avatar_content_hash',
           )
           .inFilter('id', authorIds)
@@ -139,6 +141,7 @@ class MetadataService {
   Future<ProfileModel> updateCurrentProfile({
     required WalletModel wallet,
     required String displayName,
+    required String description,
     String? avatarContentHash,
   }) async {
     await syncLegacyProfile(wallet);
@@ -150,11 +153,13 @@ class MetadataService {
     final normalizedDisplayName = displayName.trim().isNotEmpty
         ? displayName.trim()
         : _defaultDisplayNameForWallet(wallet);
+    final normalizedDescription = validateProfileDescription(description);
     final existingProfile = await _fetchProfileById(user.id);
 
     await client.from('profiles').upsert({
       'id': user.id,
       'display_name': normalizedDisplayName,
+      'description': normalizedDescription,
       'legacy_pubkey': wallet.publicKeyHex,
       'legacy_npub': wallet.npub,
       'device_id': wallet.deviceId,
@@ -628,7 +633,7 @@ class MetadataService {
       await client
           .from('profiles')
           .select(
-            'id, created_at, display_name, legacy_pubkey, legacy_npub, device_id, '
+            'id, created_at, display_name, description, legacy_pubkey, legacy_npub, device_id, '
             'avatar_seed, avatar_content_hash',
           )
           .eq('id', userId)

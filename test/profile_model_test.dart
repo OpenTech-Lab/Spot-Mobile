@@ -8,6 +8,7 @@ void main() {
       'id': 'user-1',
       'created_at': '2026-03-29T10:30:00Z',
       'display_name': 'Citizen Tokyo',
+      'description': 'Citizen reporter in Tokyo.',
       'legacy_pubkey': 'pubkey-1',
       'legacy_npub': 'npub1test',
       'device_id': 'device-1',
@@ -18,6 +19,7 @@ void main() {
     expect(profile.id, 'user-1');
     expect(profile.createdAt, DateTime.utc(2026, 3, 29, 10, 30));
     expect(profile.displayName, 'Citizen Tokyo');
+    expect(profile.description, 'Citizen reporter in Tokyo.');
     expect(profile.legacyPubkey, 'pubkey-1');
     expect(profile.avatarContentHash, 'hash-1');
   });

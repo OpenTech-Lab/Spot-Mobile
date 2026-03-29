@@ -3,6 +3,7 @@ class ProfileModel {
     required this.id,
     this.createdAt,
     this.displayName,
+    this.description,
     this.legacyPubkey,
     this.legacyNpub,
     this.deviceId,
@@ -13,6 +14,7 @@ class ProfileModel {
   final String id;
   final DateTime? createdAt;
   final String? displayName;
+  final String? description;
   final String? legacyPubkey;
   final String? legacyNpub;
   final String? deviceId;
@@ -25,6 +27,7 @@ class ProfileModel {
         ? DateTime.parse(row['created_at'].toString()).toUtc()
         : null,
     displayName: row['display_name']?.toString(),
+    description: row['description']?.toString(),
     legacyPubkey: row['legacy_pubkey']?.toString(),
     legacyNpub: row['legacy_npub']?.toString(),
     deviceId: row['device_id']?.toString(),

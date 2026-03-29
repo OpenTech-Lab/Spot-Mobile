@@ -39,7 +39,7 @@ class ProfileStatsRow extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: SpotSpacing.sm),
+        const SizedBox(height: SpotSpacing.md),
         Row(
           children: [
             Expanded(

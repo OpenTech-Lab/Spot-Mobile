@@ -553,6 +553,10 @@ class _UserProfileHeader extends StatelessWidget {
                 : 'Citizen',
             style: SpotType.subheading,
           ),
+          if (profile?.description?.trim().isNotEmpty == true) ...[
+            const SizedBox(height: SpotSpacing.xs),
+            Text(profile!.description!.trim(), style: SpotType.bodySecondary),
+          ],
           const SizedBox(height: SpotSpacing.md),
           ProfileLocationChips(summary: activitySummary),
           const SizedBox(height: SpotSpacing.lg),

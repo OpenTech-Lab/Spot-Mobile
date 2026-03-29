@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:mobile/core/encryption.dart';
+import 'package:mobile/core/profile_description.dart';
 import 'package:mobile/core/wallet.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
@@ -372,6 +373,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     final nameController = TextEditingController(
       text: _profile?.displayName ?? '',
     );
+    final descriptionController = TextEditingController(
+      text: _profile?.description ?? '',
+    );
     final picker = ImagePicker();
     XFile? selectedAvatar;
 
@@ -387,6 +391,11 @@ class _ProfileScreenState extends State<ProfileScreen>
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
+            final descriptionWordCount = countProfileDescriptionWords(
+              descriptionController.text,
+            );
+            final isDescriptionTooLong =
+                descriptionWordCount > maxProfileDescriptionWords;
             return Padding(
               padding: EdgeInsets.only(
                 left: SpotSpacing.lg,
@@ -452,16 +461,34 @@ class _ProfileScreenState extends State<ProfileScreen>
                       hintText: 'Citizen name',
                     ),
                   ),
+                  const SizedBox(height: SpotSpacing.md),
+                  TextField(
+                    controller: descriptionController,
+                    enabled: !_isSavingProfile,
+                    minLines: 3,
+                    maxLines: 3,
+                    onChanged: (_) => setSheetState(() {}),
+                    decoration: InputDecoration(
+                      labelText: 'Description',
+                      hintText: 'Simple description about you',
+                      helperText:
+                          '$descriptionWordCount/$maxProfileDescriptionWords words',
+                      errorText: isDescriptionTooLong
+                          ? 'Use 100 words or fewer'
+                          : null,
+                    ),
+                  ),
                   const SizedBox(height: SpotSpacing.lg),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: _isSavingProfile
+                      onPressed: _isSavingProfile || isDescriptionTooLong
                           ? null
                           : () async {
                               Navigator.of(sheetContext).pop();
                               await _saveProfile(
                                 displayName: nameController.text,
+                                description: descriptionController.text,
                                 selectedAvatar: selectedAvatar,
                               );
                             },
@@ -481,6 +508,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Future<void> _saveProfile({
     required String displayName,
+    required String description,
     XFile? selectedAvatar,
   }) async {
     setState(() => _isSavingProfile = true);
@@ -519,6 +547,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           .updateCurrentProfile(
             wallet: widget.wallet,
             displayName: displayName,
+            description: description,
             avatarContentHash: avatarContentHash,
           );
       final normalizedDisplayName = updatedProfile.displayName?.trim();
@@ -549,6 +578,11 @@ class _ProfileScreenState extends State<ProfileScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Profile updated')));
+    } on ProfileDescriptionTooLongError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -775,6 +809,10 @@ class _ProfileHeader extends StatelessWidget {
                 : 'You',
             style: SpotType.subheading,
           ),
+          if (profile?.description?.trim().isNotEmpty == true) ...[
+            const SizedBox(height: SpotSpacing.xs),
+            Text(profile!.description!.trim(), style: SpotType.bodySecondary),
+          ],
           const SizedBox(height: SpotSpacing.md),
           ProfileLocationChips(summary: activitySummary),
           const SizedBox(height: SpotSpacing.lg),
