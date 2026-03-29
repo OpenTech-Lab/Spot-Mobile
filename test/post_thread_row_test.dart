@@ -153,6 +153,32 @@ void main() {
   });
 
   testWidgets(
+    'PostThreadRow keeps secondhand posts icon-only without the text badge',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: PostThreadRow(
+              post: _post(
+                eventTags: const ['tokyo'],
+                sourceType: PostSourceType.secondhand,
+              ),
+              isLast: true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('2nd hand'), findsNothing);
+
+      final icon = tester.widget<Icon>(
+        find.byIcon(CupertinoIcons.arrow_2_squarepath),
+      );
+      expect(icon.color, SpotColors.accent);
+    },
+  );
+
+  testWidgets(
     'PostThreadRow shows author display name and passes avatar hash through',
     (tester) async {
       await tester.pumpWidget(
@@ -472,6 +498,7 @@ MediaPost _post({
   String? previewMimeType,
   String? authorDisplayName,
   String? authorAvatarContentHash,
+  PostSourceType sourceType = PostSourceType.firsthand,
 }) => MediaPost(
   id: 'post-id',
   pubkey: 'pubkey',
@@ -493,6 +520,7 @@ MediaPost _post({
   isLikedByMe: isLikedByMe,
   previewBase64: previewBase64,
   previewMimeType: previewMimeType,
+  sourceType: sourceType,
   nostrEventId: 'post-id',
 );
 

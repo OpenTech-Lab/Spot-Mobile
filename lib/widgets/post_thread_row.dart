@@ -300,14 +300,6 @@ class PostThreadRow extends StatelessWidget {
                             bg: SpotColors.warningSubtle,
                           ),
                         ],
-                        if (post.sourceType == PostSourceType.secondhand) ...[
-                          const SizedBox(width: SpotSpacing.sm),
-                          _PostBadge(
-                            label: '2nd hand',
-                            color: SpotColors.textSecondary,
-                            bg: SpotColors.surfaceHigh,
-                          ),
-                        ],
                         if (post.isPendingRetry) ...[
                           const SizedBox(width: SpotSpacing.sm),
                           _PostBadge(
