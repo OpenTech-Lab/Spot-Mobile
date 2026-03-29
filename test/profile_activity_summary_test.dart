@@ -78,34 +78,32 @@ void main() {
     },
   );
 
-  testWidgets(
-    'ProfileActivitySummaryChips renders compact chips without a section card heading',
-    (tester) async {
-      const summary = ProfileActivitySummary(
-        accountCreatedAt: null,
-        lastThreadAt: null,
-        lastReplyAt: null,
-        topLocations: [
-          ProfileLocationStat(label: 'Japan/Tokyo', count: 3),
-          ProfileLocationStat(label: 'Japan/Osaka', count: 2),
-        ],
-      );
+  testWidgets('ProfileLocationChips renders top locations only', (
+    tester,
+  ) async {
+    final summary = ProfileActivitySummary(
+      accountCreatedAt: DateTime(2026, 3, 20, 8, 30),
+      lastThreadAt: DateTime(2026, 3, 29, 11, 45),
+      lastReplyAt: DateTime(2026, 3, 30, 9, 15),
+      topLocations: [
+        const ProfileLocationStat(label: 'Japan/Tokyo', count: 3),
+        const ProfileLocationStat(label: 'Japan/Osaka', count: 2),
+      ],
+    );
 
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(body: ProfileActivitySummaryChips(summary: summary)),
-        ),
-      );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: ProfileLocationChips(summary: summary)),
+      ),
+    );
 
-      expect(find.byType(Wrap), findsOneWidget);
-      expect(find.textContaining('Created'), findsOneWidget);
-      expect(find.textContaining('Last thread'), findsOneWidget);
-      expect(find.textContaining('Last reply'), findsOneWidget);
-      expect(find.textContaining('Top 1'), findsOneWidget);
-      expect(find.textContaining('Top 2'), findsOneWidget);
-      expect(find.text('Top locations'), findsNothing);
-    },
-  );
+    expect(find.byType(Wrap), findsOneWidget);
+    expect(find.textContaining('Japan/Tokyo · 3'), findsOneWidget);
+    expect(find.textContaining('Japan/Osaka · 2'), findsOneWidget);
+    expect(find.textContaining('Joined'), findsNothing);
+    expect(find.textContaining('Thread'), findsNothing);
+    expect(find.textContaining('Reply'), findsNothing);
+  });
 }
 
 MediaPost _post({

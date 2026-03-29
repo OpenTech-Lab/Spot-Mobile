@@ -761,6 +761,9 @@ class _ProfileHeader extends StatelessWidget {
                   postCount: postCount,
                   followingCount: followStats.followingCount,
                   followerCount: followStats.followerCount,
+                  joinedAt: activitySummary.accountCreatedAt,
+                  lastThreadAt: activitySummary.lastThreadAt,
+                  lastReplyAt: activitySummary.lastReplyAt,
                 ),
               ),
             ],
@@ -773,7 +776,7 @@ class _ProfileHeader extends StatelessWidget {
             style: SpotType.subheading,
           ),
           const SizedBox(height: SpotSpacing.md),
-          ProfileActivitySummaryChips(summary: activitySummary),
+          ProfileLocationChips(summary: activitySummary),
           const SizedBox(height: SpotSpacing.lg),
           SizedBox(
             width: double.infinity,

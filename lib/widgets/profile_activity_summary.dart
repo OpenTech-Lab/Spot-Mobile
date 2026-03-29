@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:intl/intl.dart';
 
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/services/geo_lookup.dart';
@@ -73,41 +72,23 @@ String? _aggregateLocationLabelForPost(MediaPost post) {
   return '${post.latitude!.toStringAsFixed(1)}, ${post.longitude!.toStringAsFixed(1)}';
 }
 
-class ProfileActivitySummaryChips extends StatelessWidget {
-  const ProfileActivitySummaryChips({super.key, required this.summary});
+class ProfileLocationChips extends StatelessWidget {
+  const ProfileLocationChips({super.key, required this.summary});
 
   final ProfileActivitySummary summary;
 
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: SpotSpacing.sm,
-      runSpacing: SpotSpacing.sm,
+      spacing: SpotSpacing.xs,
+      runSpacing: SpotSpacing.xs,
       children: [
-        _ProfileSummaryChip(
-          label: 'Created',
-          value: _formatDateTime(summary.accountCreatedAt),
-        ),
-        _ProfileSummaryChip(
-          label: 'Last thread',
-          value: _formatDateTime(summary.lastThreadAt, empty: 'No threads yet'),
-        ),
-        _ProfileSummaryChip(
-          label: 'Last reply',
-          value: _formatDateTime(summary.lastReplyAt, empty: 'No replies yet'),
-        ),
         if (summary.topLocations.isEmpty)
-          const _ProfileSummaryChip(
-            label: 'Locations',
-            value: 'No public locations yet',
-            isLocation: true,
-          )
+          const _ProfileSummaryChip(value: 'No locations', isLocation: true)
         else
-          for (var i = 0; i < summary.topLocations.length; i++)
+          for (final location in summary.topLocations)
             _ProfileSummaryChip(
-              label: 'Top ${i + 1}',
-              value:
-                  '${summary.topLocations[i].label} · ${summary.topLocations[i].count}',
+              value: '${location.label} · ${location.count}',
               isLocation: true,
             ),
       ],
@@ -116,13 +97,8 @@ class ProfileActivitySummaryChips extends StatelessWidget {
 }
 
 class _ProfileSummaryChip extends StatelessWidget {
-  const _ProfileSummaryChip({
-    required this.label,
-    required this.value,
-    this.isLocation = false,
-  });
+  const _ProfileSummaryChip({required this.value, this.isLocation = false});
 
-  final String label;
   final String value;
   final bool isLocation;
 
@@ -134,13 +110,12 @@ class _ProfileSummaryChip extends StatelessWidget {
     final borderColor = isLocation
         ? SpotColors.accent.withAlpha(60)
         : SpotColors.border;
-    final labelColor = isLocation ? SpotColors.accent : SpotColors.textTertiary;
     final valueColor = isLocation ? SpotColors.accent : SpotColors.textPrimary;
 
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: SpotSpacing.md,
-        vertical: SpotSpacing.xs,
+        horizontal: SpotSpacing.sm,
+        vertical: 3,
       ),
       decoration: BoxDecoration(
         color: backgroundColor,
@@ -151,12 +126,8 @@ class _ProfileSummaryChip extends StatelessWidget {
         TextSpan(
           children: [
             TextSpan(
-              text: '$label · ',
-              style: SpotType.caption.copyWith(color: labelColor),
-            ),
-            TextSpan(
               text: value,
-              style: SpotType.bodySecondary.copyWith(
+              style: SpotType.caption.copyWith(
                 color: valueColor,
                 fontWeight: FontWeight.w600,
               ),
@@ -166,9 +137,4 @@ class _ProfileSummaryChip extends StatelessWidget {
       ),
     );
   }
-}
-
-String _formatDateTime(DateTime? value, {String empty = 'Unknown'}) {
-  if (value == null) return empty;
-  return DateFormat('MMM d, yyyy  HH:mm').format(value.toLocal());
 }
