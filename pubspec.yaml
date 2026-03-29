@@ -2,7 +2,7 @@ name: mobile
 description: "Spot - Citizen Swarm: Decentralized SNS & Event Timeline Platform"
 publish_to: 'none'
 
-version: 0.6.0+41
+version: 0.6.1+42
 
 environment:
   sdk: ^3.11.0
