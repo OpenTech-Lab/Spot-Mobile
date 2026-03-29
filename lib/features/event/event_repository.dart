@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:mobile/features/event/event_ordering.dart';
 import 'package:mobile/features/ebes/trust_service.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/event_model.dart';
@@ -121,9 +122,7 @@ class EventRepository {
   }
 
   List<CivicEvent> getAllEvents() {
-    final events = _cache.values.toList(growable: false);
-    events.sort((a, b) => b.firstSeen.compareTo(a.firstSeen));
-    return events;
+    return sortEventsByLastActivity(_cache.values);
   }
 
   Future<List<MediaPost>> fetchPostsPage({DateTime? before, int limit = 20}) =>

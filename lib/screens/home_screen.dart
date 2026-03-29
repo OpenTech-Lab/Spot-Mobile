@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/features/event/event_repository.dart';
@@ -27,7 +28,7 @@ List<String> orderedFavoriteEventTags({
   for (final event in events) {
     final normalizedTag = normalizeTag(event.hashtag);
     if (normalizedTag.isEmpty) continue;
-    final latestActivity = event.latestPost?.capturedAt ?? event.firstSeen;
+    final latestActivity = event.lastActivityAt;
     final existingActivity = latestActivityByTag[normalizedTag];
     if (existingActivity == null || latestActivity.isAfter(existingActivity)) {
       latestActivityByTag[normalizedTag] = latestActivity;
@@ -735,6 +736,34 @@ class _EventRow extends StatelessWidget {
                     '${event.posts.length} posts · ${event.participantCount} contributors',
                     style: SpotType.caption,
                   ),
+                  const SizedBox(height: SpotSpacing.sm),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _EventDateChip(
+                          label: 'Created',
+                          icon: Icons.event_outlined,
+                          value: formatEventListDate(event.firstSeen),
+                        ),
+                      ),
+                      const SizedBox(width: SpotSpacing.xs),
+                      Expanded(
+                        child: _EventDateChip(
+                          label: 'Post',
+                          icon: Icons.article_outlined,
+                          value: formatEventListDate(event.lastPostAt),
+                        ),
+                      ),
+                      const SizedBox(width: SpotSpacing.xs),
+                      Expanded(
+                        child: _EventDateChip(
+                          label: 'Reply',
+                          icon: Icons.reply,
+                          value: formatEventListDate(event.lastReplyAt),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -744,6 +773,65 @@ class _EventRow extends StatelessWidget {
               size: 16,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+String formatEventListDate(DateTime? value, {String empty = '-'}) {
+  if (value == null) return empty;
+  return DateFormat('yyyy/MM/dd').format(value.toLocal());
+}
+
+class _EventDateChip extends StatelessWidget {
+  const _EventDateChip({
+    required this.label,
+    required this.icon,
+    required this.value,
+  });
+
+  final String label;
+  final IconData icon;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '$label ${value == '-' ? 'none' : value}',
+      child: ExcludeSemantics(
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: SpotSpacing.xs,
+            vertical: 5,
+          ),
+          decoration: BoxDecoration(
+            color: SpotColors.surfaceHigh,
+            borderRadius: BorderRadius.circular(SpotRadius.full),
+            border: Border.all(color: SpotColors.border, width: 0.5),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 12, color: SpotColors.textSecondary),
+              const SizedBox(width: 4),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    value,
+                    textAlign: TextAlign.center,
+                    style: SpotType.caption.copyWith(
+                      color: SpotColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

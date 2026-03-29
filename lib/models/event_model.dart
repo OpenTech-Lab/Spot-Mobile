@@ -42,26 +42,26 @@ class NostrEvent {
   String serialize() => jsonEncode([0, pubkey, createdAt, kind, tags, content]);
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'pubkey': pubkey,
-        'created_at': createdAt,
-        'kind': kind,
-        'tags': tags,
-        'content': content,
-        'sig': sig,
-      };
+    'id': id,
+    'pubkey': pubkey,
+    'created_at': createdAt,
+    'kind': kind,
+    'tags': tags,
+    'content': content,
+    'sig': sig,
+  };
 
   factory NostrEvent.fromJson(Map<String, dynamic> json) => NostrEvent(
-        id: json['id'] as String,
-        pubkey: json['pubkey'] as String,
-        createdAt: json['created_at'] as int,
-        kind: json['kind'] as int,
-        tags: (json['tags'] as List)
-            .map((t) => List<String>.from(t as List))
-            .toList(),
-        content: json['content'] as String,
-        sig: json['sig'] as String,
-      );
+    id: json['id'] as String,
+    pubkey: json['pubkey'] as String,
+    createdAt: json['created_at'] as int,
+    kind: json['kind'] as int,
+    tags: (json['tags'] as List)
+        .map((t) => List<String>.from(t as List))
+        .toList(),
+    content: json['content'] as String,
+    sig: json['sig'] as String,
+  );
 
   /// Convenience getter: find the first value for a given tag name.
   String? getTagValue(String name) {
@@ -150,9 +150,38 @@ class CivicEvent {
   /// Returns the most recent post, or null if there are no posts.
   MediaPost? get latestPost => posts.isEmpty ? null : posts.last;
 
+  /// Returns the most recent non-reply post in this event, if any.
+  DateTime? get lastPostAt =>
+      _latestCapturedAtWhere((post) => post.replyToId == null);
+
+  /// Returns the most recent reply in this event, if any.
+  DateTime? get lastReplyAt =>
+      _latestCapturedAtWhere((post) => post.replyToId != null);
+
+  /// Returns the newest visible activity for this event.
+  DateTime get lastActivityAt {
+    final postAt = lastPostAt;
+    final replyAt = lastReplyAt;
+    if (postAt == null) return replyAt ?? firstSeen;
+    if (replyAt == null) return postAt;
+    return replyAt.isAfter(postAt) ? replyAt : postAt;
+  }
+
   /// Returns posts sorted newest-first for feed display.
   List<MediaPost> get postsByNewest =>
-      List<MediaPost>.from(posts)..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+      List<MediaPost>.from(posts)
+        ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+
+  DateTime? _latestCapturedAtWhere(bool Function(MediaPost post) predicate) {
+    DateTime? latest;
+    for (final post in posts) {
+      if (!predicate(post)) continue;
+      if (latest == null || post.capturedAt.isAfter(latest)) {
+        latest = post.capturedAt;
+      }
+    }
+    return latest;
+  }
 
   // ── EBES convenience getters ───────────────────────────────────────────────
 
@@ -178,19 +207,18 @@ class CivicEvent {
     double? trustScore,
     EventStatus? status,
     List<Witness>? witnesses,
-  }) =>
-      CivicEvent(
-        hashtag: hashtag ?? this.hashtag,
-        title: title ?? this.title,
-        posts: posts ?? this.posts,
-        centerLat: centerLat ?? this.centerLat,
-        centerLon: centerLon ?? this.centerLon,
-        firstSeen: firstSeen ?? this.firstSeen,
-        participantCount: participantCount ?? this.participantCount,
-        trustScore: trustScore ?? this.trustScore,
-        status: status ?? this.status,
-        witnesses: witnesses ?? this.witnesses,
-      );
+  }) => CivicEvent(
+    hashtag: hashtag ?? this.hashtag,
+    title: title ?? this.title,
+    posts: posts ?? this.posts,
+    centerLat: centerLat ?? this.centerLat,
+    centerLon: centerLon ?? this.centerLon,
+    firstSeen: firstSeen ?? this.firstSeen,
+    participantCount: participantCount ?? this.participantCount,
+    trustScore: trustScore ?? this.trustScore,
+    status: status ?? this.status,
+    witnesses: witnesses ?? this.witnesses,
+  );
 
   @override
   String toString() =>
