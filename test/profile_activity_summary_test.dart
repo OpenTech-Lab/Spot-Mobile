@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mobile/models/media_post.dart';
@@ -74,6 +75,35 @@ void main() {
         ),
         [('35.7, 139.8', 3), ('34.7, 135.5', 2), ('51.5, -0.1', 1)],
       );
+    },
+  );
+
+  testWidgets(
+    'ProfileActivitySummaryChips renders compact chips without a section card heading',
+    (tester) async {
+      const summary = ProfileActivitySummary(
+        accountCreatedAt: null,
+        lastThreadAt: null,
+        lastReplyAt: null,
+        topLocations: [
+          ProfileLocationStat(label: 'Japan/Tokyo', count: 3),
+          ProfileLocationStat(label: 'Japan/Osaka', count: 2),
+        ],
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: ProfileActivitySummaryChips(summary: summary)),
+        ),
+      );
+
+      expect(find.byType(Wrap), findsOneWidget);
+      expect(find.textContaining('Created'), findsOneWidget);
+      expect(find.textContaining('Last thread'), findsOneWidget);
+      expect(find.textContaining('Last reply'), findsOneWidget);
+      expect(find.textContaining('Top 1'), findsOneWidget);
+      expect(find.textContaining('Top 2'), findsOneWidget);
+      expect(find.text('Top locations'), findsNothing);
     },
   );
 }

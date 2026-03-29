@@ -73,110 +73,97 @@ String? _aggregateLocationLabelForPost(MediaPost post) {
   return '${post.latitude!.toStringAsFixed(1)}, ${post.longitude!.toStringAsFixed(1)}';
 }
 
-class ProfileActivitySummaryCard extends StatelessWidget {
-  const ProfileActivitySummaryCard({super.key, required this.summary});
+class ProfileActivitySummaryChips extends StatelessWidget {
+  const ProfileActivitySummaryChips({super.key, required this.summary});
 
   final ProfileActivitySummary summary;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(SpotSpacing.md),
-      decoration: BoxDecoration(
-        color: SpotColors.surfaceHigh,
-        borderRadius: BorderRadius.circular(SpotRadius.md),
-        border: Border.all(color: SpotColors.border, width: 0.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _ProfileMetaRow(
-            icon: CupertinoIcons.calendar,
-            label: 'Account created',
-            value: _formatDateTime(summary.accountCreatedAt),
-          ),
-          const SizedBox(height: SpotSpacing.sm),
-          _ProfileMetaRow(
-            icon: CupertinoIcons.text_bubble,
-            label: 'Last thread',
-            value: _formatDateTime(
-              summary.lastThreadAt,
-              empty: 'No threads yet',
+    return Wrap(
+      spacing: SpotSpacing.sm,
+      runSpacing: SpotSpacing.sm,
+      children: [
+        _ProfileSummaryChip(
+          label: 'Created',
+          value: _formatDateTime(summary.accountCreatedAt),
+        ),
+        _ProfileSummaryChip(
+          label: 'Last thread',
+          value: _formatDateTime(summary.lastThreadAt, empty: 'No threads yet'),
+        ),
+        _ProfileSummaryChip(
+          label: 'Last reply',
+          value: _formatDateTime(summary.lastReplyAt, empty: 'No replies yet'),
+        ),
+        if (summary.topLocations.isEmpty)
+          const _ProfileSummaryChip(
+            label: 'Locations',
+            value: 'No public locations yet',
+            isLocation: true,
+          )
+        else
+          for (var i = 0; i < summary.topLocations.length; i++)
+            _ProfileSummaryChip(
+              label: 'Top ${i + 1}',
+              value:
+                  '${summary.topLocations[i].label} · ${summary.topLocations[i].count}',
+              isLocation: true,
             ),
-          ),
-          const SizedBox(height: SpotSpacing.sm),
-          _ProfileMetaRow(
-            icon: CupertinoIcons.arrow_turn_up_left,
-            label: 'Last reply',
-            value: _formatDateTime(
-              summary.lastReplyAt,
-              empty: 'No replies yet',
-            ),
-          ),
-          const SizedBox(height: SpotSpacing.md),
-          Text('Top locations', style: SpotType.caption),
-          const SizedBox(height: SpotSpacing.sm),
-          if (summary.topLocations.isEmpty)
-            Text('No public locations yet', style: SpotType.bodySecondary)
-          else
-            Wrap(
-              spacing: SpotSpacing.sm,
-              runSpacing: SpotSpacing.sm,
-              children: [
-                for (final location in summary.topLocations)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: SpotSpacing.sm,
-                      vertical: SpotSpacing.xs,
-                    ),
-                    decoration: BoxDecoration(
-                      color: SpotColors.bg,
-                      borderRadius: BorderRadius.circular(SpotRadius.sm),
-                      border: Border.all(color: SpotColors.border, width: 0.5),
-                    ),
-                    child: Text(
-                      '${location.label} · ${location.count}',
-                      style: SpotType.caption,
-                    ),
-                  ),
-              ],
-            ),
-        ],
-      ),
+      ],
     );
   }
 }
 
-class _ProfileMetaRow extends StatelessWidget {
-  const _ProfileMetaRow({
-    required this.icon,
+class _ProfileSummaryChip extends StatelessWidget {
+  const _ProfileSummaryChip({
     required this.label,
     required this.value,
+    this.isLocation = false,
   });
 
-  final IconData icon;
   final String label;
   final String value;
+  final bool isLocation;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 14, color: SpotColors.textTertiary),
-        const SizedBox(width: SpotSpacing.sm),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: SpotType.caption),
-              const SizedBox(height: 2),
-              Text(value, style: SpotType.bodySecondary),
-            ],
-          ),
+    final backgroundColor = isLocation
+        ? SpotColors.accentSubtle
+        : SpotColors.surfaceHigh;
+    final borderColor = isLocation
+        ? SpotColors.accent.withAlpha(60)
+        : SpotColors.border;
+    final labelColor = isLocation ? SpotColors.accent : SpotColors.textTertiary;
+    final valueColor = isLocation ? SpotColors.accent : SpotColors.textPrimary;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpotSpacing.md,
+        vertical: SpotSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(SpotRadius.full),
+        border: Border.all(color: borderColor, width: 0.5),
+      ),
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: '$label · ',
+              style: SpotType.caption.copyWith(color: labelColor),
+            ),
+            TextSpan(
+              text: value,
+              style: SpotType.bodySecondary.copyWith(
+                color: valueColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

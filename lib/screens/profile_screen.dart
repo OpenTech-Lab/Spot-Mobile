@@ -773,7 +773,7 @@ class _ProfileHeader extends StatelessWidget {
             style: SpotType.subheading,
           ),
           const SizedBox(height: SpotSpacing.md),
-          ProfileActivitySummaryCard(summary: activitySummary),
+          ProfileActivitySummaryChips(summary: activitySummary),
           const SizedBox(height: SpotSpacing.lg),
           SizedBox(
             width: double.infinity,
