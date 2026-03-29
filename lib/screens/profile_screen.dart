@@ -31,9 +31,9 @@ import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/profile_avatar.dart';
 import 'package:mobile/widgets/profile_activity_summary.dart';
+import 'package:mobile/widgets/profile_post_thread_row.dart';
 import 'package:mobile/widgets/profile_stats_row.dart';
 import 'package:mobile/widgets/profile_thread_tab_bar.dart';
-import 'package:mobile/widgets/post_thread_row.dart';
 
 /// Profile screen — shows identity summary and the user's own posts.
 class ProfileScreen extends StatefulWidget {
@@ -712,9 +712,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                     onTap: post.isPendingRetry
                         ? null
                         : () => _openProfileThread(ctx, post),
-                    child: PostThreadRow(
+                    child: ProfilePostThreadRow(
                       post: post,
-                      isLast: true,
                       onTagTap: (tag) => _openDiscoverTag(ctx, tag),
                       onMediaUpdated: _updateMediaPost,
                       onReply: post.isPendingRetry
