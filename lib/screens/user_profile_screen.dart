@@ -19,6 +19,7 @@ import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/profile_avatar.dart';
+import 'package:mobile/widgets/profile_activity_summary.dart';
 import 'package:mobile/widgets/profile_stats_row.dart';
 import 'package:mobile/widgets/profile_thread_tab_bar.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
@@ -359,6 +360,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     final showReplies = _contentTabController.index == 1;
     final visiblePosts = showReplies ? replies : threads;
     final emptyTitle = showReplies ? 'No replies yet' : 'No threads yet';
+    final activitySummary = buildProfileActivitySummary(
+      posts: _posts,
+      accountCreatedAt: _profile?.createdAt,
+    );
     return Scaffold(
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
@@ -366,10 +371,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         title: Text(
           _profile?.displayName?.trim().isNotEmpty == true
               ? _profile!.displayName!.trim()
-              : _shortKey(widget.pubkey),
-          style: _profile?.displayName?.trim().isNotEmpty == true
-              ? SpotType.subheading
-              : SpotType.mono,
+              : 'Citizen',
+          style: SpotType.subheading,
         ),
         actions: [
           IconButton(
@@ -396,6 +399,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 isTogglingFollow: _isTogglingFollow,
                 onFollowTap: _toggleFollow,
                 profile: _profile,
+                activitySummary: activitySummary,
               ),
             ),
             const SliverToBoxAdapter(child: Divider(height: 1, thickness: 0.5)),
@@ -483,6 +487,7 @@ class _UserProfileHeader extends StatelessWidget {
     required this.isTogglingFollow,
     required this.onFollowTap,
     required this.profile,
+    required this.activitySummary,
   });
 
   final String pubkey;
@@ -492,6 +497,7 @@ class _UserProfileHeader extends StatelessWidget {
   final bool isTogglingFollow;
   final VoidCallback onFollowTap;
   final ProfileModel? profile;
+  final ProfileActivitySummary activitySummary;
 
   @override
   Widget build(BuildContext context) {
@@ -527,13 +533,11 @@ class _UserProfileHeader extends StatelessWidget {
           Text(
             profile?.displayName?.trim().isNotEmpty == true
                 ? profile!.displayName!.trim()
-                : _shortKey(pubkey),
-            style: profile?.displayName?.trim().isNotEmpty == true
-                ? SpotType.subheading
-                : SpotType.mono,
+                : 'Citizen',
+            style: SpotType.subheading,
           ),
-          const SizedBox(height: SpotSpacing.xs),
-          Text(_shortKey(pubkey), style: SpotType.mono),
+          const SizedBox(height: SpotSpacing.md),
+          ProfileActivitySummaryCard(summary: activitySummary),
           const SizedBox(height: SpotSpacing.lg),
           SizedBox(
             width: double.infinity,
@@ -551,11 +555,4 @@ class _UserProfileHeader extends StatelessWidget {
       ),
     );
   }
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-String _shortKey(String pubkey) {
-  if (pubkey.length <= 12) return pubkey;
-  return '${pubkey.substring(0, 6)}…${pubkey.substring(pubkey.length - 4)}';
 }

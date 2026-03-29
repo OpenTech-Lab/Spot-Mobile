@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:mobile/core/encryption.dart';
@@ -29,6 +29,7 @@ import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/profile_avatar.dart';
+import 'package:mobile/widgets/profile_activity_summary.dart';
 import 'package:mobile/widgets/profile_stats_row.dart';
 import 'package:mobile/widgets/profile_thread_tab_bar.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
@@ -537,6 +538,11 @@ class _ProfileScreenState extends State<ProfileScreen>
     final emptySubtitle = showReplies
         ? 'Replies you posted will appear here'
         : 'Capture a moment to see it here';
+    final summaryPosts = _posts.where((post) => !post.isPendingRetry);
+    final activitySummary = buildProfileActivitySummary(
+      posts: summaryPosts,
+      accountCreatedAt: _profile?.createdAt ?? widget.wallet.createdAt,
+    );
     return Scaffold(
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
@@ -565,6 +571,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 postCount: _posts.length,
                 followStats: _followStats,
                 profile: _profile,
+                activitySummary: activitySummary,
                 onEdit: _editProfile,
                 isSavingProfile: _isSavingProfile,
               ),
@@ -673,6 +680,7 @@ class _ProfileHeader extends StatelessWidget {
     required this.postCount,
     required this.followStats,
     required this.profile,
+    required this.activitySummary,
     required this.onEdit,
     required this.isSavingProfile,
   });
@@ -681,6 +689,7 @@ class _ProfileHeader extends StatelessWidget {
   final int postCount;
   final FollowStats followStats;
   final ProfileModel? profile;
+  final ProfileActivitySummary activitySummary;
   final VoidCallback onEdit;
   final bool isSavingProfile;
 
@@ -721,39 +730,11 @@ class _ProfileHeader extends StatelessWidget {
           Text(
             profile?.displayName?.trim().isNotEmpty == true
                 ? profile!.displayName!.trim()
-                : 'citizen-${wallet.publicKeyHex.substring(0, 8)}',
+                : 'You',
             style: SpotType.subheading,
           ),
-          const SizedBox(height: SpotSpacing.xs),
-          // npub
-          GestureDetector(
-            onTap: () {
-              Clipboard.setData(ClipboardData(text: wallet.npub));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Copied to clipboard')),
-              );
-            },
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(wallet.npubShort, style: SpotType.mono),
-                const SizedBox(width: SpotSpacing.xs),
-                const Icon(
-                  CupertinoIcons.doc_on_doc,
-                  color: SpotColors.textTertiary,
-                  size: 11,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: SpotSpacing.xs),
-          // Device
-          Text(
-            wallet.deviceId.length > 20
-                ? '${wallet.deviceId.substring(0, 14)}…'
-                : wallet.deviceId,
-            style: SpotType.caption,
-          ),
+          const SizedBox(height: SpotSpacing.md),
+          ProfileActivitySummaryCard(summary: activitySummary),
           const SizedBox(height: SpotSpacing.lg),
           SizedBox(
             width: double.infinity,

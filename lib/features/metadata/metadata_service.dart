@@ -126,7 +126,7 @@ class MetadataService {
       await client
           .from('profiles')
           .select(
-            'id, display_name, legacy_pubkey, legacy_npub, device_id, '
+            'id, created_at, display_name, legacy_pubkey, legacy_npub, device_id, '
             'avatar_seed, avatar_content_hash',
           )
           .inFilter('id', authorIds)
@@ -625,7 +625,7 @@ class MetadataService {
       await client
           .from('profiles')
           .select(
-            'id, display_name, legacy_pubkey, legacy_npub, device_id, '
+            'id, created_at, display_name, legacy_pubkey, legacy_npub, device_id, '
             'avatar_seed, avatar_content_hash',
           )
           .eq('id', userId)
