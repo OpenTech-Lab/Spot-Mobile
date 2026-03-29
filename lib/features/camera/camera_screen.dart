@@ -6,14 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
-import 'package:mobile/core/encryption.dart';
 import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/camera_service.dart';
 import 'package:mobile/services/geo_lookup.dart';
-import 'package:mobile/services/media_processing_service.dart';
+import 'package:mobile/services/post_media_preparation_service.dart';
 import 'package:mobile/services/post_publish_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
@@ -154,76 +153,69 @@ class _CameraScreenState extends State<CameraScreen>
   Future<void> _publishPost(String caption) async {
     if (_capturedFiles.isEmpty) return;
 
-    final enteredTag = normalizeTag(_eventTag);
-    final inheritedTag = normalizeTag(widget.replyToPost?.eventTag ?? '');
-    final effectiveTag = enteredTag.isNotEmpty
-        ? enteredTag
-        : (inheritedTag.isNotEmpty ? inheritedTag : null);
-    final categoryValidationMessage = validateThreadCategoryRequirement(
-      replyToId: widget.replyToPost?.nostrEventId,
-      eventTags: [?effectiveTag],
-    );
-    if (categoryValidationMessage != null) {
-      _showError(categoryValidationMessage);
-      return;
-    }
-
-    // Process all captured files
-    final processedFiles = <File>[];
-    for (var i = 0; i < _capturedFiles.length; i++) {
-      File f = File(_capturedFiles[i].path);
-      if (_isDangerMode && !_capturedIsVideos[i]) {
-        f = await CameraService.instance.applyFaceBlur(f);
-      }
-      f = await MediaProcessingService.instance.optimizeForUpload(
-        f,
-        isVideo: _capturedIsVideos[i],
-      );
-      processedFiles.add(f);
-    }
-
-    // Compute hashes for all files
-    final hashes = <String>[];
-    for (final f in processedFiles) {
-      final bytes = await f.readAsBytes();
-      hashes.add(EncryptionUtils.sha256BytesHex(bytes));
-    }
-
-    // Use first hash as primary event ID
-    final primaryHash = hashes.first;
-    final paths = processedFiles.map((f) => f.path).toList();
-
-    final effectiveSpotName = _spotName?.trim().isNotEmpty == true
-        ? _spotName!.trim()
-        : null;
-
-    final post = MediaPost(
-      id: primaryHash,
-      pubkey: widget.wallet.publicKeyHex,
-      contentHashes: hashes,
-      mediaPaths: paths,
-      // Exact GPS only for Spot check-ins; coarsen by default.
-      // Virtual mode: GPS is stored locally but NOT published.
-      latitude: effectiveSpotName != null
-          ? _gpsLock?.latitude
-          : _coarseCoord(_gpsLock?.latitude),
-      longitude: effectiveSpotName != null
-          ? _gpsLock?.longitude
-          : _coarseCoord(_gpsLock?.longitude),
-      capturedAt: _gpsLock?.timestamp ?? DateTime.now().toUtc(),
-      eventTags: effectiveTag != null ? [effectiveTag] : const [],
-      isDangerMode: _isDangerMode,
-      isVirtual: _isVirtualMode,
-      caption: caption.isEmpty ? null : caption,
-      replyToId: widget.replyToPost?.nostrEventId,
-      nostrEventId: primaryHash,
-      spotName: effectiveSpotName,
-    );
+    MediaPost? post;
 
     try {
+      final enteredTag = normalizeTag(_eventTag);
+      final inheritedTag = normalizeTag(widget.replyToPost?.eventTag ?? '');
+      final effectiveTag = enteredTag.isNotEmpty
+          ? enteredTag
+          : (inheritedTag.isNotEmpty ? inheritedTag : null);
+      final categoryValidationMessage = validateThreadCategoryRequirement(
+        replyToId: widget.replyToPost?.nostrEventId,
+        eventTags: [?effectiveTag],
+      );
+      if (categoryValidationMessage != null) {
+        _showError(categoryValidationMessage);
+        return;
+      }
+
+      final preparedMedia = await PostMediaPreparationService.instance
+          .prepareAssets(
+            List.generate(
+              _capturedFiles.length,
+              (index) => PostMediaAsset(
+                file: File(_capturedFiles[index].path),
+                isVideo: _capturedIsVideos[index],
+              ),
+            ),
+            blurFaces: _isDangerMode,
+          );
+
+      final primaryHash = preparedMedia.hashes.first;
+      final effectiveSpotName = _spotName?.trim().isNotEmpty == true
+          ? _spotName!.trim()
+          : null;
+
+      post = MediaPost(
+        id: primaryHash,
+        pubkey: widget.wallet.publicKeyHex,
+        contentHashes: preparedMedia.hashes,
+        mediaPaths: preparedMedia.paths,
+        // Exact GPS only for Spot check-ins; coarsen by default.
+        // Virtual mode: GPS is stored locally but NOT published.
+        latitude: effectiveSpotName != null
+            ? _gpsLock?.latitude
+            : _coarseCoord(_gpsLock?.latitude),
+        longitude: effectiveSpotName != null
+            ? _gpsLock?.longitude
+            : _coarseCoord(_gpsLock?.longitude),
+        capturedAt: _gpsLock?.timestamp ?? DateTime.now().toUtc(),
+        eventTags: effectiveTag != null ? [effectiveTag] : const [],
+        isDangerMode: _isDangerMode,
+        isVirtual: _isVirtualMode,
+        caption: caption.isEmpty ? null : caption,
+        replyToId: widget.replyToPost?.nostrEventId,
+        nostrEventId: primaryHash,
+        spotName: effectiveSpotName,
+      );
+
       // Register ALL files in cache BEFORE publish so self-delivery finds them
-      for (var i = 0; i < hashes.length; i++) {
-        await CacheManager.instance.addToCache(hashes[i], paths[i]);
+      for (var i = 0; i < preparedMedia.hashes.length; i++) {
+        await CacheManager.instance.addToCache(
+          preparedMedia.hashes[i],
+          preparedMedia.paths[i],
+        );
       }
       await PostPublishService.instance.publishDraft(
         draft: post,
@@ -236,9 +228,15 @@ class _CameraScreenState extends State<CameraScreen>
       if (!mounted) return;
       _showError(e.message);
     } catch (e) {
-      await PostPublishService.instance.saveFailedPublish(post, e);
+      if (post != null) {
+        await PostPublishService.instance.saveFailedPublish(post, e);
+      }
       if (!mounted) return;
-      _showError('Publish failed. Saved in Profile so you can retry.');
+      _showError(
+        post != null
+            ? 'Publish failed. Saved in Profile so you can retry.'
+            : 'Publish failed before media could be prepared.',
+      );
       Navigator.of(context).pop();
     }
   }
@@ -364,7 +362,7 @@ class _CameraScreenState extends State<CameraScreen>
                   child: Text(
                     _isVirtualMode
                         ? 'Virtual · no location published'
-                        : 'Faces blurred',
+                        : 'Danger mode',
                     style: SpotType.label.copyWith(
                       color: _isVirtualMode
                           ? SpotColors.onAccent
@@ -1119,9 +1117,9 @@ String _buildGpsLabel(bool isDangerMode, GpsLock? gpsLock, {String? spotName}) {
     return '${spotName!.trim()}  ·  $place';
   }
 
-  // Danger mode: city-level + face blur note
+  // Danger mode: city-level privacy note
   if (isDangerMode) {
-    return '$place  (faces blurred)';
+    return '$place  (Danger mode)';
   }
 
   // Default: city-level only

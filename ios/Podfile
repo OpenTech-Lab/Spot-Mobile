@@ -1,4 +1,6 @@
-platform :ios, '13.0'
+platform :ios, '15.5'
+
+$iOSVersion = '15.5'
 
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
@@ -33,13 +35,19 @@ target 'Runner' do
 end
 
 post_install do |installer|
+  installer.pods_project.build_configurations.each do |config|
+    config.build_settings['EXCLUDED_ARCHS[sdk=*]'] = 'armv7'
+    config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = $iOSVersion
+  end
+
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
 
     target.build_configurations.each do |config|
+      config.build_settings['EXCLUDED_ARCHS[sdk=*]'] = 'armv7'
       deployment_target = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
-      if deployment_target.nil? || deployment_target.to_f < 13.0
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      if deployment_target.nil? || Gem::Version.new(deployment_target) < Gem::Version.new($iOSVersion)
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = $iOSVersion
       end
 
       # Pod targets must never require provisioning profiles in CI archives.

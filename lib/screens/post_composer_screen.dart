@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:mobile/core/encryption.dart';
@@ -18,6 +17,7 @@ import 'package:mobile/services/camera_service.dart';
 import 'package:mobile/services/cdn_media_service.dart';
 import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/services/media_processing_service.dart';
+import 'package:mobile/services/post_media_preparation_service.dart';
 import 'package:mobile/services/post_publish_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
@@ -274,23 +274,22 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
     Navigator.of(context).push(overlay);
 
     try {
-      final hashes = <String>[];
-      final paths = <String>[];
       var isTextOnly = false;
-
-      for (final xfile in _mediaFiles) {
-        final optimized = await MediaProcessingService.instance
-            .optimizeForUpload(
-              File(xfile.path),
-              isVideo: MediaProcessingService.instance.isVideoPath(
-                xfile.path,
-                mimeType: xfile.mimeType,
+      final preparedMedia = await PostMediaPreparationService.instance
+          .prepareAssets(
+            _mediaFiles.map(
+              (xfile) => PostMediaAsset(
+                file: File(xfile.path),
+                isVideo: MediaProcessingService.instance.isVideoPath(
+                  xfile.path,
+                  mimeType: xfile.mimeType,
+                ),
               ),
-            );
-        final bytes = await optimized.readAsBytes();
-        hashes.add(EncryptionUtils.sha256BytesHex(Uint8List.fromList(bytes)));
-        paths.add(optimized.path);
-      }
+            ),
+            blurFaces: _isDangerMode,
+          );
+      final hashes = preparedMedia.hashes;
+      final paths = preparedMedia.paths;
 
       // Text-only post: derive a deterministic temp ID from caption + timestamp
       if (hashes.isEmpty) {
@@ -1002,7 +1001,7 @@ class _ComposerOptions extends StatelessWidget {
           _OptionRow(
             icon: CupertinoIcons.shield_lefthalf_fill,
             label: 'Blur faces',
-            subtitle: 'Automatically blur detected faces',
+            subtitle: 'Automatically blur detected faces in photos',
             value: isDangerMode,
             onChanged: onDangerChanged,
             activeColor: SpotColors.danger,

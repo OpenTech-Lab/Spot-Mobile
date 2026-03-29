@@ -133,7 +133,7 @@ class _WelcomeStep extends StatelessWidget {
 
           const _Bullet('Device-bound cryptographic identity'),
           const _Bullet('GPS-locked at the moment of capture'),
-          const _Bullet('Danger mode — blur faces, hide location'),
+          const _Bullet('Danger mode — blur faces in photos, hide location'),
           const _Bullet('Peer-to-peer, no central servers'),
 
           const Spacer(flex: 3),
