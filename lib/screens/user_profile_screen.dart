@@ -424,9 +424,13 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               child: ProfileThreadTabBar(controller: _contentTabController),
             ),
             if (showMap)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: FootprintMapTab(posts: _posts),
+              SliverLayoutBuilder(
+                builder: (context, constraints) => SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: constraints.remainingPaintExtent,
+                    child: FootprintMapTab(posts: _posts),
+                  ),
+                ),
               )
             else if (_isLoading && visiblePosts.isEmpty)
               const SliverFillRemaining(
