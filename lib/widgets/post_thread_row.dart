@@ -41,7 +41,6 @@ double postThreadRowFeedTwoImageWidth(double viewportWidth) {
 
 List<String> visibleThreadTagsForPost(MediaPost post) {
   if (post.eventTags.isEmpty) return const [];
-  if (post.replyToId == null) return const [];
   if (post.eventTags.length == 1) return const [];
   return post.eventTags.sublist(1);
 }
@@ -369,11 +368,24 @@ class PostThreadRow extends StatelessWidget {
                         ],
                       ),
                     ],
-                    // Event hashtags
+                    // Caption
+                    if (post.caption?.isNotEmpty == true) ...[
+                      const SizedBox(height: SpotSpacing.sm),
+                      Text(post.caption!, style: SpotType.body),
+                    ],
+                    const SizedBox(height: SpotSpacing.sm),
+                    // Media
+                    _PostMedia(
+                      post: post,
+                      isMediaLoading: isMediaLoading,
+                      useFeedEdgeSwipeMediaLayout: useFeedEdgeSwipeMediaLayout,
+                      onPostUpdated: onMediaUpdated,
+                    ),
                     if (visibleTags.isNotEmpty) ...[
-                      const SizedBox(height: 3),
+                      const SizedBox(height: SpotSpacing.sm),
                       Wrap(
                         spacing: SpotSpacing.sm,
+                        runSpacing: SpotSpacing.xs,
                         children: [
                           for (final t in visibleTags)
                             GestureDetector(
@@ -391,19 +403,6 @@ class PostThreadRow extends StatelessWidget {
                         ],
                       ),
                     ],
-                    // Caption
-                    if (post.caption?.isNotEmpty == true) ...[
-                      const SizedBox(height: SpotSpacing.sm),
-                      Text(post.caption!, style: SpotType.body),
-                    ],
-                    const SizedBox(height: SpotSpacing.sm),
-                    // Media
-                    _PostMedia(
-                      post: post,
-                      isMediaLoading: isMediaLoading,
-                      useFeedEdgeSwipeMediaLayout: useFeedEdgeSwipeMediaLayout,
-                      onPostUpdated: onMediaUpdated,
-                    ),
                     const SizedBox(height: SpotSpacing.sm),
                     _PostLocationRow(post: post),
                     if (post.isPendingRetry) ...[

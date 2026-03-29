@@ -34,10 +34,10 @@ void main() {
     },
   );
 
-  test('visibleThreadTagsForPost hides inline tags on root posts', () {
+  test('visibleThreadTagsForPost shows only sub tags on root posts', () {
     final post = _post(eventTags: const ['tokyo', 'news', 'urgent']);
 
-    expect(visibleThreadTagsForPost(post), isEmpty);
+    expect(visibleThreadTagsForPost(post), ['news', 'urgent']);
   });
 
   test('visibleThreadTagsForPost shows only sub tags on replies', () {
@@ -51,6 +51,12 @@ void main() {
 
   test('visibleThreadTagsForPost hides category-only tags on replies', () {
     final post = _post(eventTags: const ['tokyo'], replyToId: 'root-id');
+
+    expect(visibleThreadTagsForPost(post), isEmpty);
+  });
+
+  test('visibleThreadTagsForPost hides category-only tags on root posts', () {
+    final post = _post(eventTags: const ['tokyo']);
 
     expect(visibleThreadTagsForPost(post), isEmpty);
   });
@@ -150,6 +156,37 @@ void main() {
     );
 
     expect(find.textContaining('#tokyo'), findsOneWidget);
+  });
+
+  testWidgets('PostThreadRow shows extra tags below the media block', (
+    tester,
+  ) async {
+    final mediaPaths = _createTempMediaPaths(count: 1);
+    addTearDown(() => _cleanupTempMediaPaths(mediaPaths));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PostThreadRow(
+            post: _post(
+              eventTags: const ['tokyo', 'news', 'urgent'],
+              mediaPaths: mediaPaths,
+            ),
+            isLast: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('#tokyo'), findsOneWidget);
+    expect(find.text('#news'), findsOneWidget);
+    expect(find.text('#urgent'), findsOneWidget);
+
+    final mediaRect = tester.getRect(find.byType(Image).first);
+    final tagRect = tester.getRect(find.text('#news'));
+
+    expect(tagRect.top, greaterThan(mediaRect.bottom));
   });
 
   testWidgets(
