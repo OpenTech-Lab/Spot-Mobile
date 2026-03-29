@@ -18,6 +18,12 @@ class MediaPost {
   /// Author's Nostr public key hex
   final String pubkey;
 
+  /// Latest visible profile name for this author, if known.
+  final String? authorDisplayName;
+
+  /// Latest visible avatar content hash for this author, if known.
+  final String? authorAvatarContentHash;
+
   /// SHA-256 hashes of all media files (hex encoded). First entry is primary.
   final List<String> contentHashes;
 
@@ -96,6 +102,8 @@ class MediaPost {
   const MediaPost({
     required this.id,
     required this.pubkey,
+    this.authorDisplayName,
+    this.authorAvatarContentHash,
     required this.contentHashes,
     this.mediaPaths = const [],
     this.ipfsCid,
@@ -149,6 +157,8 @@ class MediaPost {
   Map<String, dynamic> toJson() => {
     'id': id,
     'pubkey': pubkey,
+    'authorDisplayName': authorDisplayName,
+    'authorAvatarContentHash': authorAvatarContentHash,
     'contentHashes': contentHashes,
     'mediaPaths': mediaPaths,
     'ipfsCid': ipfsCid,
@@ -178,6 +188,8 @@ class MediaPost {
   factory MediaPost.fromJson(Map<String, dynamic> json) => MediaPost(
     id: json['id'] as String,
     pubkey: json['pubkey'] as String,
+    authorDisplayName: json['authorDisplayName'] as String?,
+    authorAvatarContentHash: json['authorAvatarContentHash'] as String?,
     // Support both old single-hash format and new list format
     contentHashes: json['contentHashes'] != null
         ? List<String>.from(json['contentHashes'] as List)
@@ -215,6 +227,8 @@ class MediaPost {
   MediaPost copyWith({
     String? id,
     String? pubkey,
+    Object? authorDisplayName = _copyWithUnset,
+    Object? authorAvatarContentHash = _copyWithUnset,
     List<String>? contentHashes,
     List<String>? mediaPaths,
     String? ipfsCid,
@@ -242,6 +256,12 @@ class MediaPost {
   }) => MediaPost(
     id: id ?? this.id,
     pubkey: pubkey ?? this.pubkey,
+    authorDisplayName: identical(authorDisplayName, _copyWithUnset)
+        ? this.authorDisplayName
+        : authorDisplayName as String?,
+    authorAvatarContentHash: identical(authorAvatarContentHash, _copyWithUnset)
+        ? this.authorAvatarContentHash
+        : authorAvatarContentHash as String?,
     contentHashes: contentHashes ?? this.contentHashes,
     mediaPaths: mediaPaths ?? this.mediaPaths,
     ipfsCid: ipfsCid ?? this.ipfsCid,
@@ -280,6 +300,8 @@ class MediaPost {
   bool isEquivalentTo(MediaPost other) {
     return id == other.id &&
         pubkey == other.pubkey &&
+        authorDisplayName == other.authorDisplayName &&
+        authorAvatarContentHash == other.authorAvatarContentHash &&
         _stringListEquals(contentHashes, other.contentHashes) &&
         _stringListEquals(mediaPaths, other.mediaPaths) &&
         ipfsCid == other.ipfsCid &&

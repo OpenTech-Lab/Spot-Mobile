@@ -128,12 +128,26 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         widget.pubkey,
       );
       if (!mounted) return;
+      final normalizedDisplayName = profile?.displayName?.trim();
       setState(() {
         _profile = profile;
         _followStats = stats ?? const FollowStats.empty();
         _isFollowing =
             stats?.isFollowingByMe ??
             FollowService.instance.isFollowing(widget.pubkey);
+        _posts = _posts
+            .map(
+              (post) => post.pubkey == widget.pubkey
+                  ? post.copyWith(
+                      authorDisplayName:
+                          normalizedDisplayName?.isNotEmpty == true
+                          ? normalizedDisplayName
+                          : null,
+                      authorAvatarContentHash: profile?.avatarContentHash,
+                    )
+                  : post,
+            )
+            .toList(growable: false);
       });
     } catch (e) {
       debugPrint('[UserProfileScreen] Failed to load profile: $e');

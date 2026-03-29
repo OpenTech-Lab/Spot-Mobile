@@ -557,6 +557,9 @@ class MetadataService {
           return MetadataPostMapper.fromRow(
             row,
             authorKey: authorKey?.isNotEmpty == true ? authorKey! : userId,
+            authorDisplayName: profile?['display_name']?.toString(),
+            authorAvatarContentHash: profile?['avatar_content_hash']
+                ?.toString(),
           );
         })
         .toList(growable: false);

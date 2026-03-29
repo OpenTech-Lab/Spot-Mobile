@@ -143,7 +143,23 @@ class _ProfileScreenState extends State<ProfileScreen>
         widget.wallet,
       );
       if (!mounted) return;
-      setState(() => _profile = profile);
+      final normalizedDisplayName = profile.displayName?.trim();
+      setState(() {
+        _profile = profile;
+        _posts = _posts
+            .map(
+              (post) => post.pubkey == widget.wallet.publicKeyHex
+                  ? post.copyWith(
+                      authorDisplayName:
+                          normalizedDisplayName?.isNotEmpty == true
+                          ? normalizedDisplayName
+                          : null,
+                      authorAvatarContentHash: profile.avatarContentHash,
+                    )
+                  : post,
+            )
+            .toList(growable: false);
+      });
     } catch (e) {
       debugPrint('[ProfileScreen] Failed to load profile: $e');
     }
@@ -505,8 +521,31 @@ class _ProfileScreenState extends State<ProfileScreen>
             displayName: displayName,
             avatarContentHash: avatarContentHash,
           );
+      final normalizedDisplayName = updatedProfile.displayName?.trim();
+      final updatedPosts = _posts
+          .map(
+            (post) => post.pubkey == widget.wallet.publicKeyHex
+                ? post.copyWith(
+                    authorDisplayName: normalizedDisplayName?.isNotEmpty == true
+                        ? normalizedDisplayName
+                        : null,
+                    authorAvatarContentHash: updatedProfile.avatarContentHash,
+                  )
+                : post,
+          )
+          .toList(growable: false);
+      await LocalPostStore.instance.updateAuthorProfile(
+        authorPubkey: widget.wallet.publicKeyHex,
+        displayName: normalizedDisplayName?.isNotEmpty == true
+            ? normalizedDisplayName
+            : null,
+        avatarContentHash: updatedProfile.avatarContentHash,
+      );
       if (!mounted) return;
-      setState(() => _profile = updatedProfile);
+      setState(() {
+        _profile = updatedProfile;
+        _posts = updatedPosts;
+      });
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Profile updated')));

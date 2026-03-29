@@ -19,6 +19,7 @@ class EventRepository {
   final _controller = StreamController<CivicEvent>.broadcast();
 
   StreamSubscription<List<Map<String, dynamic>>>? _globalPostsSub;
+  StreamSubscription<List<Map<String, dynamic>>>? _profileSub;
   StreamSubscription<List<Map<String, dynamic>>>? _witnessSub;
   StreamSubscription<List<Map<String, dynamic>>>? _blocklistSub;
   final Map<String, StreamSubscription<List<Map<String, dynamic>>>>
@@ -58,6 +59,13 @@ class EventRepository {
             unawaited(_rebuildFromRows());
           });
     }
+
+    _profileSub ??= _metadata.client
+        .from('profiles')
+        .stream(primaryKey: ['id'])
+        .listen((_) {
+          unawaited(_rebuildFromRows());
+        });
 
     _witnessSub ??= _metadata.client
         .from('witness_signals')
@@ -156,6 +164,9 @@ class EventRepository {
   Future<void> _cancelStreams() async {
     await _globalPostsSub?.cancel();
     _globalPostsSub = null;
+
+    await _profileSub?.cancel();
+    _profileSub = null;
 
     await _witnessSub?.cancel();
     _witnessSub = null;

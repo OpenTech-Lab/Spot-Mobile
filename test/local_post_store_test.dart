@@ -116,6 +116,32 @@ void main() {
       expect(posts.map((post) => post.id), ['other-post']);
     },
   );
+
+  test(
+    'updateAuthorProfile rewrites saved posts for the matching pubkey',
+    () async {
+      final original = _post(id: 'author-post');
+      final otherAuthor = _post(id: 'other-post', pubkey: 'author-b');
+
+      await LocalPostStore.instance.savePosts([original, otherAuthor]);
+      await LocalPostStore.instance.updateAuthorProfile(
+        authorPubkey: 'author-a',
+        displayName: 'Citizen Tokyo',
+        avatarContentHash: 'avatar-hash-1',
+      );
+
+      final posts = await LocalPostStore.instance.loadPosts(
+        includeFailedToSend: true,
+      );
+      final updated = posts.firstWhere((post) => post.id == 'author-post');
+      final untouched = posts.firstWhere((post) => post.id == 'other-post');
+
+      expect(updated.authorDisplayName, 'Citizen Tokyo');
+      expect(updated.authorAvatarContentHash, 'avatar-hash-1');
+      expect(untouched.authorDisplayName, isNull);
+      expect(untouched.authorAvatarContentHash, isNull);
+    },
+  );
 }
 
 MediaPost _post({

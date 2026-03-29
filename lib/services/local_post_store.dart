@@ -84,6 +84,26 @@ class LocalPostStore {
     return updated;
   }
 
+  Future<void> updateAuthorProfile({
+    required String authorPubkey,
+    String? displayName,
+    String? avatarContentHash,
+  }) async {
+    await _enqueue(() async {
+      final posts = await _readPosts();
+      final updated = posts
+          .map((post) {
+            if (post.pubkey != authorPubkey) return post;
+            return post.copyWith(
+              authorDisplayName: displayName,
+              authorAvatarContentHash: avatarContentHash,
+            );
+          })
+          .toList(growable: false);
+      await _writePosts(updated);
+    });
+  }
+
   Future<void> removePost(String postId) async {
     await _enqueue(() async {
       final posts = await _readPosts();

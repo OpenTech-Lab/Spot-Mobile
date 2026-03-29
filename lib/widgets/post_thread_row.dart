@@ -10,6 +10,7 @@ import 'package:mobile/models/media_post.dart';
 import 'package:mobile/screens/media_detail_screen.dart';
 import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/theme/spot_theme.dart';
+import 'package:mobile/widgets/profile_avatar.dart';
 
 List<String> visibleThreadTagsForPost(MediaPost post) {
   if (post.eventTags.isEmpty) return const [];
@@ -185,7 +186,11 @@ class PostThreadRow extends StatelessWidget {
                   GestureDetector(
                     onTap: onAvatarTap,
                     behavior: HitTestBehavior.opaque,
-                    child: PubkeyAvatar(pubkey: post.pubkey),
+                    child: ProfileAvatar(
+                      pubkey: post.pubkey,
+                      avatarContentHash: post.authorAvatarContentHash,
+                      size: 36,
+                    ),
                   ),
                   if (!isLast)
                     Expanded(
@@ -220,7 +225,7 @@ class PostThreadRow extends StatelessWidget {
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               Text(
-                                _shortKey(post.pubkey),
+                                _authorDisplayNameForPost(post),
                                 style: SpotType.bodySecondary,
                               ),
                               if (headerCategoryTag != null)
@@ -351,7 +356,9 @@ class PostThreadRow extends StatelessWidget {
                         children: [
                           for (final t in visibleTags)
                             GestureDetector(
-                              onTap: onTagTap == null ? null : () => onTagTap!(t),
+                              onTap: onTagTap == null
+                                  ? null
+                                  : () => onTagTap!(t),
                               behavior: HitTestBehavior.opaque,
                               child: Text(
                                 '#$t',
@@ -477,11 +484,13 @@ class _PostMediaState extends State<_PostMedia> {
   void _tryAutoLoad() {
     if (_hasTriedAutoLoad || widget.isMediaLoading) return;
     if (widget.post.isTextOnly) return;
-    
+
     // Check if media is already available
-    final hasLocalMedia = widget.post.mediaPaths.any((path) => File(path).existsSync());
+    final hasLocalMedia = widget.post.mediaPaths.any(
+      (path) => File(path).existsSync(),
+    );
     if (hasLocalMedia) return;
-    
+
     // Auto-load if only preview is available
     _hasTriedAutoLoad = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -663,7 +672,9 @@ class _PostMediaState extends State<_PostMedia> {
                 size: 26,
               ),
             Text(
-              widget.isMediaLoading ? 'Loading full media…' : 'Tap to load media',
+              widget.isMediaLoading
+                  ? 'Loading full media…'
+                  : 'Tap to load media',
               style: SpotType.caption.copyWith(color: SpotColors.textTertiary),
             ),
             const SizedBox(height: SpotSpacing.xs),
@@ -1031,6 +1042,12 @@ String _coordinateLocationLabelForPost(MediaPost post) {
 String _shortKey(String pubkey) {
   if (pubkey.length <= 12) return pubkey;
   return '${pubkey.substring(0, 6)}…${pubkey.substring(pubkey.length - 4)}';
+}
+
+String _authorDisplayNameForPost(MediaPost post) {
+  final displayName = post.authorDisplayName?.trim();
+  if (displayName != null && displayName.isNotEmpty) return displayName;
+  return _shortKey(post.pubkey);
 }
 
 String _relativeTime(DateTime dt) {

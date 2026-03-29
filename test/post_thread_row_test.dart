@@ -6,6 +6,7 @@ import 'package:mobile/models/media_post.dart';
 import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
+import 'package:mobile/widgets/profile_avatar.dart';
 
 void main() {
   test('visibleThreadTagsForPost hides inline tags on root posts', () {
@@ -125,6 +126,32 @@ void main() {
 
     expect(find.textContaining('#tokyo'), findsOneWidget);
   });
+
+  testWidgets(
+    'PostThreadRow shows author display name and passes avatar hash through',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: PostThreadRow(
+              post: _post(
+                eventTags: const ['tokyo'],
+                authorDisplayName: 'Citizen Tokyo',
+                authorAvatarContentHash: 'avatar-hash-1',
+              ),
+              isLast: true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Citizen Tokyo'), findsOneWidget);
+      expect(find.textContaining('pubkey'), findsNothing);
+
+      final avatar = tester.widget<ProfileAvatar>(find.byType(ProfileAvatar));
+      expect(avatar.avatarContentHash, 'avatar-hash-1');
+    },
+  );
 
   testWidgets('PostThreadRow calls onTagTap for the category tag', (
     tester,
@@ -285,9 +312,13 @@ MediaPost _post({
   bool isLikedByMe = false,
   String? previewBase64,
   String? previewMimeType,
+  String? authorDisplayName,
+  String? authorAvatarContentHash,
 }) => MediaPost(
   id: 'post-id',
   pubkey: 'pubkey',
+  authorDisplayName: authorDisplayName,
+  authorAvatarContentHash: authorAvatarContentHash,
   contentHashes: const ['post-id'],
   capturedAt: DateTime.utc(2026, 3, 23),
   eventTags: eventTags,

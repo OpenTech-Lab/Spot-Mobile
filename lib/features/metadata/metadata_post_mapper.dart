@@ -27,6 +27,8 @@ abstract final class MetadataPostMapper {
   static MediaPost fromRow(
     Map<String, dynamic> row, {
     required String authorKey,
+    String? authorDisplayName,
+    String? authorAvatarContentHash,
   }) {
     final id = row['id'].toString();
     final eventTags = row['event_tags'] != null
@@ -41,6 +43,8 @@ abstract final class MetadataPostMapper {
     return MediaPost(
       id: id,
       pubkey: authorKey,
+      authorDisplayName: authorDisplayName,
+      authorAvatarContentHash: authorAvatarContentHash,
       contentHashes: contentHashes.isEmpty ? <String>[id] : contentHashes,
       latitude: (row['latitude'] as num?)?.toDouble(),
       longitude: (row['longitude'] as num?)?.toDouble(),
