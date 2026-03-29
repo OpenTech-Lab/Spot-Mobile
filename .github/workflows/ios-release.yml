@@ -24,9 +24,7 @@ jobs:
 
       - name: Install CocoaPods dependencies
         working-directory: ios
-        run: |
-          pod deintegrate
-          pod install
+        run: pod install
 
       - name: Validate required TestFlight secrets
         run: |
