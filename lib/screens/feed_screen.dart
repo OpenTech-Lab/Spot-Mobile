@@ -511,6 +511,7 @@ class _LatestTabState extends State<_LatestTab> {
                 child: PostThreadRow(
                   post: post,
                   isLast: true,
+                  useFeedEdgeSwipeMediaLayout: true,
                   isMediaLoading: widget.loadingMediaPostIds.contains(post.id),
                   onAvatarTap: () => widget.onAvatarTap(ctx, post.pubkey),
                   onTagTap: (tag) => widget.onTagTap(ctx, tag),
@@ -771,6 +772,7 @@ class _FollowingTab extends StatelessWidget {
                 child: PostThreadRow(
                   post: post,
                   isLast: true,
+                  useFeedEdgeSwipeMediaLayout: true,
                   isMediaLoading: loadingMediaPostIds.contains(post.id),
                   onAvatarTap: () => onAvatarTap(ctx, post.pubkey),
                   onTagTap: (tag) => onTagTap(ctx, tag),

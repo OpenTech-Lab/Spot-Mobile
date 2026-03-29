@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +12,28 @@ import 'package:mobile/widgets/post_thread_row.dart';
 import 'package:mobile/widgets/profile_avatar.dart';
 
 void main() {
+  test(
+    'postThreadRowFeedTwoImageWidth keeps the gap and preserves full left reach',
+    () {
+      const viewportWidth = 306.0;
+      final itemWidth = postThreadRowFeedTwoImageWidth(viewportWidth);
+      final contentWidth = (itemWidth * 2) + postThreadRowMediaGap;
+      final expandedViewportWidth =
+          viewportWidth + postThreadRowFeedMediaSwipeLeftBleed;
+      final maxScrollExtent = contentWidth - expandedViewportWidth;
+
+      expect(postThreadRowMediaGap, 6);
+      expect(itemWidth, greaterThan(200));
+      expect(
+        maxScrollExtent,
+        greaterThanOrEqualTo(
+          postThreadRowFeedMediaSwipeLeftBleed +
+              postThreadRowFeedMediaSwipeActivationThreshold,
+        ),
+      );
+    },
+  );
+
   test('visibleThreadTagsForPost hides inline tags on root posts', () {
     final post = _post(eventTags: const ['tokyo', 'news', 'urgent']);
 
@@ -298,10 +323,143 @@ void main() {
     expect(find.text('Loading full image…'), findsOneWidget);
     expect(find.text('Preview'), findsOneWidget);
   });
+
+  testWidgets(
+    'PostThreadRow feed media keeps the default inset gap before swiping',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final mediaPaths = _createTempMediaPaths(count: 3);
+      addTearDown(() => _cleanupTempMediaPaths(mediaPaths));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: PostThreadRow(
+              post: _post(eventTags: const ['tokyo'], mediaPaths: mediaPaths),
+              isLast: true,
+              useFeedEdgeSwipeMediaLayout: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final viewport = find.byKey(postThreadRowMediaViewportKey);
+      final left = tester.getTopLeft(viewport).dx;
+
+      expect(left, closeTo(postThreadRowFeedMediaSwipeLeftBleed, 0.1));
+    },
+  );
+
+  testWidgets(
+    'PostThreadRow feed media widens with slider progress and keeps later images expanded',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final mediaPaths = _createTempMediaPaths(count: 3);
+      addTearDown(() => _cleanupTempMediaPaths(mediaPaths));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: PostThreadRow(
+              post: _post(eventTags: const ['tokyo'], mediaPaths: mediaPaths),
+              isLast: true,
+              useFeedEdgeSwipeMediaLayout: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final viewport = find.byKey(postThreadRowMediaViewportKey);
+      final mediaContent = find.byKey(postThreadRowMediaContentKey);
+      final mediaImage = find.byType(Image).first;
+
+      final idleLeft = tester.getTopLeft(viewport).dx;
+      final idleWidth = tester.getSize(mediaContent).width;
+      await tester.drag(mediaImage, const Offset(-40, 0));
+      await tester.pumpAndSettle();
+
+      final partialSwipeWidth = tester.getSize(mediaContent).width;
+      expect(idleLeft, closeTo(postThreadRowFeedMediaSwipeLeftBleed, 0.1));
+      expect(partialSwipeWidth, greaterThan(idleWidth));
+      expect(
+        partialSwipeWidth,
+        lessThan(idleWidth + postThreadRowFeedMediaSwipeLeftBleed),
+      );
+
+      await tester.drag(mediaImage, const Offset(-240, 0));
+      await tester.pumpAndSettle();
+
+      final fullSwipeWidth = tester.getSize(mediaContent).width;
+      expect(
+        fullSwipeWidth,
+        closeTo(idleWidth + postThreadRowFeedMediaSwipeLeftBleed, 0.1),
+      );
+
+      await tester.drag(mediaContent, const Offset(320, 0));
+      await tester.pumpAndSettle();
+
+      final resetWidth = tester.getSize(mediaContent).width;
+      expect(resetWidth, closeTo(idleWidth, 0.1));
+    },
+  );
+
+  testWidgets(
+    'PostThreadRow two-image feed media still reaches the left edge',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final mediaPaths = _createTempMediaPaths(count: 2);
+      addTearDown(() => _cleanupTempMediaPaths(mediaPaths));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: PostThreadRow(
+              post: _post(eventTags: const ['tokyo'], mediaPaths: mediaPaths),
+              isLast: true,
+              useFeedEdgeSwipeMediaLayout: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final mediaContent = find.byKey(postThreadRowMediaContentKey);
+
+      expect(
+        tester.getTopLeft(mediaContent).dx,
+        closeTo(postThreadRowFeedMediaSwipeLeftBleed, 0.1),
+      );
+
+      final idleWidth = tester.getSize(mediaContent).width;
+      await tester.drag(mediaContent, const Offset(-240, 0));
+      await tester.pumpAndSettle();
+
+      expect(tester.getTopLeft(mediaContent).dx, closeTo(0, 0.1));
+      expect(
+        tester.getSize(mediaContent).width,
+        closeTo(idleWidth + postThreadRowFeedMediaSwipeLeftBleed, 0.1),
+      );
+    },
+  );
 }
 
 MediaPost _post({
   required List<String> eventTags,
+  List<String>? mediaPaths,
   String? replyToId,
   double? latitude,
   double? longitude,
@@ -319,7 +477,10 @@ MediaPost _post({
   pubkey: 'pubkey',
   authorDisplayName: authorDisplayName,
   authorAvatarContentHash: authorAvatarContentHash,
-  contentHashes: const ['post-id'],
+  contentHashes: mediaPaths == null
+      ? const ['post-id']
+      : List<String>.generate(mediaPaths.length, (index) => 'post-id-$index'),
+  mediaPaths: mediaPaths ?? const [],
   capturedAt: DateTime.utc(2026, 3, 23),
   eventTags: eventTags,
   replyToId: replyToId,
@@ -337,6 +498,35 @@ MediaPost _post({
 
 const _tinyPngBase64 =
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a8Z0AAAAASUVORK5CYII=';
+
+List<String> _createTempMediaPaths({required int count}) {
+  final bytes = base64Decode(_tinyPngBase64);
+  final directory = Directory.systemTemp.createTempSync('post-thread-row-test');
+  final paths = <String>[];
+  for (var index = 0; index < count; index++) {
+    final file = File('${directory.path}/media-$index.png');
+    file.writeAsBytesSync(bytes);
+    paths.add(file.path);
+  }
+  return paths;
+}
+
+void _cleanupTempMediaPaths(List<String> paths) {
+  final directories = <String>{};
+  for (final path in paths) {
+    final file = File(path);
+    directories.add(file.parent.path);
+    if (file.existsSync()) {
+      file.deleteSync();
+    }
+  }
+  for (final directoryPath in directories) {
+    final directory = Directory(directoryPath);
+    if (directory.existsSync()) {
+      directory.deleteSync(recursive: true);
+    }
+  }
+}
 
 class _LikeHarness extends StatefulWidget {
   const _LikeHarness({required this.post});

@@ -570,6 +570,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 child: PostThreadRow(
                   post: post,
                   isLast: true,
+                  useFeedEdgeSwipeMediaLayout: true,
                   isMediaLoading: _loadingMediaPostIds.contains(post.id),
                   onAvatarTap: () => _openUserProfile(ctx, post.pubkey),
                   onTagTap: _openDiscoverTag,

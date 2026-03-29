@@ -12,6 +12,33 @@ import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/profile_avatar.dart';
 
+const double postThreadRowHorizontalPadding = SpotSpacing.lg;
+const double postThreadRowLeadingColumnWidth = 44;
+const double postThreadRowLeadingGap = SpotSpacing.sm;
+const double postThreadRowFeedMediaSwipeLeftBleed =
+    postThreadRowHorizontalPadding +
+    postThreadRowLeadingColumnWidth +
+    postThreadRowLeadingGap;
+const double postThreadRowFeedMediaSwipeActivationThreshold = 6;
+const double postThreadRowMediaGap = 6;
+const ValueKey<String> postThreadRowMediaViewportKey = ValueKey<String>(
+  'post-thread-row-media-viewport',
+);
+const ValueKey<String> postThreadRowMediaContentKey = ValueKey<String>(
+  'post-thread-row-media-content',
+);
+
+double postThreadRowFeedTwoImageWidth(double viewportWidth) {
+  final minimumWidth =
+      (viewportWidth +
+          (postThreadRowFeedMediaSwipeLeftBleed * 2) +
+          postThreadRowFeedMediaSwipeActivationThreshold -
+          postThreadRowMediaGap) /
+      2;
+  if (minimumWidth < 200) return 200;
+  return minimumWidth;
+}
+
 List<String> visibleThreadTagsForPost(MediaPost post) {
   if (post.eventTags.isEmpty) return const [];
   if (post.replyToId == null) return const [];
@@ -52,6 +79,7 @@ class PostThreadRow extends StatelessWidget {
     super.key,
     required this.post,
     required this.isLast,
+    this.useFeedEdgeSwipeMediaLayout = false,
     this.onAvatarTap,
     this.onTagTap,
     this.onReply,
@@ -66,6 +94,7 @@ class PostThreadRow extends StatelessWidget {
 
   final MediaPost post;
   final bool isLast;
+  final bool useFeedEdgeSwipeMediaLayout;
   final VoidCallback? onAvatarTap;
   final ValueChanged<String>? onTagTap;
   final VoidCallback? onReply;
@@ -168,9 +197,9 @@ class PostThreadRow extends StatelessWidget {
     final headerCategoryTag = post.eventTag;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        SpotSpacing.lg,
+        postThreadRowHorizontalPadding,
         SpotSpacing.sm,
-        SpotSpacing.lg,
+        postThreadRowHorizontalPadding,
         0,
       ),
       child: IntrinsicHeight(
@@ -179,7 +208,7 @@ class PostThreadRow extends StatelessWidget {
           children: [
             // ── Left: avatar + thread connector line ────────────────────────
             SizedBox(
-              width: 44,
+              width: postThreadRowLeadingColumnWidth,
               child: Column(
                 children: [
                   const SizedBox(height: 2),
@@ -205,7 +234,7 @@ class PostThreadRow extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: SpotSpacing.sm),
+            const SizedBox(width: postThreadRowLeadingGap),
             // ── Right: post content ──────────────────────────────────────────
             Expanded(
               child: Padding(
@@ -380,6 +409,7 @@ class PostThreadRow extends StatelessWidget {
                     _PostMedia(
                       post: post,
                       isMediaLoading: isMediaLoading,
+                      useFeedEdgeSwipeMediaLayout: useFeedEdgeSwipeMediaLayout,
                       onPostUpdated: onMediaUpdated,
                     ),
                     const SizedBox(height: SpotSpacing.sm),
@@ -449,11 +479,13 @@ class _PostMedia extends StatefulWidget {
   const _PostMedia({
     required this.post,
     required this.isMediaLoading,
+    required this.useFeedEdgeSwipeMediaLayout,
     this.onPostUpdated,
   });
 
   final MediaPost post;
   final bool isMediaLoading;
+  final bool useFeedEdgeSwipeMediaLayout;
   final ValueChanged<MediaPost>? onPostUpdated;
 
   // Max height for a single image — keeps tall portraits from dominating the feed.
@@ -465,11 +497,23 @@ class _PostMedia extends StatefulWidget {
 
 class _PostMediaState extends State<_PostMedia> {
   bool _hasTriedAutoLoad = false;
+  double _feedEdgeSwipeProgress = 0;
+  late final ScrollController _mediaScrollController;
 
   @override
   void initState() {
     super.initState();
+    _mediaScrollController = ScrollController()
+      ..addListener(_syncFeedEdgeSwipe);
     _tryAutoLoad();
+  }
+
+  @override
+  void dispose() {
+    _mediaScrollController
+      ..removeListener(_syncFeedEdgeSwipe)
+      ..dispose();
+    super.dispose();
   }
 
   @override
@@ -477,6 +521,12 @@ class _PostMediaState extends State<_PostMedia> {
     super.didUpdateWidget(oldWidget);
     if (widget.post.id != oldWidget.post.id) {
       _hasTriedAutoLoad = false;
+      _feedEdgeSwipeProgress = 0;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_mediaScrollController.hasClients) return;
+        if (_mediaScrollController.position.pixels == 0) return;
+        _mediaScrollController.jumpTo(0);
+      });
       _tryAutoLoad();
     }
   }
@@ -500,6 +550,106 @@ class _PostMediaState extends State<_PostMedia> {
     });
   }
 
+  void _syncFeedEdgeSwipe() {
+    if (!widget.useFeedEdgeSwipeMediaLayout) return;
+    if (!_mediaScrollController.hasClients) return;
+
+    final pixels = _mediaScrollController.position.pixels;
+    final effectivePixels =
+        (pixels - postThreadRowFeedMediaSwipeActivationThreshold).clamp(
+          0.0,
+          postThreadRowFeedMediaSwipeLeftBleed,
+        );
+    final progress = effectivePixels / postThreadRowFeedMediaSwipeLeftBleed;
+    if ((_feedEdgeSwipeProgress - progress).abs() < 0.001) return;
+    setState(() => _feedEdgeSwipeProgress = progress);
+  }
+
+  Widget _buildMultiMediaList(List<({int index, String path})> availableMedia) {
+    Widget buildListView(double itemWidth) => ListView.separated(
+      controller: _mediaScrollController,
+      scrollDirection: Axis.horizontal,
+      itemCount: availableMedia.length,
+      separatorBuilder: (ctx, i) =>
+          const SizedBox(width: postThreadRowMediaGap),
+      itemBuilder: (ctx, i) {
+        final media = availableMedia[i];
+        return GestureDetector(
+          onTap: () => _openDetail(context, initialIndex: media.index),
+          behavior: HitTestBehavior.opaque,
+          child: SizedBox(
+            width: itemWidth,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(SpotRadius.sm),
+              child: _isVideo(media.path)
+                  ? _VideoThumb(path: media.path, compact: true)
+                  : Image.file(
+                      File(media.path),
+                      fit: BoxFit.cover,
+                      errorBuilder: (ctx, err, stack) => Container(
+                        color: SpotColors.surface,
+                        child: const Icon(
+                          CupertinoIcons.photo,
+                          color: SpotColors.overlay,
+                          size: 22,
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!widget.useFeedEdgeSwipeMediaLayout) {
+      final itemWidth = availableMedia.length == 2 ? 200.0 : 160.0;
+      return KeyedSubtree(
+        key: postThreadRowMediaViewportKey,
+        child: SizedBox(
+          key: postThreadRowMediaContentKey,
+          height: _PostMedia.maxImageHeight,
+          child: buildListView(itemWidth),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: _PostMedia.maxImageHeight,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final baseWidth = constraints.maxWidth;
+          final itemWidth = availableMedia.length == 2
+              ? postThreadRowFeedTwoImageWidth(baseWidth)
+              : 160.0;
+          final extraWidth =
+              postThreadRowFeedMediaSwipeLeftBleed * _feedEdgeSwipeProgress;
+          final expandedWidth =
+              baseWidth + postThreadRowFeedMediaSwipeLeftBleed;
+          final targetWidth = baseWidth + extraWidth;
+          final targetOffset = -extraWidth;
+
+          return OverflowBox(
+            alignment: Alignment.centerLeft,
+            minWidth: baseWidth,
+            maxWidth: expandedWidth,
+            minHeight: _PostMedia.maxImageHeight,
+            maxHeight: _PostMedia.maxImageHeight,
+            child: Transform.translate(
+              key: postThreadRowMediaViewportKey,
+              offset: Offset(targetOffset, 0),
+              child: SizedBox(
+                key: postThreadRowMediaContentKey,
+                width: targetWidth,
+                height: _PostMedia.maxImageHeight,
+                child: buildListView(itemWidth),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.post.isTextOnly) return const SizedBox.shrink();
@@ -513,42 +663,7 @@ class _PostMediaState extends State<_PostMedia> {
     }
 
     if (availableMedia.length > 1) {
-      return SizedBox(
-        height: _PostMedia.maxImageHeight,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: availableMedia.length,
-          separatorBuilder: (ctx, i) => const SizedBox(width: 6),
-          itemBuilder: (ctx, i) {
-            final media = availableMedia[i];
-            final width = availableMedia.length == 2 ? 200.0 : 160.0;
-            return GestureDetector(
-              onTap: () => _openDetail(context, initialIndex: media.index),
-              behavior: HitTestBehavior.opaque,
-              child: SizedBox(
-                width: width,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(SpotRadius.sm),
-                  child: _isVideo(media.path)
-                      ? _VideoThumb(path: media.path, compact: true)
-                      : Image.file(
-                          File(media.path),
-                          fit: BoxFit.cover,
-                          errorBuilder: (ctx, err, stack) => Container(
-                            color: SpotColors.surface,
-                            child: const Icon(
-                              CupertinoIcons.photo,
-                              color: SpotColors.overlay,
-                              size: 22,
-                            ),
-                          ),
-                        ),
-                ),
-              ),
-            );
-          },
-        ),
-      );
+      return _buildMultiMediaList(availableMedia);
     }
 
     final media = availableMedia.isEmpty ? null : availableMedia.first;
