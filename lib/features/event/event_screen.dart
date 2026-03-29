@@ -89,6 +89,7 @@ double eventLocationZoom(Iterable<EventLocationSpot> spots) {
 const double eventLocationMinZoom = 1.0;
 const double eventLocationMaxZoom = 17.0;
 const double eventLocationZoomStep = 1.0;
+const String eventScreenSeenWitnessLabel = '#seen';
 
 double clampEventLocationZoom(double zoom) =>
     zoom.clamp(eventLocationMinZoom, eventLocationMaxZoom).toDouble();
@@ -384,6 +385,12 @@ String formatWitnessCooldown(Duration remaining) {
   final seconds = totalSeconds % 60;
   return '$minutes:${seconds.toString().padLeft(2, '0')}';
 }
+
+String eventScreenSeenWitnessCountLabel(int seenCount) =>
+    '$seenCount $eventScreenSeenWitnessLabel';
+
+String eventScreenSeenWitnessRemovalHint() =>
+    'Tap $eventScreenSeenWitnessLabel again to remove it.';
 
 CivicEvent eventWithToggledWitness({
   required CivicEvent event,
@@ -1431,7 +1438,7 @@ class _WitnessSummary extends StatelessWidget {
             const Spacer(),
             Text(
               cooldownLabel == null
-                  ? '${event.seenCount} seen'
+                  ? eventScreenSeenWitnessCountLabel(event.seenCount)
                   : 'Locked $cooldownLabel',
               style: SpotType.caption.copyWith(
                 color: cooldownLabel == null
@@ -1446,8 +1453,7 @@ class _WitnessSummary extends StatelessWidget {
           Row(
             children: [
               _WitnessButton(
-                label: 'Seen',
-                icon: CupertinoIcons.eye,
+                label: eventScreenSeenWitnessLabel,
                 count: event.seenCount,
                 isSelected: selectedType == WitnessType.seen,
                 isDisabled: buttonsDisabled,
@@ -1465,7 +1471,7 @@ class _WitnessSummary extends StatelessWidget {
           ] else if (selectedType != null) ...[
             const SizedBox(height: SpotSpacing.sm),
             Text(
-              'Tap Seen again to remove it.',
+              eventScreenSeenWitnessRemovalHint(),
               style: SpotType.caption.copyWith(color: SpotColors.textSecondary),
             ),
           ],
@@ -1478,7 +1484,6 @@ class _WitnessSummary extends StatelessWidget {
 class _WitnessButton extends StatelessWidget {
   const _WitnessButton({
     required this.label,
-    required this.icon,
     required this.count,
     required this.isSelected,
     required this.isDisabled,
@@ -1487,7 +1492,6 @@ class _WitnessButton extends StatelessWidget {
   });
 
   final String label;
-  final IconData icon;
   final int count;
   final bool isSelected;
   final bool isDisabled;
@@ -1543,8 +1547,6 @@ class _WitnessButton extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Icon(icon, color: foregroundColor, size: 16),
-              const SizedBox(height: 3),
               Text(
                 label,
                 style: SpotType.caption.copyWith(color: foregroundColor),

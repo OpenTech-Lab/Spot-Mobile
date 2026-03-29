@@ -140,6 +140,12 @@ void main() {
     expect(formatWitnessCooldown(const Duration(seconds: 60)), '1:00');
   });
 
+  test('Event-screen seen witness copy uses the #seen label', () {
+    expect(eventScreenSeenWitnessLabel, '#seen');
+    expect(eventScreenSeenWitnessCountLabel(3), '3 #seen');
+    expect(eventScreenSeenWitnessRemovalHint(), 'Tap #seen again to remove it.');
+  });
+
   test(
     'eventScreenVisibleWitnessType only exposes seen on the Event screen',
     () {
