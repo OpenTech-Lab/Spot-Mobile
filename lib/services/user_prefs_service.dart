@@ -102,6 +102,17 @@ class UserPrefsService {
     await _save();
   }
 
+  // ── Footprint Map privacy ──────────────────────────────────────────────────
+
+  /// Whether the footprint map is visible to other users.
+  /// Defaults to false (private) until the user explicitly enables it.
+  bool get footprintMapPublic => _data['footprint_map_public'] as bool? ?? false;
+
+  Future<void> saveFootprintMapPublic(bool isPublic) async {
+    _data = {..._data, 'footprint_map_public': isPublic};
+    await _save();
+  }
+
   Future<void> clearAll() async {
     _data = {};
     _loaded = true;

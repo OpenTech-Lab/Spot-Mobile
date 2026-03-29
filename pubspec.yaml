@@ -61,3 +61,4 @@ flutter:
     - assets/icon.png
     - assets/logo_transparent.png
     - assets/geo/places.db
+    - assets/geo/countries.geojson

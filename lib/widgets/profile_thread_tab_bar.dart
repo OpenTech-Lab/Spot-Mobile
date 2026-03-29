@@ -27,6 +27,7 @@ class ProfileThreadTabBar extends StatelessWidget {
         tabs: const [
           Tab(text: 'THREADS'),
           Tab(text: 'REPLIES'),
+          Tab(text: 'MAP'),
         ],
       ),
     );

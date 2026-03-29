@@ -22,6 +22,7 @@ import 'package:mobile/widgets/profile_avatar.dart';
 import 'package:mobile/widgets/profile_activity_summary.dart';
 import 'package:mobile/widgets/profile_post_thread_row.dart';
 import 'package:mobile/widgets/profile_stats_row.dart';
+import 'package:mobile/widgets/footprint_map_tab.dart';
 import 'package:mobile/widgets/profile_thread_tab_bar.dart';
 
 /// Profile screen for any user other than the local account.
@@ -58,7 +59,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   void initState() {
     super.initState();
     _repo = EventRepository();
-    _contentTabController = TabController(length: 2, vsync: this)
+    _contentTabController = TabController(length: 3, vsync: this)
       ..addListener(() {
         if (mounted) setState(() {});
       });
@@ -371,7 +372,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Widget build(BuildContext context) {
     final threads = topLevelThreadPosts(_posts);
     final replies = replyPosts(_posts);
-    final showReplies = _contentTabController.index == 1;
+    final tabIndex = _contentTabController.index;
+    final showReplies = tabIndex == 1;
+    final showMap = tabIndex == 2;
     final visiblePosts = showReplies ? replies : threads;
     final emptyTitle = showReplies ? 'No replies yet' : 'No threads yet';
     final activitySummary = buildProfileActivitySummary(
@@ -420,7 +423,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             SliverToBoxAdapter(
               child: ProfileThreadTabBar(controller: _contentTabController),
             ),
-            if (_isLoading && visiblePosts.isEmpty)
+            if (showMap)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: FootprintMapTab(posts: _posts),
+              )
+            else if (_isLoading && visiblePosts.isEmpty)
               const SliverFillRemaining(
                 child: Center(
                   child: SizedBox(

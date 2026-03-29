@@ -36,6 +36,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       UserPrefsService.instance.assetTransportPolicy;
   String get _favoriteTopicsValue =>
       favoriteTopicsSummary(UserPrefsService.instance.interests);
+  bool get _footprintMapPublic => UserPrefsService.instance.footprintMapPublic;
+
+  Future<void> _toggleFootprintMapPublic() async {
+    await UserPrefsService.instance.saveFootprintMapPublic(!_footprintMapPublic);
+    if (mounted) setState(() {});
+  }
 
   Future<void> _openAssetTransportSettings() async {
     await Navigator.of(context).push(
@@ -193,6 +199,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 builder: (_) => WalletScreen(wallet: widget.wallet),
               ),
             ),
+          ),
+          const SizedBox(height: SpotSpacing.xl),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: SpotSpacing.sm),
+            child: Text('PRIVACY', style: SpotType.label),
+          ),
+          _SettingsRow(
+            icon: CupertinoIcons.map,
+            label: 'Footprint Map',
+            value: _footprintMapPublic ? 'Public' : 'Private',
+            onTap: _toggleFootprintMapPublic,
           ),
           const SizedBox(height: SpotSpacing.xl),
           const Padding(

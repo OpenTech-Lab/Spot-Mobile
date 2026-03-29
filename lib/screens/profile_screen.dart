@@ -29,6 +29,7 @@ import 'package:mobile/services/post_publish_service.dart';
 import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
+import 'package:mobile/widgets/footprint_map_tab.dart';
 import 'package:mobile/widgets/profile_avatar.dart';
 import 'package:mobile/widgets/profile_activity_summary.dart';
 import 'package:mobile/widgets/profile_post_thread_row.dart';
@@ -69,7 +70,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   void initState() {
     super.initState();
-    _contentTabController = TabController(length: 2, vsync: this)
+    _contentTabController = TabController(length: 3, vsync: this)
       ..addListener(() {
         if (mounted) setState(() {});
       });
@@ -605,7 +606,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget build(BuildContext context) {
     final threads = topLevelThreadPosts(_posts);
     final replies = replyPosts(_posts);
-    final showReplies = _contentTabController.index == 1;
+    final tabIndex = _contentTabController.index;
+    final showReplies = tabIndex == 1;
+    final showMap = tabIndex == 2;
     final visiblePosts = showReplies ? replies : threads;
     final emptyTitle = showReplies ? 'No replies yet' : 'No threads yet';
     final emptySubtitle = showReplies
@@ -657,8 +660,13 @@ class _ProfileScreenState extends State<ProfileScreen>
               child: ProfileThreadTabBar(controller: _contentTabController),
             ),
 
-            // ── Posts ──────────────────────────────────────────────────────
-            if (_isLoading && visiblePosts.isEmpty)
+            // ── Posts / Map ────────────────────────────────────────────────
+            if (showMap)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: FootprintMapTab(posts: _posts),
+              )
+            else if (_isLoading && visiblePosts.isEmpty)
               const SliverFillRemaining(
                 child: Center(
                   child: SizedBox(
