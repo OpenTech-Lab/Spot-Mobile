@@ -65,6 +65,7 @@ class FeedScreenState extends State<FeedScreen>
   late final TabController _tabController;
   EventRepository get _repo => widget.eventRepo;
   StreamSubscription<CivicEvent>? _sub;
+  StreamSubscription<List<MediaPost>>? _localSub;
 
   List<MediaPost> _posts = [];
   final Set<String> _loadingMediaPostIds = {};
@@ -81,6 +82,7 @@ class FeedScreenState extends State<FeedScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     FollowService.instance.init();
+    _localSub ??= LocalPostStore.instance.changes.listen(_onLocalPostsChanged);
     _initFeed();
     _showInterestsIfNeeded();
   }
@@ -89,6 +91,7 @@ class FeedScreenState extends State<FeedScreen>
   void dispose() {
     _tabController.dispose();
     _sub?.cancel();
+    _localSub?.cancel();
     super.dispose();
   }
 
@@ -152,15 +155,20 @@ class FeedScreenState extends State<FeedScreen>
 
   Future<void> _loadPersistedPosts() async {
     final persisted = await LocalPostStore.instance.loadPosts();
-    final visible = persisted
+    final visible = _visiblePersistedPosts(persisted);
+    if (!mounted || visible.isEmpty) return;
+    setState(() => _posts = _mergePosts(_posts, visible));
+  }
+
+  List<MediaPost> _visiblePersistedPosts(Iterable<MediaPost> posts) {
+    return posts
         .where(
           (post) => post.contentHashes.every(
             (hash) => !CacheManager.instance.isBlocked(hash),
           ),
         )
-        .toList();
-    if (!mounted || visible.isEmpty) return;
-    setState(() => _posts = _mergePosts(_posts, visible));
+        .where((post) => !post.isPendingRetry)
+        .toList(growable: false);
   }
 
   Future<void> _loadMorePosts() async {
@@ -214,6 +222,13 @@ class FeedScreenState extends State<FeedScreen>
     );
     debugPrint('[FeedScreen] _mergePosts result: ${result.length} posts');
     return result;
+  }
+
+  void _onLocalPostsChanged(List<MediaPost> persisted) {
+    if (!mounted) return;
+    final merged = _mergePosts(_posts, _visiblePersistedPosts(persisted));
+    if (orderedPostsEqual(merged, _posts)) return;
+    setState(() => _posts = merged);
   }
 
   void _toggleLike(MediaPost post) {

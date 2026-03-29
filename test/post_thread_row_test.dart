@@ -387,6 +387,35 @@ void main() {
     expect(find.text('Preview'), findsOneWidget);
   });
 
+  testWidgets('PostThreadRow auto-requests missing media on first build', (
+    tester,
+  ) async {
+    var updateCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ListView(
+            children: [
+              PostThreadRow(
+                post: _post(eventTags: const ['tokyo']),
+                isLast: true,
+                onMediaUpdated: (_) => updateCalls++,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    expect(updateCalls, 1);
+
+    await tester.pump();
+    expect(updateCalls, 1);
+  });
+
   testWidgets(
     'PostThreadRow feed media keeps the default inset gap before swiping',
     (tester) async {

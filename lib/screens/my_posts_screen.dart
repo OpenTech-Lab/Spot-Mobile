@@ -4,12 +4,15 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
+import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/discover_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/media_resolver.dart';
+import 'package:mobile/services/media_sync_service.dart';
 import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
@@ -30,6 +33,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
   StreamSubscription<CivicEvent>? _sub;
 
   List<MediaPost> _posts = [];
+  final Set<String> _loadingMediaPostIds = {};
   bool _isLoading = true;
   String? _error;
 
@@ -106,8 +110,29 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
   }
 
   void _updateMediaPost(MediaPost post) {
-    setState(() => _posts = replacePostsById(_posts, [post]));
+    setState(() {
+      _posts = replacePostsById(_posts, [post]);
+      _loadingMediaPostIds.remove(post.id);
+    });
     unawaited(LocalPostStore.instance.savePost(post));
+  }
+
+  Future<void> _hydrateMediaPost(MediaPost post) async {
+    if (_loadingMediaPostIds.contains(post.id)) return;
+    setState(() => _loadingMediaPostIds.add(post.id));
+
+    try {
+      await P2PService.instance.startSwarm();
+      final sync = MediaSyncService(fetchMedia: MediaResolver.instance.resolve);
+      final hydrated = await sync.hydratePost(post);
+
+      if (!mounted) return;
+      _updateMediaPost(hydrated);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingMediaPostIds.remove(post.id));
+      }
+    }
   }
 
   void _openDiscoverTag(BuildContext context, String tag) {
@@ -236,9 +261,10 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
             itemBuilder: (ctx, i) => PostThreadRow(
               post: entries[i].post,
               isLast: isLastInThread(entries, i),
+              isMediaLoading: _loadingMediaPostIds.contains(entries[i].post.id),
               onTagTap: (tag) => _openDiscoverTag(ctx, tag),
               onLike: () => _toggleLike(entries[i].post),
-              onMediaUpdated: _updateMediaPost,
+              onMediaUpdated: _hydrateMediaPost,
             ),
           );
         },

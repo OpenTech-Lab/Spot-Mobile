@@ -11,6 +11,7 @@ import 'package:mobile/core/profile_description.dart';
 import 'package:mobile/core/wallet.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
+import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/follow_stats.dart';
 import 'package:mobile/models/media_post.dart';
@@ -24,6 +25,8 @@ import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/cdn_media_service.dart';
 import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/media_resolver.dart';
+import 'package:mobile/services/media_sync_service.dart';
 import 'package:mobile/services/media_processing_service.dart';
 import 'package:mobile/services/post_publish_service.dart';
 import 'package:mobile/services/post_merge.dart';
@@ -48,10 +51,10 @@ class ProfileScreen extends StatefulWidget {
   final EventRepository eventRepo;
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  State<ProfileScreen> createState() => ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen>
+class ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
   EventRepository get _repo => widget.eventRepo;
   StreamSubscription<CivicEvent>? _sub;
@@ -60,6 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   late final TabController _contentTabController;
 
   List<MediaPost> _posts = [];
+  final Set<String> _loadingMediaPostIds = {};
   bool _isLoading = true;
   String? _error;
   final Set<String> _retryingPostIds = {};
@@ -127,6 +131,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     _repo.reset();
     setState(() => _posts = []);
     await _initFeed();
+  }
+
+  Future<void> triggerRefresh() async {
+    await _loadPersistedPosts();
+    await _loadProfile();
+    await _loadFollowStats();
   }
 
   Future<void> _loadPersistedPosts() async {
@@ -215,8 +225,29 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   void _updateMediaPost(MediaPost post) {
-    setState(() => _posts = replacePostsById(_posts, [post]));
+    setState(() {
+      _posts = replacePostsById(_posts, [post]);
+      _loadingMediaPostIds.remove(post.id);
+    });
     unawaited(LocalPostStore.instance.savePost(post));
+  }
+
+  Future<void> _hydrateMediaPost(MediaPost post) async {
+    if (_loadingMediaPostIds.contains(post.id)) return;
+    setState(() => _loadingMediaPostIds.add(post.id));
+
+    try {
+      await P2PService.instance.startSwarm();
+      final sync = MediaSyncService(fetchMedia: MediaResolver.instance.resolve);
+      final hydrated = await sync.hydratePost(post);
+
+      if (!mounted) return;
+      _updateMediaPost(hydrated);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingMediaPostIds.remove(post.id));
+      }
+    }
   }
 
   Future<void> _purgePostCache(MediaPost post) async {
@@ -727,7 +758,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                     child: ProfilePostThreadRow(
                       post: post,
                       onTagTap: (tag) => _openDiscoverTag(ctx, tag),
-                      onMediaUpdated: _updateMediaPost,
+                      isMediaLoading: _loadingMediaPostIds.contains(post.id),
+                      onMediaUpdated: _hydrateMediaPost,
                       onReply: post.isPendingRetry
                           ? null
                           : () => showPostComposer(

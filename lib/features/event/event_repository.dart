@@ -141,10 +141,14 @@ class EventRepository {
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   void reset() {
+    unawaited(refresh());
+  }
+
+  Future<void> refresh() async {
     _cache.clear();
     _globalPostRows = const [];
     _authorPostRows.updateAll((_, currentRows) => const []);
-    unawaited(_restartStreams());
+    await _restartStreams();
   }
 
   Future<void> _restartStreams() async {

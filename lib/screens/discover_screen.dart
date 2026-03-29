@@ -206,6 +206,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   late final TabController _tabController;
   late final EventRepository _repo;
   StreamSubscription<CivicEvent>? _sub;
+  StreamSubscription<List<MediaPost>>? _localSub;
   StreamSubscription<void>? _followChangesSub;
   final TextEditingController _searchController = TextEditingController();
 
@@ -227,6 +228,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_onTabChanged);
     _repo = EventRepository();
+    _localSub ??= LocalPostStore.instance.changes.listen(_onLocalPostsChanged);
     _searchQuery = widget.initialSearchQuery;
     _searchController.text = widget.initialSearchQuery;
     _initFeed();
@@ -239,6 +241,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _sub?.cancel();
+    _localSub?.cancel();
     _followChangesSub?.cancel();
     _repo.dispose();
     _searchController.dispose();
@@ -357,14 +360,26 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   Future<void> _loadPersistedPosts() async {
     final persisted = await LocalPostStore.instance.loadPosts();
-    if (!mounted || persisted.isEmpty) return;
-    setState(() => _posts = _mergePosts(_posts, persisted));
+    final visible = _visiblePersistedPosts(persisted);
+    if (!mounted || visible.isEmpty) return;
+    setState(() => _posts = _mergePosts(_posts, visible));
   }
 
   List<MediaPost> _mergePosts(
     List<MediaPost> current,
     Iterable<MediaPost> incoming,
   ) => mergePostsPreservingLocalState(current, incoming);
+
+  List<MediaPost> _visiblePersistedPosts(Iterable<MediaPost> posts) {
+    return posts.where((post) => !post.isPendingRetry).toList(growable: false);
+  }
+
+  void _onLocalPostsChanged(List<MediaPost> persisted) {
+    if (!mounted) return;
+    final merged = _mergePosts(_posts, _visiblePersistedPosts(persisted));
+    if (orderedPostsEqual(merged, _posts)) return;
+    setState(() => _posts = merged);
+  }
 
   void _toggleLike(MediaPost post) {
     final updated = post.copyWith(isLikedByMe: !post.isLikedByMe);

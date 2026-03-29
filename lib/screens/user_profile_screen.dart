@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
+import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/follow_stats.dart';
 import 'package:mobile/models/media_post.dart';
@@ -15,6 +16,8 @@ import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/thread_screen.dart';
 import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/media_resolver.dart';
+import 'package:mobile/services/media_sync_service.dart';
 import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
@@ -49,6 +52,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   late final TabController _contentTabController;
 
   List<MediaPost> _posts = [];
+  final Set<String> _loadingMediaPostIds = {};
   bool _isLoading = true;
   bool _isFollowing = false;
   bool _isTogglingFollow = false;
@@ -162,8 +166,29 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   void _updateMediaPost(MediaPost post) {
-    setState(() => _posts = replacePostsById(_posts, [post]));
+    setState(() {
+      _posts = replacePostsById(_posts, [post]);
+      _loadingMediaPostIds.remove(post.id);
+    });
     unawaited(LocalPostStore.instance.savePost(post));
+  }
+
+  Future<void> _hydrateMediaPost(MediaPost post) async {
+    if (_loadingMediaPostIds.contains(post.id)) return;
+    setState(() => _loadingMediaPostIds.add(post.id));
+
+    try {
+      await P2PService.instance.startSwarm();
+      final sync = MediaSyncService(fetchMedia: MediaResolver.instance.resolve);
+      final hydrated = await sync.hydratePost(post);
+
+      if (!mounted) return;
+      _updateMediaPost(hydrated);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingMediaPostIds.remove(post.id));
+      }
+    }
   }
 
   void _openProfileThread(BuildContext context, MediaPost post) {
@@ -480,7 +505,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                       onTagTap: (tag) => _openDiscoverTag(ctx, tag),
                       onReport: () => _reportPost(post),
                       onLike: () => _toggleLike(post),
-                      onMediaUpdated: _updateMediaPost,
+                      isMediaLoading: _loadingMediaPostIds.contains(post.id),
+                      onMediaUpdated: _hydrateMediaPost,
                       onReply: () => showPostComposer(
                         ctx,
                         wallet: widget.wallet,

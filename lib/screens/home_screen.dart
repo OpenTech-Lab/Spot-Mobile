@@ -83,13 +83,14 @@ class HomeScreen extends StatefulWidget {
   final WalletModel wallet;
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0;
   late final EventRepository _eventRepo;
   final _feedKey = GlobalKey<FeedScreenState>();
+  final _profileKey = GlobalKey<ProfileScreenState>();
 
   @override
   void initState() {
@@ -107,12 +108,22 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  Future<void> triggerSessionRefresh() async {
+    await P2PService.instance.refreshTransportAvailability();
+    await _eventRepo.refresh();
+    await _profileKey.currentState?.triggerRefresh();
+  }
+
   // Tabs built once and preserved via IndexedStack
   late final List<Widget> _tabs = [
     FeedScreen(key: _feedKey, wallet: widget.wallet, eventRepo: _eventRepo),
     DiscoverScreen(wallet: widget.wallet),
     _EventsListTab(eventRepo: _eventRepo, wallet: widget.wallet),
-    ProfileScreen(wallet: widget.wallet, eventRepo: _eventRepo),
+    ProfileScreen(
+      key: _profileKey,
+      wallet: widget.wallet,
+      eventRepo: _eventRepo,
+    ),
   ];
 
   void _openComposer() {

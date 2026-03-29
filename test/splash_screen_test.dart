@@ -1,0 +1,123 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:mobile/models/profile_model.dart';
+import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/screens/splash_screen.dart';
+import 'package:mobile/services/app_refresh_service.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMessageHandler('flutter/assets', (message) async => null);
+  });
+
+  tearDownAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMessageHandler('flutter/assets', null);
+  });
+
+  testWidgets('SplashScreen shows a loading page before home is ready', (
+    tester,
+  ) async {
+    final blockers = [Completer<void>()];
+    final service = _refreshServiceWithBlockers(blockers);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SplashScreen(
+          wallet: _wallet(),
+          refreshService: service,
+          verificationRunner: () async {},
+          homeBuilder: (_) => const Text('Home ready'),
+        ),
+      ),
+    );
+
+    expect(find.text('Loading Spot'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.text('Home ready'), findsNothing);
+
+    blockers.single.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Home ready'), findsOneWidget);
+    expect(find.text('Loading Spot'), findsNothing);
+  });
+
+  testWidgets('SplashScreen shows the loading overlay again on app resume', (
+    tester,
+  ) async {
+    final blockers = [Completer<void>(), Completer<void>()];
+    var refreshCalls = 0;
+    final service = _refreshServiceWithBlockers(
+      blockers,
+      onFetchProfile: () => refreshCalls++,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SplashScreen(
+          wallet: _wallet(),
+          refreshService: service,
+          verificationRunner: () async {},
+          homeBuilder: (_) => const Text('Home ready'),
+        ),
+      ),
+    );
+
+    blockers.first.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Home ready'), findsOneWidget);
+    expect(refreshCalls, 1);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(find.text('Refreshing data…'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(refreshCalls, 2);
+
+    blockers.last.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Refreshing data…'), findsNothing);
+    expect(find.text('Home ready'), findsOneWidget);
+  });
+}
+
+AppRefreshService _refreshServiceWithBlockers(
+  List<Completer<void>> blockers, {
+  VoidCallback? onFetchProfile,
+}) {
+  var fetchIndex = 0;
+  return AppRefreshService(
+    initFollowState: () async {},
+    fetchCurrentProfile: (_) async {
+      onFetchProfile?.call();
+      await blockers[fetchIndex++].future;
+      return const ProfileModel(id: 'profile-id');
+    },
+    fetchPosts: ({authorPubkey, limit = 20}) async => const [],
+    savePosts: (_) async {},
+    updateAuthorProfile:
+        ({required authorPubkey, displayName, avatarContentHash}) async {},
+  );
+}
+
+WalletModel _wallet() => WalletModel(
+  privateKeyHex:
+      '0000000000000000000000000000000000000000000000000000000000000001',
+  publicKeyHex:
+      '1111111111111111111111111111111111111111111111111111111111111111',
+  npub: 'npub1test',
+  mnemonic: const ['test'],
+  deviceId: 'device-1',
+  isRevoked: false,
+  createdAt: DateTime.utc(2026, 3, 29),
+);
