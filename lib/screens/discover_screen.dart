@@ -86,8 +86,14 @@ bool discoverThreadPostMatchesQuery(MediaPost post, String query) {
 List<MediaPost> visibleDiscoverThreads(
   Iterable<MediaPost> posts, {
   String query = '',
+  String? excludedAuthorPubkey,
 }) {
-  final roots = topLevelThreadPosts(posts);
+  final roots = topLevelThreadPosts(posts)
+      .where(
+        (post) =>
+            excludedAuthorPubkey == null || post.pubkey != excludedAuthorPubkey,
+      )
+      .toList(growable: false);
   final normalizedQuery = normalizeDiscoverSearchQuery(query);
   if (normalizedQuery.isEmpty) return roots;
 
@@ -494,7 +500,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     required List<MediaPost> posts,
     required String emptyLabel,
   }) {
-    final roots = visibleDiscoverThreads(posts, query: _searchQuery);
+    final roots = visibleDiscoverThreads(
+      posts,
+      query: _searchQuery,
+      excludedAuthorPubkey: widget.wallet.publicKeyHex,
+    );
     if (_isLoading && roots.isEmpty) {
       return Center(
         child: Column(

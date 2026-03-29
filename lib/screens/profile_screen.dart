@@ -294,6 +294,12 @@ class _ProfileScreenState extends State<ProfileScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Post sent')));
+    } on MissingCategoryTagError catch (e) {
+      if (!mounted) return;
+      setState(() => _retryingPostIds.remove(post.id));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       final failed = await PostPublishService.instance.saveFailedPublish(
         post,

@@ -154,6 +154,20 @@ class _CameraScreenState extends State<CameraScreen>
   Future<void> _publishPost(String caption) async {
     if (_capturedFiles.isEmpty) return;
 
+    final enteredTag = normalizeTag(_eventTag);
+    final inheritedTag = normalizeTag(widget.replyToPost?.eventTag ?? '');
+    final effectiveTag = enteredTag.isNotEmpty
+        ? enteredTag
+        : (inheritedTag.isNotEmpty ? inheritedTag : null);
+    final categoryValidationMessage = validateThreadCategoryRequirement(
+      replyToId: widget.replyToPost?.nostrEventId,
+      eventTags: [?effectiveTag],
+    );
+    if (categoryValidationMessage != null) {
+      _showError(categoryValidationMessage);
+      return;
+    }
+
     // Process all captured files
     final processedFiles = <File>[];
     for (var i = 0; i < _capturedFiles.length; i++) {
@@ -174,13 +188,6 @@ class _CameraScreenState extends State<CameraScreen>
       final bytes = await f.readAsBytes();
       hashes.add(EncryptionUtils.sha256BytesHex(bytes));
     }
-
-    // Inherit event tag from parent post when replying
-    final enteredTag = normalizeTag(_eventTag);
-    final inheritedTag = normalizeTag(widget.replyToPost?.eventTag ?? '');
-    final effectiveTag = enteredTag.isNotEmpty
-        ? enteredTag
-        : (inheritedTag.isNotEmpty ? inheritedTag : null);
 
     // Use first hash as primary event ID
     final primaryHash = hashes.first;
@@ -225,6 +232,9 @@ class _CameraScreenState extends State<CameraScreen>
       if (mounted) {
         Navigator.of(context).pop();
       }
+    } on MissingCategoryTagError catch (e) {
+      if (!mounted) return;
+      _showError(e.message);
     } catch (e) {
       await PostPublishService.instance.saveFailedPublish(post, e);
       if (!mounted) return;

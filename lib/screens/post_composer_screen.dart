@@ -211,13 +211,20 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
   bool get _canPost =>
       _captionCtrl.text.trim().isNotEmpty || _mediaFiles.isNotEmpty;
 
-  bool get _hasCategoryTagForPublish =>
-      _tags.isNotEmpty || (_tags.isEmpty && _pendingTagInput.isNotEmpty);
+  String? get _threadCategoryValidationMessage =>
+      validateThreadCategoryRequirement(
+        replyToId: widget.replyToPost?.nostrEventId,
+        eventTags: [
+          ..._tags,
+          if (_pendingTagInput.isNotEmpty) _pendingTagInput,
+        ],
+      );
 
   Future<void> _onPost() async {
     if (!_canPost || _isPublishing) return;
-    if (widget.replyToPost == null && !_hasCategoryTagForPublish) {
-      _showSnack('Add a category tag before posting a new thread.');
+    final categoryValidationMessage = _threadCategoryValidationMessage;
+    if (categoryValidationMessage != null) {
+      _showSnack(categoryValidationMessage);
       _tagFocus.requestFocus();
       return;
     }
@@ -377,7 +384,9 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
     } catch (e) {
       if (!mounted) return;
       Navigator.of(context).pop(); // overlay
-      if (post != null) {
+      if (e is MissingCategoryTagError) {
+        _showSnack(e.message);
+      } else if (post != null) {
         await PostPublishService.instance.saveFailedPublish(post, e);
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(

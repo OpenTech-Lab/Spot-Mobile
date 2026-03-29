@@ -53,10 +53,47 @@ void main() {
 
     expect(visible.map((post) => post.id), ['root']);
   });
+
+  test('discover hides self-authored root threads when requested', () {
+    final visible = visibleDiscoverThreads([
+      _post(id: 'mine', pubkey: 'self'),
+      _post(id: 'other', pubkey: 'other'),
+    ], excludedAuthorPubkey: 'self');
+
+    expect(visible.map((post) => post.id), ['other']);
+  });
+
+  test(
+    'discover keeps other-authored roots even when my reply matches query',
+    () {
+      final root = _post(
+        id: 'root',
+        nostrEventId: 'root-event',
+        pubkey: 'other',
+        caption: 'Parent thread',
+      );
+      final myReply = _post(
+        id: 'reply',
+        nostrEventId: 'reply-event',
+        pubkey: 'self',
+        replyToId: 'root-event',
+        caption: 'Smoke nearby',
+      );
+
+      final visible = visibleDiscoverThreads(
+        [root, myReply],
+        query: 'smoke',
+        excludedAuthorPubkey: 'self',
+      );
+
+      expect(visible.map((post) => post.id), ['root']);
+    },
+  );
 }
 
 MediaPost _post({
   required String id,
+  String? pubkey,
   String? nostrEventId,
   String? replyToId,
   String? caption,
@@ -64,7 +101,7 @@ MediaPost _post({
   List<String> tags = const [],
 }) => MediaPost(
   id: id,
-  pubkey: 'pubkey-$id',
+  pubkey: pubkey ?? 'pubkey-$id',
   contentHashes: [id],
   capturedAt: DateTime.utc(2026, 3, 26),
   eventTags: eventTags,

@@ -1,11 +1,39 @@
 import 'package:flutter/foundation.dart';
 
+import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/local_post_store.dart';
+
+const String kMissingCategoryTagMessage =
+    'Add a category tag before posting a new thread.';
+
+String? validateThreadCategoryRequirement({
+  required String? replyToId,
+  required Iterable<String> eventTags,
+}) {
+  if (replyToId != null) return null;
+  if (normalizeUniqueTags(eventTags).isNotEmpty) return null;
+  return kMissingCategoryTagMessage;
+}
+
+String? validateDraftForPublish(MediaPost draft) =>
+    validateThreadCategoryRequirement(
+      replyToId: draft.replyToId,
+      eventTags: draft.eventTags,
+    );
+
+class MissingCategoryTagError implements Exception {
+  const MissingCategoryTagError([this.message = kMissingCategoryTagMessage]);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
 
 /// Shared publish/persist helper for new posts and retrying failed local posts.
 class PostPublishService {
@@ -19,6 +47,11 @@ class PostPublishService {
     EventRepository? eventRepo,
     String? replaceLocalPostId,
   }) async {
+    final validationMessage = validateDraftForPublish(draft);
+    if (validationMessage != null) {
+      throw MissingCategoryTagError(validationMessage);
+    }
+
     debugPrint('[PostPublish] Starting publish for ${draft.id}');
     debugPrint(
       '[PostPublish] eventRepo is ${eventRepo == null ? "NULL" : "present"}',
