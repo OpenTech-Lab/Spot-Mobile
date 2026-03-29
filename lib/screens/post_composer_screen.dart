@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:mobile/core/encryption.dart';
+import 'package:mobile/core/post_location_formatter.dart';
 import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/core/wallet.dart';
 import 'package:mobile/features/event/event_repository.dart';
@@ -762,14 +763,10 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                       sourceType: _sourceType,
                       spotName: _spotName,
                       spotNameCtrl: _spotNameCtrl,
-                      onDangerChanged: (v) => setState(() {
-                        _isDangerMode = v;
-                        if (v) _isVirtual = false;
-                      }),
+                      onDangerChanged: (v) => setState(() => _isDangerMode = v),
                       onVirtualChanged: (v) => setState(() {
                         _isVirtual = v;
                         if (v) {
-                          _isDangerMode = false;
                           _spotName = null;
                           _spotNameCtrl.clear();
                         }
@@ -1548,7 +1545,6 @@ class _LocationRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Virtual mode
     if (isVirtual) {
       return Row(
         children: [
@@ -1559,7 +1555,11 @@ class _LocationRow extends StatelessWidget {
           ),
           const SizedBox(width: 5),
           Text(
-            'Virtual — location not published',
+            visiblePostLocationText(
+              isVirtual: true,
+              latitude: null,
+              longitude: null,
+            ),
             style: SpotType.caption.copyWith(color: SpotColors.accent),
           ),
         ],
@@ -1588,26 +1588,19 @@ class _LocationRow extends StatelessWidget {
     final lon = gpsLock!.longitude;
     final geo = GeoLookup.instance.nearest(lat, lon);
     final hasSpot = spotName != null && spotName!.trim().isNotEmpty;
-
-    final IconData icon;
-    final Color iconColor;
-    final String label;
-
-    if (hasSpot) {
-      // Spot check-in: show spot name + exact location
-      icon = CupertinoIcons.map_pin_ellipse;
-      iconColor = SpotColors.accent;
-      label = geo != null
-          ? '${spotName!.trim()}  ·  ${geo.country} / ${geo.city}'
-          : '${spotName!.trim()}  ·  Exact location';
-    } else {
-      // Default: city-level only (coarsened)
-      icon = CupertinoIcons.location;
-      iconColor = SpotColors.success.withAlpha(160);
-      label = geo != null
-          ? '${geo.country} / ${geo.city}'
-          : '${lat.toStringAsFixed(1)}, ${lon.toStringAsFixed(1)}';
-    }
+    final icon = hasSpot
+        ? CupertinoIcons.map_pin_ellipse
+        : CupertinoIcons.location;
+    final iconColor = hasSpot
+        ? SpotColors.accent
+        : SpotColors.success.withAlpha(160);
+    final label = visiblePostLocationText(
+      isVirtual: false,
+      latitude: lat,
+      longitude: lon,
+      geoLocation: geo,
+      spotName: spotName,
+    );
 
     return Row(
       children: [

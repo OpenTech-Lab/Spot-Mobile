@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:mobile/core/post_location_formatter.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/screens/media_detail_screen.dart';
 import 'package:mobile/services/geo_lookup.dart';
@@ -49,25 +50,13 @@ String visibleThreadLocationTextForPost(
   MediaPost post, {
   GeoLocation? geoLocation,
 }) {
-  if (post.isVirtual) {
-    return 'Virtual';
-  }
-
-  if (!post.hasGps) {
-    return 'Location hidden';
-  }
-
-  final geo = geoLocation ?? _geoLocationForPost(post);
-  final coordinates = _coordinateLocationLabelForPost(post);
-  final place = geo != null ? '${geo.country}/${geo.city}' : null;
-
-  if (post.isSpotCheckIn) {
-    if (place != null) return '${post.spotName} - $place ($coordinates)';
-    return '${post.spotName} - $coordinates';
-  }
-
-  if (place != null) return place;
-  return coordinates;
+  return visiblePostLocationText(
+    isVirtual: post.isVirtual,
+    latitude: post.latitude,
+    longitude: post.longitude,
+    geoLocation: geoLocation ?? _geoLocationForPost(post),
+    spotName: post.spotName,
+  );
 }
 
 /// Twitter/Threads-style thread row for a single [MediaPost].
@@ -1137,12 +1126,6 @@ class _LikeActionButton extends StatelessWidget {
 GeoLocation? _geoLocationForPost(MediaPost post) {
   if (!post.hasGps) return null;
   return GeoLookup.instance.nearest(post.latitude!, post.longitude!);
-}
-
-String _coordinateLocationLabelForPost(MediaPost post) {
-  final lat = post.latitude!;
-  final lon = post.longitude!;
-  return '${lat.toStringAsFixed(1)}, ${lon.toStringAsFixed(1)}';
 }
 
 String _shortKey(String pubkey) {

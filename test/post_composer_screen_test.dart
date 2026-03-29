@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
+import 'package:mobile/services/camera_service.dart';
 
 void main() {
   testWidgets('reply flow opens the same composer UI in reply mode', (
@@ -291,12 +292,73 @@ void main() {
     );
     expect(find.text('Confirm & Post'), findsNothing);
   });
+
+  testWidgets('virtual mode stays active when blur faces is toggled', (
+    tester,
+  ) async {
+    final wallet = _wallet();
+
+    await tester.pumpWidget(
+      _ComposerHarness(wallet: wallet, gpsLoader: () async => _gpsLock()),
+    );
+
+    await tester.tap(find.text('Compose'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    await tester.tap(find.byIcon(CupertinoIcons.slider_horizontal_3));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Virtual'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Check in at a spot'), findsNothing);
+
+    await tester.tap(find.byType(Switch).first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Check in at a spot'), findsNothing);
+    expect(tester.widget<Switch>(find.byType(Switch).first).value, isTrue);
+  });
+
+  testWidgets('composer location row matches posted thread spot format', (
+    tester,
+  ) async {
+    final wallet = _wallet();
+
+    await tester.pumpWidget(
+      _ComposerHarness(wallet: wallet, gpsLoader: () async => _gpsLock()),
+    );
+
+    await tester.tap(find.text('Compose'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    await tester.tap(find.byIcon(CupertinoIcons.slider_horizontal_3));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Check in at a spot'));
+    await tester.pumpAndSettle();
+
+    final spotField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.hintText == 'e.g. Eiffel Tower, Central Park…',
+    );
+
+    await tester.enterText(spotField, 'Shibuya Crossing');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Shibuya Crossing - 35.7, 139.7'), findsOneWidget);
+    expect(find.text('Shibuya Crossing  ·  Exact location'), findsNothing);
+  });
 }
 
 class _ComposerHarness extends StatelessWidget {
-  const _ComposerHarness({required this.wallet});
+  const _ComposerHarness({required this.wallet, this.gpsLoader});
 
   final WalletModel wallet;
+  final Future<GpsLock?> Function()? gpsLoader;
 
   @override
   Widget build(BuildContext context) {
@@ -308,7 +370,7 @@ class _ComposerHarness extends StatelessWidget {
               showPostComposer(
                 context,
                 wallet: wallet,
-                gpsLoader: () async => null,
+                gpsLoader: gpsLoader ?? () async => null,
               );
             },
             child: const Text('Compose'),
@@ -339,4 +401,11 @@ MediaPost _replyTarget(String pubkey) => MediaPost(
   eventTags: const ['tokyo'],
   caption: 'Original thread',
   nostrEventId: 'reply-target-id',
+);
+
+GpsLock _gpsLock() => GpsLock(
+  latitude: 35.7,
+  longitude: 139.7,
+  accuracy: 5,
+  timestamp: DateTime.utc(2026, 3, 29, 12),
 );
