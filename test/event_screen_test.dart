@@ -25,6 +25,20 @@ void main() {
     },
   );
 
+  test('eventDiscoverSearchQuery prefixes the event hashtag for Discover', () {
+    final query = eventDiscoverSearchQuery(
+      CivicEvent(
+        hashtag: 'tokyo',
+        title: '#tokyo',
+        posts: [_post(id: 'root-1')],
+        firstSeen: DateTime.utc(2026, 3, 26, 10),
+        participantCount: 1,
+      ),
+    );
+
+    expect(query, '#tokyo');
+  });
+
   test('eventLocationSpots returns every geo-tagged post as a map spot', () {
     final spots = eventLocationSpots([
       _post(id: 'a', latitude: 35.68, longitude: 139.76, spotName: 'Shibuya'),

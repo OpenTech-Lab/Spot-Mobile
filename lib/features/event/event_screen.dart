@@ -14,6 +14,7 @@ import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/models/witness_model.dart';
+import 'package:mobile/screens/discover_screen.dart';
 import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
@@ -209,6 +210,8 @@ class EventTrendSnapshot {
     rangeEnd: rangeEnd,
   );
 }
+
+String eventDiscoverSearchQuery(CivicEvent event) => '#${event.hashtag}';
 
 List<MediaPost> eventRootThreads(Iterable<MediaPost> posts) {
   final allPosts = posts.toList(growable: false);
@@ -586,7 +589,6 @@ class _EventScreenState extends State<EventScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final posts = _event.postsByNewest;
     final bottomPadding =
         MediaQuery.of(context).padding.bottom + SpotSpacing.huge;
 
@@ -675,37 +677,23 @@ class _EventScreenState extends State<EventScreen> {
           const SliverToBoxAdapter(child: _EventSectionDivider()),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(
+              padding: EdgeInsets.fromLTRB(
                 SpotSpacing.lg,
+                SpotSpacing.xl,
                 SpotSpacing.lg,
-                SpotSpacing.lg,
-                SpotSpacing.md,
+                bottomPadding,
               ),
-              child: Text('${posts.length} posts', style: SpotType.label),
+              child: _EventDiscoverCta(
+                hashtag: _event.hashtag,
+                onTap: () => Navigator.of(context).push(
+                  buildDiscoverScreenRoute(
+                    wallet: widget.wallet,
+                    initialSearchQuery: eventDiscoverSearchQuery(_event),
+                  ),
+                ),
+              ),
             ),
           ),
-          posts.isEmpty
-              ? SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      SpotSpacing.lg,
-                      SpotSpacing.xl,
-                      SpotSpacing.lg,
-                      bottomPadding,
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'No posts yet',
-                        style: SpotType.bodySecondary,
-                      ),
-                    ),
-                  ),
-                )
-              : SliverPadding(
-                  padding: EdgeInsets.only(bottom: bottomPadding),
-                  sliver: _ThreadSliver(posts: posts),
-                ),
         ],
       ),
     );
@@ -756,6 +744,63 @@ class _EventHeader extends StatelessWidget {
         _StatRow(label: 'Location', value: eventLocationSummary(event)),
         const SizedBox(height: SpotSpacing.lg),
         _EventLocationMap(event: event),
+      ],
+    );
+  }
+}
+
+class _EventDiscoverCta extends StatelessWidget {
+  const _EventDiscoverCta({required this.hashtag, required this.onTap});
+
+  final String hashtag;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Browse every matching thread in Discover with #$hashtag already filled in.',
+          style: SpotType.caption.copyWith(color: SpotColors.textSecondary),
+        ),
+        const SizedBox(height: SpotSpacing.md),
+        GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: SpotSpacing.lg,
+              vertical: SpotSpacing.md,
+            ),
+            decoration: BoxDecoration(
+              color: SpotColors.accentSubtle,
+              borderRadius: BorderRadius.circular(SpotRadius.sm),
+              border: Border.all(
+                color: SpotColors.accent.withValues(alpha: 0.45),
+                width: 0.5,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  CupertinoIcons.compass,
+                  color: SpotColors.accent,
+                  size: 18,
+                ),
+                const SizedBox(width: SpotSpacing.sm),
+                Text(
+                  'Open in Discover',
+                  style: SpotType.body.copyWith(
+                    color: SpotColors.accent,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -1308,180 +1353,6 @@ class _StatRow extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-// ── Thread sliver ──────────────────────────────────────────────────────────────
-
-/// Renders [posts] as a depth-first thread tree (roots + nested replies).
-class _ThreadSliver extends StatelessWidget {
-  const _ThreadSliver({required this.posts});
-  final List<MediaPost> posts;
-
-  /// Returns posts in depth-first order with their nesting depth.
-  static List<({MediaPost post, int depth})> _flatten(List<MediaPost> all) {
-    final ids = {for (final p in all) p.nostrEventId};
-    final roots =
-        all
-            .where((p) => p.replyToId == null || !ids.contains(p.replyToId))
-            .toList()
-          ..sort((a, b) => a.capturedAt.compareTo(b.capturedAt));
-
-    final out = <({MediaPost post, int depth})>[];
-    void visit(MediaPost p, int depth) {
-      out.add((post: p, depth: depth));
-      final replies = all.where((r) => r.replyToId == p.nostrEventId).toList()
-        ..sort((a, b) => a.capturedAt.compareTo(b.capturedAt));
-      for (final r in replies) {
-        visit(r, depth + 1);
-      }
-    }
-
-    for (final root in roots) {
-      visit(root, 0);
-    }
-    return out;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final items = _flatten(posts);
-    return SliverList(
-      delegate: SliverChildBuilderDelegate((ctx, i) {
-        final (:post, :depth) = items[i];
-        return _ThreadPostCard(post: post, depth: depth);
-      }, childCount: items.length),
-    );
-  }
-}
-
-// ── Thread post card ────────────────────────────────────────────────────────────
-
-class _ThreadPostCard extends StatelessWidget {
-  const _ThreadPostCard({required this.post, required this.depth});
-  final MediaPost post;
-  final int depth;
-
-  @override
-  Widget build(BuildContext context) {
-    final df = DateFormat('MMM d  HH:mm');
-    final shortKey = post.pubkey.length > 12
-        ? '${post.pubkey.substring(0, 8)}…'
-        : post.pubkey;
-    // Cap visible indent at 4 levels
-    final indent = depth.clamp(0, 4) * 18.0;
-
-    return Container(
-      margin: EdgeInsets.fromLTRB(
-        SpotSpacing.lg + indent,
-        0,
-        SpotSpacing.lg,
-        4,
-      ),
-      decoration: depth == 0
-          ? SpotDecoration.card()
-          : BoxDecoration(
-              color: SpotColors.surface,
-              borderRadius: BorderRadius.circular(SpotRadius.sm),
-              border: Border(
-                left: BorderSide(
-                  color: SpotColors.accent.withValues(alpha: 0.35),
-                  width: 2,
-                ),
-              ),
-            ),
-      child: Row(
-        children: [
-          // Thumbnail area
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: SpotColors.bg,
-              borderRadius: depth == 0
-                  ? const BorderRadius.only(
-                      topLeft: Radius.circular(SpotRadius.sm),
-                      bottomLeft: Radius.circular(SpotRadius.sm),
-                    )
-                  : null,
-            ),
-            child: Center(
-              child: Icon(
-                post.isDangerMode
-                    ? CupertinoIcons.shield
-                    : CupertinoIcons.photo,
-                color: post.isDangerMode
-                    ? SpotColors.danger.withAlpha(160)
-                    : SpotColors.overlay,
-                size: 20,
-              ),
-            ),
-          ),
-          const SizedBox(width: SpotSpacing.sm),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: SpotSpacing.sm),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (depth > 0)
-                    Row(
-                      children: [
-                        const Icon(
-                          CupertinoIcons.arrow_turn_up_left,
-                          size: 10,
-                          color: SpotColors.textTertiary,
-                        ),
-                        const SizedBox(width: 3),
-                        Text('reply', style: SpotType.caption),
-                      ],
-                    ),
-                  if (post.isDangerMode)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 3),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: SpotColors.dangerSubtle,
-                        borderRadius: BorderRadius.circular(SpotRadius.xs),
-                      ),
-                      child: Text(
-                        'Protected',
-                        style: SpotType.label.copyWith(
-                          color: SpotColors.danger,
-                        ),
-                      ),
-                    ),
-                  Text(shortKey, style: SpotType.mono),
-                  const SizedBox(height: 2),
-                  Text(
-                    df.format(post.capturedAt.toLocal()),
-                    style: SpotType.caption,
-                  ),
-                  if (post.caption != null) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      post.caption!,
-                      style: SpotType.bodySecondary,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          const Icon(
-            CupertinoIcons.chevron_right,
-            color: SpotColors.overlay,
-            size: 14,
-          ),
-          const SizedBox(width: SpotSpacing.xs),
-        ],
-      ),
     );
   }
 }
