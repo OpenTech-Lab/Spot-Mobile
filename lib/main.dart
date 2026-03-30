@@ -13,6 +13,7 @@ import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/services/storage_service.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
+import 'package:mobile/widgets/dismiss_keyboard_on_tap.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,6 +59,8 @@ class SpotApp extends StatelessWidget {
       title: 'Spot',
       debugShowCheckedModeBanner: false,
       theme: SpotTheme.build(),
+      builder: (context, child) =>
+          DismissKeyboardOnTap(child: child ?? const SizedBox.shrink()),
       // Returning users: silent splash + ALTCHA, then HomeScreen.
       // New users: explicit ALTCHA gate, then OnboardingScreen.
       home: initialWallet != null
