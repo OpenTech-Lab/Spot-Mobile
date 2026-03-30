@@ -185,6 +185,31 @@ String? discoverProfileSearchSecondaryText(ProfileModel profile) {
   return '${pubkey.substring(0, 10)}...${pubkey.substring(pubkey.length - 6)}';
 }
 
+class _DiscoverSearchField extends StatelessWidget {
+  const _DiscoverSearchField({
+    required this.controller,
+    this.onChanged,
+    this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String>? onChanged;
+  final VoidCallback? onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoSearchTextField(
+      controller: controller,
+      placeholder: 'Search threads or #tags',
+      backgroundColor: SpotColors.surface,
+      itemColor: SpotColors.textSecondary,
+      style: SpotType.body.copyWith(color: SpotColors.textPrimary),
+      onChanged: onChanged,
+      onSubmitted: (_) => onSubmitted?.call(),
+    );
+  }
+}
+
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({
     super.key,
@@ -563,16 +588,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 const Text('Discover', style: SpotType.subheading),
                 const SizedBox(width: SpotSpacing.md),
                 Expanded(
-                  child: CupertinoSearchTextField(
+                  child: _DiscoverSearchField(
                     controller: _searchController,
-                    placeholder: 'Search threads or #tags',
-                    backgroundColor: SpotColors.surface,
-                    itemColor: SpotColors.textSecondary,
-                    style: SpotType.body.copyWith(
-                      color: SpotColors.textPrimary,
-                    ),
                     onChanged: _onSearchChanged,
-                    onSubmitted: (_) => _submitSearch(),
+                    onSubmitted: _submitSearch,
                   ),
                 ),
               ],
@@ -792,17 +811,20 @@ class _DiscoverSearchResultsScreenState
   late final EventRepository _repo;
   late final TabController _tabController;
   StreamSubscription<CivicEvent>? _sub;
+  final TextEditingController _searchController = TextEditingController();
 
   List<MediaPost> _posts = [];
   List<ProfileModel> _profiles = [];
   final Set<String> _loadingMediaPostIds = {};
   bool _isLoadingPosts = true;
   bool _isLoadingProfiles = false;
+  String _searchQuery = '';
+  int _profileSearchRequestId = 0;
 
   bool get _usesTabbedLayout =>
-      discoverSearchResultUsesTabbedLayout(widget.initialQuery);
+      discoverSearchResultUsesTabbedLayout(_searchQuery);
 
-  String get _queryLabel => widget.initialQuery.trim();
+  String get _queryLabel => _searchQuery.trim();
 
   @override
   void initState() {
@@ -810,15 +832,19 @@ class _DiscoverSearchResultsScreenState
     _repo = EventRepository();
     _tabController = TabController(length: 2, vsync: this);
     _posts = List<MediaPost>.from(widget.initialPosts);
+    _searchQuery = widget.initialQuery;
+    _searchController.text = widget.initialQuery;
+    _isLoadingProfiles = _usesTabbedLayout;
     _initFeed();
     if (_usesTabbedLayout) {
-      unawaited(_loadProfiles());
+      unawaited(_loadProfilesForQuery(_searchQuery));
     }
   }
 
   @override
   void dispose() {
     _sub?.cancel();
+    _searchController.dispose();
     _tabController.dispose();
     _repo.dispose();
     super.dispose();
@@ -846,14 +872,18 @@ class _DiscoverSearchResultsScreenState
     setState(() => _posts = _mergePosts(_posts, persisted));
   }
 
-  Future<void> _loadProfiles() async {
-    setState(() => _isLoadingProfiles = true);
+  Future<void> _loadProfilesForQuery(String query) async {
+    final requestId = ++_profileSearchRequestId;
     try {
       final profiles =
           await (widget.profileSearch ??
                   MetadataService.instance.searchProfiles)
-              .call(widget.initialQuery);
-      if (!mounted) return;
+              .call(query);
+      if (!mounted ||
+          requestId != _profileSearchRequestId ||
+          query != _searchQuery) {
+        return;
+      }
       setState(() {
         _profiles = profiles
             .where((profile) {
@@ -865,10 +895,16 @@ class _DiscoverSearchResultsScreenState
             .toList(growable: false);
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted ||
+          requestId != _profileSearchRequestId ||
+          query != _searchQuery) {
+        return;
+      }
       setState(() => _profiles = const []);
     } finally {
-      if (mounted) {
+      if (mounted &&
+          requestId == _profileSearchRequestId &&
+          query == _searchQuery) {
         setState(() => _isLoadingProfiles = false);
       }
     }
@@ -893,7 +929,37 @@ class _DiscoverSearchResultsScreenState
     setState(() => _posts = List<MediaPost>.from(widget.initialPosts));
     await _initFeed();
     if (_usesTabbedLayout) {
-      await _loadProfiles();
+      setState(() => _isLoadingProfiles = true);
+      await _loadProfilesForQuery(_searchQuery);
+    }
+  }
+
+  void _submitSearch() {
+    final query = discoverSubmittedSearchQuery(_searchController.text);
+    if (query == null) return;
+
+    final usesTabbedLayout = discoverSearchResultUsesTabbedLayout(query);
+    _profileSearchRequestId += 1;
+    final canonicalValue = TextEditingValue(
+      text: query,
+      selection: TextSelection.collapsed(offset: query.length),
+    );
+
+    setState(() {
+      _searchQuery = query;
+      _searchController.value = canonicalValue;
+      _profiles = const [];
+      _isLoadingProfiles = usesTabbedLayout;
+    });
+
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    if (_tabController.index != 0) {
+      _tabController.animateTo(0);
+    }
+
+    if (usesTabbedLayout) {
+      unawaited(_loadProfilesForQuery(query));
     }
   }
 
@@ -967,16 +1033,8 @@ class _DiscoverSearchResultsScreenState
   }
 
   void _openDiscoverTag(String tag) {
-    Navigator.of(context).push(
-      buildDiscoverSearchResultsRoute(
-        wallet: widget.wallet,
-        query: '#$tag',
-        initialPosts: _posts,
-        persistedPostsLoader: widget.persistedPostsLoader,
-        profileSearch: widget.profileSearch,
-        eventStreamFactory: widget.eventStreamFactory,
-      ),
-    );
+    _searchController.text = '#$tag';
+    _submitSearch();
   }
 
   Widget _buildLoadingState() {
@@ -1019,27 +1077,9 @@ class _DiscoverSearchResultsScreenState
             ),
             const SizedBox(width: SpotSpacing.sm),
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.md),
-                decoration: SpotDecoration.input(radius: SpotRadius.full),
-                child: Row(
-                  children: [
-                    const Icon(
-                      CupertinoIcons.search,
-                      size: 16,
-                      color: SpotColors.textSecondary,
-                    ),
-                    const SizedBox(width: SpotSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        _queryLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: SpotType.body,
-                      ),
-                    ),
-                  ],
-                ),
+              child: _DiscoverSearchField(
+                controller: _searchController,
+                onSubmitted: _submitSearch,
               ),
             ),
           ],
@@ -1051,7 +1091,7 @@ class _DiscoverSearchResultsScreenState
   Widget _buildThreadsTab() {
     final roots = visibleDiscoverThreads(
       _posts,
-      query: widget.initialQuery,
+      query: _searchQuery,
       excludedAuthorPubkey: widget.wallet.publicKeyHex,
     );
 

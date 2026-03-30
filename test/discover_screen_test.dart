@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -190,6 +191,108 @@ void main() {
     expect(find.text('Fire near station'), findsOneWidget);
     expect(profileSearchCalls, 0);
   });
+
+  testWidgets(
+    'search results submit reruns the query in place without pushing a new route',
+    (tester) async {
+      final observer = _TestNavigatorObserver();
+      final profileSearchQueries = <String>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorObservers: [observer],
+          home: Scaffold(
+            body: DiscoverSearchResultsScreen(
+              wallet: _wallet(),
+              initialQuery: 'smoke',
+              initialPosts: [
+                _post(id: 'smoke', caption: 'Smoke near station'),
+                _post(id: 'flood', caption: 'Flood near river'),
+              ],
+              persistedPostsLoader: () async => const [],
+              profileSearch: (query) async {
+                profileSearchQueries.add(query);
+                return const [];
+              },
+              eventStreamFactory: () => const Stream<CivicEvent>.empty(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(find.text('Smoke near station'), findsOneWidget);
+
+      await tester.enterText(find.byType(CupertinoTextField), 'flood');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(find.text('Flood near river'), findsOneWidget);
+      expect(find.text('Smoke near station'), findsNothing);
+      expect(profileSearchQueries, ['smoke', 'flood']);
+      expect(observer.pushCount, 1);
+    },
+  );
+
+  testWidgets(
+    'tapping a tag on search results reruns search in place instead of pushing another results screen',
+    (tester) async {
+      final observer = _TestNavigatorObserver();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorObservers: [observer],
+          home: Scaffold(
+            body: DiscoverSearchResultsScreen(
+              wallet: _wallet(),
+              initialQuery: 'smoke',
+              initialPosts: [
+                _post(
+                  id: 'fire-root',
+                  caption: 'Smoke near station',
+                  eventTags: const ['smoke', 'fire'],
+                ),
+                _post(
+                  id: 'other-root',
+                  caption: 'Smoke near harbor',
+                  eventTags: const ['smoke', 'harbor'],
+                ),
+              ],
+              persistedPostsLoader: () async => const [],
+              profileSearch: (_) async => const [],
+              eventStreamFactory: () => const Stream<CivicEvent>.empty(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(find.byType(TabBar), findsOneWidget);
+      expect(find.text('#fire'), findsOneWidget);
+      expect(find.text('Smoke near harbor'), findsOneWidget);
+
+      await tester.tap(find.text('#fire'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(find.byType(TabBar), findsNothing);
+      expect(find.text('Smoke near station'), findsOneWidget);
+      expect(find.text('Smoke near harbor'), findsNothing);
+      expect(
+        tester
+            .widget<CupertinoTextField>(find.byType(CupertinoTextField))
+            .controller
+            ?.text,
+        '#fire',
+      );
+      expect(observer.pushCount, 1);
+    },
+  );
 }
 
 MediaPost _post({
@@ -223,3 +326,13 @@ WalletModel _wallet() => WalletModel(
   isRevoked: false,
   createdAt: DateTime.utc(2026, 3, 29),
 );
+
+class _TestNavigatorObserver extends NavigatorObserver {
+  int pushCount = 0;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    pushCount += 1;
+  }
+}
