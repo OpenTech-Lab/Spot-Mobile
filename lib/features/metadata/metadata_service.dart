@@ -359,6 +359,7 @@ class MetadataService {
       mediaPaths: normalizedDraft.mediaPaths,
       previewBase64: normalizedDraft.previewBase64,
       previewMimeType: normalizedDraft.previewMimeType,
+      visibleLocationLabel: normalizedDraft.visibleLocationLabel,
       deliveryState: PostDeliveryState.sent,
       lastPublishError: null,
     );

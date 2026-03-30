@@ -111,6 +111,21 @@ void main() {
   );
 
   test(
+    'visibleThreadLocationTextForPost prefers the preserved composer label for rounded normal posts',
+    () {
+      final post = _post(
+        eventTags: const ['tokyo'],
+        latitude: 35.5,
+        longitude: 139.5,
+        visibleLocationLabel: 'Japan/Tokyo',
+      );
+      final location = visibleThreadLocationTextForPost(post);
+
+      expect(location, 'Japan/Tokyo');
+    },
+  );
+
+  test(
     'visibleThreadLocationTextForPost falls back to coarse coordinates without geo lookup',
     () {
       final post = _post(
@@ -636,6 +651,7 @@ MediaPost _post({
   bool isVirtual = false,
   bool isAiGenerated = false,
   String? spotName,
+  String? visibleLocationLabel,
   int replyCount = 0,
   int likeCount = 0,
   bool isLikedByMe = false,
@@ -663,6 +679,7 @@ MediaPost _post({
   isVirtual: isVirtual,
   isAiGenerated: isAiGenerated,
   spotName: spotName,
+  visibleLocationLabel: visibleLocationLabel,
   replyCount: replyCount,
   likeCount: likeCount,
   isLikedByMe: isLikedByMe,

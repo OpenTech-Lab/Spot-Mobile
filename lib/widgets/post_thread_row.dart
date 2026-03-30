@@ -62,6 +62,11 @@ String visibleThreadLocationTextForPost(
   MediaPost post, {
   GeoLocation? geoLocation,
 }) {
+  final visibleLocationLabel = post.visibleLocationLabel?.trim();
+  if (visibleLocationLabel != null && visibleLocationLabel.isNotEmpty) {
+    return visibleLocationLabel;
+  }
+
   return visiblePostLocationText(
     isVirtual: post.isVirtual,
     latitude: post.latitude,

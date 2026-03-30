@@ -72,6 +72,12 @@ class MediaPost {
   /// When non-null and non-empty, exact GPS is published instead of coarsened.
   final String? spotName;
 
+  /// Frozen location text shown to the user when this post was composed.
+  ///
+  /// This keeps normal privacy-rounded posts from drifting to a nearby city
+  /// when later UI surfaces reverse-geocode the rounded coordinate pair.
+  final String? visibleLocationLabel;
+
   /// Number of replies to this post (computed at display time).
   final int replyCount;
 
@@ -123,6 +129,7 @@ class MediaPost {
     this.tags = const [],
     required this.nostrEventId,
     this.spotName,
+    this.visibleLocationLabel,
     this.replyCount = 0,
     this.likeCount = 0,
     this.isLikedByMe = false,
@@ -178,6 +185,7 @@ class MediaPost {
     'tags': tags,
     'nostrEventId': nostrEventId,
     'spotName': spotName,
+    'visibleLocationLabel': visibleLocationLabel,
     'replyCount': replyCount,
     'likeCount': likeCount,
     'isLikedByMe': isLikedByMe,
@@ -217,6 +225,7 @@ class MediaPost {
     tags: List<String>.from(json['tags'] as List? ?? []),
     nostrEventId: json['nostrEventId'] as String,
     spotName: json['spotName'] as String?,
+    visibleLocationLabel: json['visibleLocationLabel'] as String?,
     replyCount: json['replyCount'] as int? ?? 0,
     likeCount: json['likeCount'] as int? ?? 0,
     isLikedByMe: json['isLikedByMe'] as bool? ?? false,
@@ -248,6 +257,7 @@ class MediaPost {
     String? previewMimeType,
     PostSourceType? sourceType,
     String? spotName,
+    Object? visibleLocationLabel = _copyWithUnset,
     int? replyCount,
     int? likeCount,
     bool? isLikedByMe,
@@ -281,6 +291,9 @@ class MediaPost {
     tags: tags ?? this.tags,
     nostrEventId: nostrEventId ?? this.nostrEventId,
     spotName: spotName ?? this.spotName,
+    visibleLocationLabel: identical(visibleLocationLabel, _copyWithUnset)
+        ? this.visibleLocationLabel
+        : visibleLocationLabel as String?,
     replyCount: replyCount ?? this.replyCount,
     likeCount: likeCount ?? this.likeCount,
     isLikedByMe: isLikedByMe ?? this.isLikedByMe,
@@ -295,6 +308,7 @@ class MediaPost {
     mediaPaths: _mergeMediaPaths(existing.mediaPaths),
     previewBase64: previewBase64 ?? existing.previewBase64,
     previewMimeType: previewMimeType ?? existing.previewMimeType,
+    visibleLocationLabel: visibleLocationLabel ?? existing.visibleLocationLabel,
   );
 
   bool isEquivalentTo(MediaPost other) {
@@ -317,6 +331,7 @@ class MediaPost {
         sourceType == other.sourceType &&
         isVirtual == other.isVirtual &&
         spotName == other.spotName &&
+        visibleLocationLabel == other.visibleLocationLabel &&
         replyCount == other.replyCount &&
         likeCount == other.likeCount &&
         isLikedByMe == other.isLikedByMe &&

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'package:mobile/core/post_location_formatter.dart';
 import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -186,6 +187,20 @@ class _CameraScreenState extends State<CameraScreen>
       final effectiveSpotName = _spotName?.trim().isNotEmpty == true
           ? _spotName!.trim()
           : null;
+      final publishedLatitude = publishedPostLatitude(
+        exactLatitude: _gpsLock?.latitude,
+        spotName: effectiveSpotName,
+      );
+      final publishedLongitude = publishedPostLongitude(
+        exactLongitude: _gpsLock?.longitude,
+        spotName: effectiveSpotName,
+      );
+      final visibleLocationLabel = visiblePublishedLocationText(
+        isVirtual: _isVirtualMode,
+        exactLatitude: _gpsLock?.latitude,
+        exactLongitude: _gpsLock?.longitude,
+        spotName: effectiveSpotName,
+      );
 
       post = MediaPost(
         id: primaryHash,
@@ -194,12 +209,8 @@ class _CameraScreenState extends State<CameraScreen>
         mediaPaths: preparedMedia.paths,
         // Exact GPS only for Spot check-ins; coarsen by default.
         // Virtual mode: GPS is stored locally but NOT published.
-        latitude: effectiveSpotName != null
-            ? _gpsLock?.latitude
-            : _coarseCoord(_gpsLock?.latitude),
-        longitude: effectiveSpotName != null
-            ? _gpsLock?.longitude
-            : _coarseCoord(_gpsLock?.longitude),
+        latitude: publishedLatitude,
+        longitude: publishedLongitude,
         capturedAt: _gpsLock?.timestamp ?? DateTime.now().toUtc(),
         eventTags: effectiveTag != null ? [effectiveTag] : const [],
         isDangerMode: _isDangerMode,
@@ -210,6 +221,7 @@ class _CameraScreenState extends State<CameraScreen>
         replyToId: widget.replyToPost?.nostrEventId,
         nostrEventId: primaryHash,
         spotName: effectiveSpotName,
+        visibleLocationLabel: visibleLocationLabel,
       );
 
       // Register ALL files in cache BEFORE publish so self-delivery finds them
@@ -1096,10 +1108,6 @@ String _shortPubkey(String pubkey) {
   if (pubkey.length <= 12) return pubkey;
   return '${pubkey.substring(0, 6)}…${pubkey.substring(pubkey.length - 4)}';
 }
-
-/// Rounds a coordinate to the nearest 0.5° (≈55 km) for city-level privacy.
-double? _coarseCoord(double? v) =>
-    v == null ? null : (v * 2).roundToDouble() / 2.0;
 
 /// Builds the GPS label shown in the preview screen metadata row.
 /// Default:   "Japan/Tokyo" — city-level only (coarsened)

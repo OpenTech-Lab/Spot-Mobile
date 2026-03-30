@@ -15,7 +15,6 @@ import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/camera_service.dart';
 import 'package:mobile/services/cdn_media_service.dart';
-import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/services/media_processing_service.dart';
 import 'package:mobile/services/post_media_preparation_service.dart';
 import 'package:mobile/services/post_publish_service.dart';
@@ -314,6 +313,20 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
       final effectiveSpotName = _spotName?.trim().isNotEmpty == true
           ? _spotName!.trim()
           : null;
+      final publishedLatitude = publishedPostLatitude(
+        exactLatitude: _gpsLock?.latitude,
+        spotName: effectiveSpotName,
+      );
+      final publishedLongitude = publishedPostLongitude(
+        exactLongitude: _gpsLock?.longitude,
+        spotName: effectiveSpotName,
+      );
+      final visibleLocationLabel = visiblePublishedLocationText(
+        isVirtual: _isVirtual,
+        exactLatitude: _gpsLock?.latitude,
+        exactLongitude: _gpsLock?.longitude,
+        spotName: effectiveSpotName,
+      );
 
       post = MediaPost(
         id: hashes.first,
@@ -321,12 +334,8 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
         contentHashes: hashes,
         mediaPaths: paths,
         // Exact GPS only for Spot check-ins; coarsen by default.
-        latitude: effectiveSpotName != null
-            ? _gpsLock?.latitude
-            : _coarseCoord(_gpsLock?.latitude),
-        longitude: effectiveSpotName != null
-            ? _gpsLock?.longitude
-            : _coarseCoord(_gpsLock?.longitude),
+        latitude: publishedLatitude,
+        longitude: publishedLongitude,
         capturedAt: _gpsLock?.timestamp ?? DateTime.now().toUtc(),
         eventTags: effectiveTags,
         isDangerMode: _isDangerMode,
@@ -340,6 +349,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
         replyToId: widget.replyToPost?.nostrEventId,
         nostrEventId: hashes.first,
         spotName: effectiveSpotName,
+        visibleLocationLabel: visibleLocationLabel,
       );
 
       // Register all media files in cache before publishing
@@ -403,11 +413,6 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
     } finally {
       if (mounted) setState(() => _isPublishing = false);
     }
-  }
-
-  double? _coarseCoord(double? v) {
-    if (v == null) return null;
-    return (v / 0.5).round() * 0.5;
   }
 
   void _showSnack(String msg) {
@@ -1587,7 +1592,6 @@ class _LocationRow extends StatelessWidget {
 
     final lat = gpsLock!.latitude;
     final lon = gpsLock!.longitude;
-    final geo = GeoLookup.instance.nearest(lat, lon);
     final hasSpot = spotName != null && spotName!.trim().isNotEmpty;
     final icon = hasSpot
         ? CupertinoIcons.map_pin_ellipse
@@ -1595,11 +1599,10 @@ class _LocationRow extends StatelessWidget {
     final iconColor = hasSpot
         ? SpotColors.accent
         : SpotColors.success.withAlpha(160);
-    final label = visiblePostLocationText(
+    final label = visiblePublishedLocationText(
       isVirtual: false,
-      latitude: lat,
-      longitude: lon,
-      geoLocation: geo,
+      exactLatitude: lat,
+      exactLongitude: lon,
       spotName: spotName,
     );
 
