@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
@@ -20,6 +19,10 @@ import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
+const ValueKey<String> threadScreenEdgeSwipeBackRegionKey = ValueKey<String>(
+  'thread-screen-edge-swipe-back-region',
+);
+
 Route<void> buildThreadScreenRoute({
   required String rootPostId,
   required List<MediaPost> initialPosts,
@@ -28,7 +31,7 @@ Route<void> buildThreadScreenRoute({
   MediaFetcher? mediaFetcher,
   Future<List<MediaPost>> Function()? persistedPostsLoader,
 }) {
-  return CupertinoPageRoute<void>(
+  return MaterialPageRoute<void>(
     builder: (_) => ThreadScreen(
       rootPostId: rootPostId,
       initialPosts: initialPosts,
@@ -237,8 +240,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
         ? rootPost!.eventTags.first
         : null;
     final title = categoryTag != null ? '#$categoryTag' : 'Thread';
-
-    return Scaffold(
+    final scaffold = Scaffold(
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
         backgroundColor: SpotColors.bg,
@@ -278,6 +280,71 @@ class _ThreadScreenState extends State<ThreadScreen> {
                 );
               },
             ),
+    );
+
+    if (!Navigator.of(context).canPop()) return scaffold;
+    return _EdgeSwipeBackPopRegion(child: scaffold);
+  }
+}
+
+class _EdgeSwipeBackPopRegion extends StatefulWidget {
+  const _EdgeSwipeBackPopRegion({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_EdgeSwipeBackPopRegion> createState() =>
+      _EdgeSwipeBackPopRegionState();
+}
+
+class _EdgeSwipeBackPopRegionState extends State<_EdgeSwipeBackPopRegion> {
+  static const double _gestureWidth = 24;
+  static const double _popThreshold = 72;
+  static const double _popVelocity = 500;
+
+  double _dragDistance = 0;
+
+  void _reset() => _dragDistance = 0;
+
+  void _handleDragUpdate(DragUpdateDetails details) {
+    final delta = details.primaryDelta ?? 0;
+    if (delta <= 0) return;
+    _dragDistance += delta;
+  }
+
+  void _handleDragEnd(DragEndDetails details) {
+    final shouldPop =
+        _dragDistance >= _popThreshold ||
+        (details.primaryVelocity ?? 0) >= _popVelocity;
+    _reset();
+    if (!shouldPop) return;
+    Navigator.of(context).maybePop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        widget.child,
+        Positioned(
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: _gestureWidth,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragStart: (_) => _reset(),
+            onHorizontalDragUpdate: _handleDragUpdate,
+            onHorizontalDragCancel: _reset,
+            onHorizontalDragEnd: _handleDragEnd,
+            child: const ColoredBox(
+              key: threadScreenEdgeSwipeBackRegionKey,
+              color: Colors.transparent,
+              child: SizedBox.expand(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
