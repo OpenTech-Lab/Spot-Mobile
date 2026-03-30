@@ -117,8 +117,8 @@ class UserPrefsService {
   // ── Session safety ────────────────────────────────────────────────────────
 
   /// Whether a saved account should require local unlock on app open/resume.
-  /// Defaults to true so existing installs keep the current safer behavior.
-  bool get safeModeEnabled => _data['safe_mode_enabled'] as bool? ?? true;
+  /// Defaults to false unless the user explicitly enables it.
+  bool get safeModeEnabled => _data['safe_mode_enabled'] as bool? ?? false;
 
   Future<void> saveSafeModeEnabled(bool enabled) async {
     _data = {..._data, 'safe_mode_enabled': enabled};

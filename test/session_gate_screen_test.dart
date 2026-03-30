@@ -35,6 +35,7 @@ void main() {
         home: SessionGateScreen(
           initialWallet: _wallet(),
           appLockService: service,
+          safeModeEnabled: true,
           unlockedBuilder: (_) => const Text('Unlocked home'),
         ),
       ),
@@ -70,6 +71,7 @@ void main() {
         home: SessionGateScreen(
           initialWallet: _wallet(),
           appLockService: service,
+          safeModeEnabled: true,
           logoutRunner: () async => logoutCalls++,
           onboardingBuilder: () => const Text('Onboarding flow'),
         ),
@@ -103,6 +105,7 @@ void main() {
         home: SessionGateScreen(
           initialWallet: wallet,
           appLockService: service,
+          safeModeEnabled: true,
           unlockedBuilder: (_) => const Text('Unlocked home'),
         ),
       ),
@@ -143,6 +146,7 @@ void main() {
         home: SessionGateScreen(
           initialWallet: _wallet(),
           appLockService: service,
+          safeModeEnabled: true,
           relockAfter: Duration.zero,
           unlockedBuilder: (_) => const Text('Unlocked home'),
         ),
@@ -176,6 +180,30 @@ void main() {
           initialWallet: _wallet(),
           appLockService: service,
           safeModeEnabled: false,
+          unlockedBuilder: (_) => const Text('Unlocked home'),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unlocked home'), findsOneWidget);
+    expect(find.text('Saved account locked'), findsNothing);
+  });
+
+  testWidgets('default safe mode is off for a saved account', (tester) async {
+    final service = _FakeAppLockService(
+      status: const AppLockStatus(
+        canAuthenticate: true,
+        message: 'Unlock this saved account.',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SessionGateScreen(
+          initialWallet: _wallet(),
+          appLockService: service,
           unlockedBuilder: (_) => const Text('Unlocked home'),
         ),
       ),
