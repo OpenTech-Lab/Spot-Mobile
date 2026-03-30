@@ -39,7 +39,11 @@ void main() {
       MaterialApp(home: SettingsScreen(wallet: _wallet())),
     );
 
-    expect(find.text('Log Out'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Log Out'),
+      200,
+      scrollable: find.byType(Scrollable),
+    );
 
     await tester.tap(find.text('Log Out'));
     await tester.pumpAndSettle();

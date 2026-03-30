@@ -46,7 +46,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool get _footprintMapPublic => UserPrefsService.instance.footprintMapPublic;
 
   Future<void> _toggleFootprintMapPublic() async {
-    await UserPrefsService.instance.saveFootprintMapPublic(!_footprintMapPublic);
+    await UserPrefsService.instance.saveFootprintMapPublic(
+      !_footprintMapPublic,
+    );
     if (mounted) setState(() {});
   }
 
@@ -239,13 +241,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         message: const Text('Choose which of your public posts to open.'),
         actions: [
           CupertinoActionSheetAction(
-            onPressed: () =>
-                Navigator.of(ctx).pop(MyPostsScreenMode.threads),
+            onPressed: () => Navigator.of(ctx).pop(MyPostsScreenMode.threads),
             child: const Text('Posted Threads'),
           ),
           CupertinoActionSheetAction(
-            onPressed: () =>
-                Navigator.of(ctx).pop(MyPostsScreenMode.replies),
+            onPressed: () => Navigator.of(ctx).pop(MyPostsScreenMode.replies),
             child: const Text('Replied Threads'),
           ),
         ],
@@ -301,13 +301,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: SpotSpacing.sm),
-          _SettingsRow(
-            icon: CupertinoIcons.square_arrow_right,
-            label: 'Log Out',
-            value: _isLoggingOut ? 'Signing out…' : null,
-            onTap: _confirmLogout,
-          ),
           const SizedBox(height: SpotSpacing.xl),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: SpotSpacing.sm),
@@ -346,6 +339,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             label: 'Clear Local Data',
             onTap: _clearAllData,
           ),
+          const SizedBox(height: SpotSpacing.xl),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: SpotSpacing.sm),
+            child: Text('SESSION', style: SpotType.label),
+          ),
+          _SettingsRow(
+            icon: CupertinoIcons.square_arrow_right,
+            label: 'Log Out',
+            value: _isLoggingOut ? 'Signing out…' : null,
+            onTap: _confirmLogout,
+          ),
+          const SizedBox(height: SpotSpacing.xxl),
         ],
       ),
     );
