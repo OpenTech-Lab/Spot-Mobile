@@ -28,6 +28,18 @@ const ValueKey<String> postThreadRowMediaViewportKey = ValueKey<String>(
 const ValueKey<String> postThreadRowMediaContentKey = ValueKey<String>(
   'post-thread-row-media-content',
 );
+const ValueKey<String> postThreadRowProtectedStatusIconKey = ValueKey<String>(
+  'post-thread-row-status-protected',
+);
+const ValueKey<String> postThreadRowAiStatusIconKey = ValueKey<String>(
+  'post-thread-row-status-ai',
+);
+const ValueKey<String> postThreadRowRetryStatusIconKey = ValueKey<String>(
+  'post-thread-row-status-retry',
+);
+const ValueKey<String> postThreadRowSecondhandStatusIconKey = ValueKey<String>(
+  'post-thread-row-status-secondhand',
+);
 
 double postThreadRowFeedTwoImageWidth(double viewportWidth) {
   final minimumWidth =
@@ -272,30 +284,6 @@ class PostThreadRow extends StatelessWidget {
                             ],
                           ),
                         ),
-                        if (post.isDangerMode) ...[
-                          const SizedBox(width: SpotSpacing.sm),
-                          _PostBadge(
-                            label: 'Protected',
-                            color: SpotColors.danger,
-                            bg: SpotColors.dangerSubtle,
-                          ),
-                        ],
-                        if (post.isAiGenerated) ...[
-                          const SizedBox(width: SpotSpacing.sm),
-                          _PostBadge(
-                            label: 'AI',
-                            color: SpotColors.warning,
-                            bg: SpotColors.warningSubtle,
-                          ),
-                        ],
-                        if (post.isPendingRetry) ...[
-                          const SizedBox(width: SpotSpacing.sm),
-                          _PostBadge(
-                            label: 'Not sent',
-                            color: SpotColors.warning,
-                            bg: SpotColors.warningSubtle,
-                          ),
-                        ],
                         if (onRetryPublish != null) ...[
                           const SizedBox(width: SpotSpacing.sm),
                           GestureDetector(
@@ -321,7 +309,6 @@ class PostThreadRow extends StatelessWidget {
                           ),
                         ],
                         if (onDelete != null || onReport != null) ...[
-                          const Spacer(),
                           GestureDetector(
                             onTap: () => _showPostMenu(context),
                             behavior: HitTestBehavior.opaque,
@@ -423,23 +410,7 @@ class PostThreadRow extends StatelessWidget {
                           onTap: onLike,
                         ),
                         const Spacer(),
-                        // AI-generated indicator
-                        Icon(
-                          CupertinoIcons.sparkles,
-                          size: 14,
-                          color: post.isAiGenerated
-                              ? SpotColors.warning
-                              : SpotColors.textTertiary.withAlpha(60),
-                        ),
-                        const SizedBox(width: SpotSpacing.md),
-                        // Repost / secondhand indicator
-                        Icon(
-                          CupertinoIcons.arrow_2_squarepath,
-                          size: 14,
-                          color: post.sourceType == PostSourceType.secondhand
-                              ? SpotColors.accent
-                              : SpotColors.textTertiary.withAlpha(60),
-                        ),
+                        _PostStatusIndicators(post: post),
                       ],
                     ),
                   ],
@@ -1050,27 +1021,87 @@ class _PostLocationRow extends StatelessWidget {
   }
 }
 
-// ── Post badge ────────────────────────────────────────────────────────────────
+// ── Post status indicators ───────────────────────────────────────────────────
 
-class _PostBadge extends StatelessWidget {
-  const _PostBadge({
-    required this.label,
-    required this.color,
-    required this.bg,
-  });
-  final String label;
-  final Color color;
-  final Color bg;
+class _PostStatusIndicators extends StatelessWidget {
+  const _PostStatusIndicators({required this.post});
+
+  final MediaPost post;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(SpotRadius.xs),
+    final indicators = <Widget>[
+      if (post.isDangerMode)
+        const _PostStatusIndicator(
+          iconKey: postThreadRowProtectedStatusIconKey,
+          tooltip: 'Protected',
+          icon: CupertinoIcons.lock_fill,
+          color: SpotColors.danger,
+        ),
+      if (post.isAiGenerated)
+        const _PostStatusIndicator(
+          iconKey: postThreadRowAiStatusIconKey,
+          tooltip: 'AI-generated',
+          icon: CupertinoIcons.sparkles,
+          color: SpotColors.warning,
+        ),
+      if (post.isPendingRetry)
+        const _PostStatusIndicator(
+          iconKey: postThreadRowRetryStatusIconKey,
+          tooltip: 'Not sent',
+          icon: CupertinoIcons.exclamationmark_circle_fill,
+          color: SpotColors.warning,
+        ),
+      if (post.sourceType == PostSourceType.secondhand)
+        const _PostStatusIndicator(
+          iconKey: postThreadRowSecondhandStatusIconKey,
+          tooltip: 'Secondhand',
+          icon: CupertinoIcons.arrow_2_squarepath,
+          color: SpotColors.accent,
+        ),
+    ];
+    if (indicators.isEmpty) return const SizedBox.shrink();
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var index = 0; index < indicators.length; index++) ...[
+          if (index > 0) const SizedBox(width: SpotSpacing.sm),
+          indicators[index],
+        ],
+      ],
+    );
+  }
+}
+
+class _PostStatusIndicator extends StatelessWidget {
+  const _PostStatusIndicator({
+    required this.iconKey,
+    required this.tooltip,
+    required this.icon,
+    required this.color,
+  });
+
+  final Key iconKey;
+  final String tooltip;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: SizedBox(
+        width: 16,
+        height: 16,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(icon, size: 15, color: color.withAlpha(60)),
+            Icon(icon, key: iconKey, size: 13, color: color),
+          ],
+        ),
       ),
-      child: Text(label, style: SpotType.label.copyWith(color: color)),
     );
   }
 }

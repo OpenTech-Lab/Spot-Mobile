@@ -209,9 +209,48 @@ void main() {
       expect(find.text('2nd hand'), findsNothing);
 
       final icon = tester.widget<Icon>(
-        find.byIcon(CupertinoIcons.arrow_2_squarepath),
+        find.byKey(postThreadRowSecondhandStatusIconKey),
       );
       expect(icon.color, SpotColors.accent);
+    },
+  );
+
+  testWidgets(
+    'PostThreadRow moves header status text into lit bottom-right icons',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: PostThreadRow(
+              post: _post(
+                eventTags: const ['tokyo'],
+                isDangerMode: true,
+                isAiGenerated: true,
+                deliveryState: PostDeliveryState.failedToSend,
+              ),
+              isLast: true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Protected'), findsNothing);
+      expect(find.text('AI'), findsNothing);
+      expect(find.text('Not sent'), findsNothing);
+
+      final protectedIcon = tester.widget<Icon>(
+        find.byKey(postThreadRowProtectedStatusIconKey),
+      );
+      final aiIcon = tester.widget<Icon>(
+        find.byKey(postThreadRowAiStatusIconKey),
+      );
+      final retryIcon = tester.widget<Icon>(
+        find.byKey(postThreadRowRetryStatusIconKey),
+      );
+
+      expect(protectedIcon.color, SpotColors.danger);
+      expect(aiIcon.color, SpotColors.warning);
+      expect(retryIcon.color, SpotColors.warning);
     },
   );
 
@@ -593,7 +632,9 @@ MediaPost _post({
   String? replyToId,
   double? latitude,
   double? longitude,
+  bool isDangerMode = false,
   bool isVirtual = false,
+  bool isAiGenerated = false,
   String? spotName,
   int replyCount = 0,
   int likeCount = 0,
@@ -603,6 +644,7 @@ MediaPost _post({
   String? authorDisplayName,
   String? authorAvatarContentHash,
   PostSourceType sourceType = PostSourceType.firsthand,
+  PostDeliveryState deliveryState = PostDeliveryState.sent,
 }) => MediaPost(
   id: 'post-id',
   pubkey: 'pubkey',
@@ -617,7 +659,9 @@ MediaPost _post({
   replyToId: replyToId,
   latitude: latitude,
   longitude: longitude,
+  isDangerMode: isDangerMode,
   isVirtual: isVirtual,
+  isAiGenerated: isAiGenerated,
   spotName: spotName,
   replyCount: replyCount,
   likeCount: likeCount,
@@ -626,6 +670,7 @@ MediaPost _post({
   previewMimeType: previewMimeType,
   sourceType: sourceType,
   nostrEventId: 'post-id',
+  deliveryState: deliveryState,
 );
 
 const _tinyPngBase64 =
