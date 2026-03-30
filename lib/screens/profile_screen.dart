@@ -596,33 +596,39 @@ class ProfileScreenState extends State<ProfileScreen>
     setState(() => _isSavingProfile = true);
     try {
       String? avatarContentHash = _profile?.avatarContentHash;
+      String? avatarUploadWarning;
       if (selectedAvatar != null) {
-        final optimized = await MediaProcessingService.instance
-            .optimizeForUpload(File(selectedAvatar.path), isVideo: false);
-        final bytes = await optimized.readAsBytes();
-        avatarContentHash = EncryptionUtils.sha256BytesHex(
-          Uint8List.fromList(bytes),
-        );
+        try {
+          final optimized = await MediaProcessingService.instance
+              .optimizeForUpload(File(selectedAvatar.path), isVideo: false);
+          final bytes = await optimized.readAsBytes();
+          avatarContentHash = EncryptionUtils.sha256BytesHex(
+            Uint8List.fromList(bytes),
+          );
 
-        await CacheManager.instance.addToCache(
-          avatarContentHash,
-          optimized.path,
-        );
-        await CdnMediaService.instance.ensureUploadedToCdn(
-          contentHash: avatarContentHash,
-          filePath: optimized.path,
-          contentType: _profileImageContentType(
+          await CacheManager.instance.addToCache(
+            avatarContentHash,
             optimized.path,
-            mimeType: selectedAvatar.mimeType,
-          ),
-          signPayload: (message) async => PresignAuth(
-            pubkey: widget.wallet.publicKeyHex,
-            signature: WalletService.signMessage(
-              message,
-              widget.wallet.privateKeyHex,
+          );
+          await CdnMediaService.instance.ensureUploadedToCdn(
+            contentHash: avatarContentHash,
+            filePath: optimized.path,
+            contentType: _profileImageContentType(
+              optimized.path,
+              mimeType: selectedAvatar.mimeType,
             ),
-          ),
-        );
+            signPayload: (message) async => PresignAuth(
+              pubkey: widget.wallet.publicKeyHex,
+              signature: WalletService.signMessage(
+                message,
+                widget.wallet.privateKeyHex,
+              ),
+            ),
+          );
+        } catch (error) {
+          avatarContentHash = _profile?.avatarContentHash;
+          avatarUploadWarning = _avatarUploadWarningMessage(error);
+        }
       }
 
       final updatedProfile = await MetadataService.instance
@@ -657,9 +663,12 @@ class ProfileScreenState extends State<ProfileScreen>
         _profile = updatedProfile;
         _posts = updatedPosts;
       });
+      final successMessage = avatarUploadWarning == null
+          ? 'Profile updated'
+          : 'Profile updated. $avatarUploadWarning';
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Profile updated')));
+      ).showSnackBar(SnackBar(content: Text(successMessage)));
     } on ProfileDescriptionTooLongError catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -673,6 +682,15 @@ class ProfileScreenState extends State<ProfileScreen>
     } finally {
       if (mounted) setState(() => _isSavingProfile = false);
     }
+  }
+
+  String _avatarUploadWarningMessage(Object error) {
+    final message = error.toString().toLowerCase();
+    if (message.contains('device time appears out of sync') ||
+        message.contains('timestamp too far from server time')) {
+      return 'Avatar not updated. Turn on automatic date & time and try again.';
+    }
+    return 'Avatar not updated. Please try again.';
   }
 
   String _profileImageContentType(String path, {String? mimeType}) {

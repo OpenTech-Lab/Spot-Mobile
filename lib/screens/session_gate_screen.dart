@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'package:mobile/core/wallet.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/altcha_gate_screen.dart';
 import 'package:mobile/screens/onboarding_screen.dart';
@@ -14,6 +15,29 @@ import 'package:mobile/widgets/app_loading_view.dart';
 typedef SessionUnlockedBuilder = Widget Function(WalletModel wallet);
 typedef SessionOnboardingBuilder = Widget Function();
 typedef SessionLogoutRunner = Future<void> Function();
+
+List<String> normalizeRecoveryPhraseWords(String phrase) {
+  return phrase
+      .trim()
+      .toLowerCase()
+      .split(RegExp(r'\s+'))
+      .where((word) => word.isNotEmpty)
+      .toList(growable: false);
+}
+
+String? validateRecoveryPhraseForWallet(WalletModel wallet, String phrase) {
+  final words = normalizeRecoveryPhraseWords(phrase);
+  if (words.length != 12 || !WalletService.validateMnemonic(words)) {
+    return 'Enter the exact 12-word recovery phrase.';
+  }
+
+  final (_, derivedPubkey) = WalletService.keypairFromMnemonic(words);
+  if (derivedPubkey != wallet.publicKeyHex) {
+    return 'Recovery phrase does not match this saved account.';
+  }
+
+  return null;
+}
 
 class SessionGateScreen extends StatefulWidget {
   const SessionGateScreen({
@@ -168,6 +192,88 @@ class _SessionGateScreenState extends State<SessionGateScreen>
     setState(() => _isUnlocking = false);
   }
 
+  Future<void> _promptRecoveryPhraseUnlock() async {
+    if (_wallet == null || _isUnlocking) return;
+
+    final phrase = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          backgroundColor: SpotColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(SpotRadius.md),
+          ),
+          title: const Text(
+            'Unlock with recovery phrase',
+            style: SpotType.subheading,
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enter the 12-word recovery phrase for this saved account.',
+                style: SpotType.bodySecondary,
+              ),
+              const SizedBox(height: SpotSpacing.md),
+              TextField(
+                key: const Key('recovery_phrase_unlock_field'),
+                controller: controller,
+                autofocus: true,
+                minLines: 2,
+                maxLines: 4,
+                autocorrect: false,
+                enableSuggestions: false,
+                textCapitalization: TextCapitalization.none,
+                keyboardType: TextInputType.visiblePassword,
+                decoration: const InputDecoration(
+                  hintText: 'twelve recovery words',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel', style: SpotType.bodySecondary),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(controller.text),
+              child: const Text('Unlock'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (phrase == null) return;
+    await _unlockWithRecoveryPhrase(phrase);
+  }
+
+  Future<void> _unlockWithRecoveryPhrase(String phrase) async {
+    final wallet = _wallet;
+    if (wallet == null || _isUnlocking) return;
+
+    setState(() {
+      _isUnlocking = true;
+      _unlockError = null;
+    });
+
+    final validationError = validateRecoveryPhraseForWallet(wallet, phrase);
+    if (!mounted) return;
+
+    setState(() {
+      _isUnlocking = false;
+      if (validationError == null) {
+        _isLocked = false;
+        _backgroundedAt = null;
+      } else {
+        _unlockError = validationError;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final wallet = _wallet;
@@ -186,7 +292,7 @@ class _SessionGateScreenState extends State<SessionGateScreen>
     }
 
     final lockStatus = _lockStatus!;
-    if (_shouldShowUnlockedContent(lockStatus)) {
+    if (_shouldShowUnlockedContent()) {
       return widget.unlockedBuilder?.call(wallet) ??
           SplashScreen(wallet: wallet);
     }
@@ -199,18 +305,19 @@ class _SessionGateScreenState extends State<SessionGateScreen>
       onUnlock: lockStatus.canAuthenticate
           ? () => _unlock(showErrorOnFailure: true)
           : null,
+      onUnlockWithRecoveryPhrase: _promptRecoveryPhraseUnlock,
       onResetAccount: _resetSavedAccount,
     );
   }
 
-  bool _shouldShowUnlockedContent(AppLockStatus status) {
+  bool _shouldShowUnlockedContent() {
     if (_wallet == null || _isLocked || _isCheckingLock || _isUnlocking) {
       return false;
     }
     if (_unlockError != null) {
       return false;
     }
-    return status.canAuthenticate;
+    return true;
   }
 }
 
@@ -221,6 +328,7 @@ class _LockedAccountScreen extends StatelessWidget {
     required this.isUnlocking,
     required this.errorText,
     required this.onUnlock,
+    required this.onUnlockWithRecoveryPhrase,
     required this.onResetAccount,
   });
 
@@ -229,6 +337,7 @@ class _LockedAccountScreen extends StatelessWidget {
   final bool isUnlocking;
   final String? errorText;
   final Future<void> Function()? onUnlock;
+  final Future<void> Function() onUnlockWithRecoveryPhrase;
   final Future<void> Function() onResetAccount;
 
   @override
@@ -327,6 +436,18 @@ class _LockedAccountScreen extends StatelessWidget {
                               ),
                             if (status.canAuthenticate)
                               const SizedBox(height: SpotSpacing.md),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton(
+                                onPressed: isUnlocking
+                                    ? null
+                                    : onUnlockWithRecoveryPhrase,
+                                child: const Text(
+                                  'Unlock with recovery phrase',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: SpotSpacing.md),
                             SizedBox(
                               width: double.infinity,
                               child: OutlinedButton(

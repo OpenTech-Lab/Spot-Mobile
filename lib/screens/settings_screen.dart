@@ -187,8 +187,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         title: const Text('Log out?', style: SpotType.subheading),
         content: const Text(
-          'This will sign you out on this device and erase local app data. '
-          'Your Supabase account and remote posts will remain intact.',
+          'Before logging out, make sure you have saved your 12-word recovery '
+          'phrase. You will need it to restore this same identity later. '
+          'Logging out will sign you out on this device and erase local app '
+          'data. Your Supabase account and remote posts will remain intact.',
           style: SpotType.bodySecondary,
         ),
         actions: [

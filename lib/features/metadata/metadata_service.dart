@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:mobile/core/single_flight.dart';
 import 'package:mobile/core/profile_description.dart';
 import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/features/metadata/metadata_post_mapper.dart';
@@ -40,6 +41,8 @@ class MetadataService {
   MetadataService._();
 
   static final MetadataService instance = MetadataService._();
+  final SingleFlight<User?> _signInFlight = SingleFlight<User?>();
+  final SingleFlight<void> _profileSyncFlight = SingleFlight<void>();
 
   SupabaseClient get client => Supabase.instance.client;
 
@@ -47,64 +50,72 @@ class MetadataService {
     final current = client.auth.currentUser;
     if (current != null) return current;
 
-    try {
-      final response = await client.auth.signInAnonymously();
-      return response.user;
-    } on AuthException catch (error) {
-      debugPrint(
-        '[MetadataService] Anonymous sign-in failed: ${error.message}',
-      );
-      throw StateError(
-        'Supabase anonymous sign-in failed. Enable Anonymous Auth and verify '
-        'SUPABASE_URL/SUPABASE_ANON_KEY. ${error.message}',
-      );
-    }
+    return _signInFlight.run(() async {
+      final existing = client.auth.currentUser;
+      if (existing != null) return existing;
+
+      try {
+        final response = await client.auth.signInAnonymously();
+        return response.user;
+      } on AuthException catch (error) {
+        debugPrint(
+          '[MetadataService] Anonymous sign-in failed: ${error.message}',
+        );
+        throw StateError(
+          'Supabase anonymous sign-in failed. Enable Anonymous Auth and verify '
+          'SUPABASE_URL/SUPABASE_ANON_KEY. ${error.message}',
+        );
+      }
+    });
   }
 
   Future<void> syncLegacyProfile(WalletModel wallet) async {
-    final user = await ensureSignedIn();
-    if (user == null) {
-      throw StateError('Unable to create a Supabase auth session');
-    }
-    final existingProfile = await _fetchProfileById(user.id);
-    final displayName = existingProfile?.displayName?.trim().isNotEmpty == true
-        ? existingProfile!.displayName!.trim()
-        : _defaultDisplayNameForWallet(wallet);
-    final avatarSeed = existingProfile?.avatarSeed?.trim().isNotEmpty == true
-        ? existingProfile!.avatarSeed!.trim()
-        : wallet.publicKeyHex.substring(0, 12);
+    return _profileSyncFlight.run(() async {
+      final user = await ensureSignedIn();
+      if (user == null) {
+        throw StateError('Unable to create a Supabase auth session');
+      }
+      final existingProfile = await _fetchProfileById(user.id);
+      final displayName =
+          existingProfile?.displayName?.trim().isNotEmpty == true
+          ? existingProfile!.displayName!.trim()
+          : _defaultDisplayNameForWallet(wallet);
+      final avatarSeed = existingProfile?.avatarSeed?.trim().isNotEmpty == true
+          ? existingProfile!.avatarSeed!.trim()
+          : wallet.publicKeyHex.substring(0, 12);
 
-    debugPrint('[MetadataService] Syncing profile for ${user.id}');
-    try {
-      await client.from('profiles').upsert({
-        'id': user.id,
-        'display_name': displayName,
-        'description': existingProfile?.description,
-        'legacy_pubkey': wallet.publicKeyHex,
-        'legacy_npub': wallet.npub,
-        'device_id': wallet.deviceId,
-        'avatar_seed': avatarSeed,
-        'avatar_content_hash': existingProfile?.avatarContentHash,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }, onConflict: 'id');
-      debugPrint('[MetadataService] Profile sync complete for ${user.id}');
-    } on PostgrestException catch (error, stackTrace) {
-      debugPrint(
-        '[MetadataService] Profile sync failed for ${user.id}: '
-        'message=${error.message} code=${error.code} '
-        'details=${error.details} hint=${error.hint}',
-      );
-      debugPrintStack(
-        label: '[MetadataService] Profile sync stack for ${user.id}',
-        stackTrace: stackTrace,
-      );
-      throw StateError(
-        'Supabase profile sync failed. Check profiles table/RLS setup. '
-        '${error.message}'
-        '${error.details != null ? ' details=${error.details}' : ''}'
-        '${error.hint != null ? ' hint=${error.hint}' : ''}',
-      );
-    }
+      debugPrint('[MetadataService] Syncing profile for ${user.id}');
+      try {
+        await client.from('profiles').upsert({
+          'id': user.id,
+          'display_name': displayName,
+          'description': existingProfile?.description,
+          'legacy_pubkey': wallet.publicKeyHex,
+          'legacy_npub': wallet.npub,
+          'device_id': wallet.deviceId,
+          'avatar_seed': avatarSeed,
+          'avatar_content_hash': existingProfile?.avatarContentHash,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        }, onConflict: 'id');
+        debugPrint('[MetadataService] Profile sync complete for ${user.id}');
+      } on PostgrestException catch (error, stackTrace) {
+        debugPrint(
+          '[MetadataService] Profile sync failed for ${user.id}: '
+          'message=${error.message} code=${error.code} '
+          'details=${error.details} hint=${error.hint}',
+        );
+        debugPrintStack(
+          label: '[MetadataService] Profile sync stack for ${user.id}',
+          stackTrace: stackTrace,
+        );
+        throw StateError(
+          'Supabase profile sync failed. Check profiles table/RLS setup. '
+          '${error.message}'
+          '${error.details != null ? ' details=${error.details}' : ''}'
+          '${error.hint != null ? ' hint=${error.hint}' : ''}',
+        );
+      }
+    });
   }
 
   Future<ProfileModel> fetchCurrentProfile(WalletModel wallet) async {

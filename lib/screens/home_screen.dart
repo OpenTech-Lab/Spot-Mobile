@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/event/event_screen.dart';
-import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -96,7 +95,6 @@ class HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _eventRepo = EventRepository();
-    unawaited(MetadataService.instance.syncLegacyProfile(widget.wallet));
     P2PService.instance.configure(wallet: widget.wallet);
     unawaited(P2PService.instance.refreshTransportAvailability());
   }

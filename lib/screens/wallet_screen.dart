@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -23,6 +24,7 @@ class WalletScreen extends StatefulWidget {
 
 class _WalletScreenState extends State<WalletScreen> {
   bool _isDeletingAccount = false;
+  bool _isRecoveryPhraseVisible = false;
 
   Future<void> _confirmDeleteAccount() async {
     if (_isDeletingAccount) return;
@@ -90,6 +92,16 @@ class _WalletScreenState extends State<WalletScreen> {
     }
   }
 
+  Future<void> _copyRecoveryPhrase() async {
+    await Clipboard.setData(
+      ClipboardData(text: widget.wallet.mnemonic.join(' ')),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Recovery phrase copied')));
+  }
+
   @override
   Widget build(BuildContext context) {
     final wallet = widget.wallet;
@@ -136,6 +148,67 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
             const SizedBox(height: SpotSpacing.lg),
             _Section(
+              title: 'Recovery phrase',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'These 12 words are the only way to restore this identity '
+                    'after logging out or moving to a new device.',
+                    style: SpotType.bodySecondary,
+                  ),
+                  const SizedBox(height: SpotSpacing.md),
+                  if (!_isRecoveryPhraseVisible)
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () {
+                          setState(() => _isRecoveryPhraseVisible = true);
+                        },
+                        child: const Text('Show recovery phrase'),
+                      ),
+                    )
+                  else ...[
+                    Wrap(
+                      spacing: SpotSpacing.xs,
+                      runSpacing: SpotSpacing.xs,
+                      children: wallet.mnemonic
+                          .asMap()
+                          .entries
+                          .map((entry) {
+                            return _RecoveryPhraseChip(
+                              index: entry.key + 1,
+                              word: entry.value,
+                            );
+                          })
+                          .toList(growable: false),
+                    ),
+                    const SizedBox(height: SpotSpacing.md),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _copyRecoveryPhrase,
+                            child: const Text('Copy phrase'),
+                          ),
+                        ),
+                        const SizedBox(width: SpotSpacing.sm),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              setState(() => _isRecoveryPhraseVisible = false);
+                            },
+                            child: const Text('Hide'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: SpotSpacing.lg),
+            _Section(
               title: 'Danger zone',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -173,6 +246,31 @@ class _WalletScreenState extends State<WalletScreen> {
             const SizedBox(height: SpotSpacing.xxxl),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RecoveryPhraseChip extends StatelessWidget {
+  const _RecoveryPhraseChip({required this.index, required this.word});
+
+  final int index;
+  final String word;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpotSpacing.sm,
+        vertical: 5,
+      ),
+      decoration: BoxDecoration(
+        color: SpotColors.surfaceHigh,
+        borderRadius: BorderRadius.circular(SpotRadius.xs),
+      ),
+      child: Text(
+        '$index. $word',
+        style: SpotType.mono.copyWith(color: SpotColors.textPrimary),
       ),
     );
   }

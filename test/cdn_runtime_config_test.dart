@@ -41,4 +41,34 @@ void main() {
       expect(resolved, isEmpty);
     },
   );
+
+  test('timestamp drift error body is detected from JSON response', () {
+    expect(
+      CdnMediaService.isTimestampDriftResponseBody(
+        '{"error":"Timestamp too far from server time"}',
+      ),
+      isTrue,
+    );
+  });
+
+  test('timestamp drift detector ignores unrelated errors', () {
+    expect(
+      CdnMediaService.isTimestampDriftResponseBody(
+        '{"error":"Invalid signature"}',
+      ),
+      isFalse,
+    );
+  });
+
+  test('HTTP date header parses to epoch seconds', () {
+    final seconds = CdnMediaService.timestampSecondsFromDateHeader(
+      'Mon, 30 Mar 2026 12:34:56 GMT',
+    );
+
+    expect(seconds, isNotNull);
+    expect(
+      DateTime.fromMillisecondsSinceEpoch(seconds! * 1000, isUtc: true),
+      DateTime.utc(2026, 3, 30, 12, 34, 56),
+    );
+  });
 }

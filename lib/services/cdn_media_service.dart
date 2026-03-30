@@ -254,43 +254,37 @@ class CdnMediaService {
           contentType ?? (isImage ? 'image/jpeg' : 'application/octet-stream');
 
       debugPrint('[CDN] Requesting presigned URL for $contentHash...');
-
-      // Request presigned URL
-      final timestamp = (DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000)
-          .toString();
-      final message = 'PUT:$contentHash:$timestamp';
-      final auth = await signPayload(message);
-
-      final presignUri = Uri.parse(_presignEndpoint);
-      final presignRequest = await _httpClient
-          .postUrl(presignUri)
-          .timeout(_presignTimeout);
-      presignRequest.headers.contentType = ContentType.json;
-      presignRequest.write(
-        jsonEncode({
-          'pubkey': auth.pubkey,
-          'contentHash': contentHash,
-          'timestamp': timestamp,
-          'signature': auth.signature,
-          'contentType': resolvedContentType,
-        }),
+      var presignResult = await _requestPresignUrl(
+        contentHash: contentHash,
+        resolvedContentType: resolvedContentType,
+        signPayload: signPayload,
       );
-      final presignResponse = await presignRequest.close().timeout(
-        _presignTimeout,
-      );
+      if (!presignResult.isSuccess &&
+          isTimestampDriftResponseBody(presignResult.body) &&
+          presignResult.serverTimestampSeconds != null) {
+        debugPrint(
+          '[CDN] Retrying presign for $contentHash using server timestamp '
+          '${presignResult.serverTimestampSeconds}',
+        );
+        presignResult = await _requestPresignUrl(
+          contentHash: contentHash,
+          resolvedContentType: resolvedContentType,
+          signPayload: signPayload,
+          timestampSecondsOverride: presignResult.serverTimestampSeconds,
+        );
+      }
 
-      if (presignResponse.statusCode != 200) {
-        final body = await _collectString(presignResponse);
-        final message =
-            '[CDN] Presign request failed (${presignResponse.statusCode}): $body';
+      if (!presignResult.isSuccess) {
+        final message = _presignFailureMessage(
+          statusCode: presignResult.statusCode,
+          body: presignResult.body,
+        );
         debugPrint(message);
         if (throwOnFailure) throw StateError(message);
         return;
       }
 
-      final presignBody = await _collectString(presignResponse);
-      final presignJson = jsonDecode(presignBody) as Map<String, dynamic>;
-      final uploadUrl = presignJson['uploadUrl'] as String?;
+      final uploadUrl = presignResult.uploadUrl;
       if (uploadUrl == null) {
         const message = '[CDN] Presign response missing uploadUrl';
         debugPrint(message);
@@ -328,6 +322,59 @@ class CdnMediaService {
       debugPrint('[CDN] Upload failed for $contentHash: $e');
       if (throwOnFailure) rethrow;
     }
+  }
+
+  Future<_PresignResult> _requestPresignUrl({
+    required String contentHash,
+    required String resolvedContentType,
+    required Future<PresignAuth> Function(String message) signPayload,
+    int? timestampSecondsOverride,
+  }) async {
+    final timestampSeconds =
+        timestampSecondsOverride ??
+        (DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000);
+    final timestamp = timestampSeconds.toString();
+    final message = 'PUT:$contentHash:$timestamp';
+    final auth = await signPayload(message);
+
+    final presignUri = Uri.parse(_presignEndpoint);
+    final presignRequest = await _httpClient
+        .postUrl(presignUri)
+        .timeout(_presignTimeout);
+    presignRequest.headers.contentType = ContentType.json;
+    presignRequest.write(
+      jsonEncode({
+        'pubkey': auth.pubkey,
+        'contentHash': contentHash,
+        'timestamp': timestamp,
+        'signature': auth.signature,
+        'contentType': resolvedContentType,
+      }),
+    );
+    final presignResponse = await presignRequest.close().timeout(
+      _presignTimeout,
+    );
+    final body = await _collectString(presignResponse);
+
+    if (presignResponse.statusCode != 200) {
+      return _PresignResult(
+        statusCode: presignResponse.statusCode,
+        body: body,
+        serverTimestampSeconds: timestampSecondsFromDateHeader(
+          presignResponse.headers.value(HttpHeaders.dateHeader),
+        ),
+      );
+    }
+
+    final presignJson = jsonDecode(body) as Map<String, dynamic>;
+    return _PresignResult(
+      statusCode: presignResponse.statusCode,
+      body: body,
+      uploadUrl: presignJson['uploadUrl'] as String?,
+      serverTimestampSeconds: timestampSecondsFromDateHeader(
+        presignResponse.headers.value(HttpHeaders.dateHeader),
+      ),
+    );
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -371,6 +418,40 @@ class CdnMediaService {
     }
     return builder.toString();
   }
+
+  @visibleForTesting
+  static bool isTimestampDriftResponseBody(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, dynamic>) return false;
+      final error = decoded['error']?.toString().trim().toLowerCase();
+      return error == 'timestamp too far from server time';
+    } catch (_) {
+      return body.toLowerCase().contains('timestamp too far from server time');
+    }
+  }
+
+  @visibleForTesting
+  static int? timestampSecondsFromDateHeader(String? dateHeader) {
+    final value = dateHeader?.trim();
+    if (value == null || value.isEmpty) return null;
+    try {
+      return HttpDate.parse(value).toUtc().millisecondsSinceEpoch ~/ 1000;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String _presignFailureMessage({
+    required int statusCode,
+    required String body,
+  }) {
+    if (isTimestampDriftResponseBody(body)) {
+      return '[CDN] Presign request failed ($statusCode): '
+          'Device time appears out of sync. Turn on automatic date & time and try again.';
+    }
+    return '[CDN] Presign request failed ($statusCode): $body';
+  }
 }
 
 /// Authentication payload returned by the wallet signing callback.
@@ -379,4 +460,20 @@ class PresignAuth {
 
   final String pubkey;
   final String signature;
+}
+
+class _PresignResult {
+  const _PresignResult({
+    required this.statusCode,
+    required this.body,
+    this.uploadUrl,
+    this.serverTimestampSeconds,
+  });
+
+  final int statusCode;
+  final String body;
+  final String? uploadUrl;
+  final int? serverTimestampSeconds;
+
+  bool get isSuccess => statusCode == 200 && uploadUrl != null;
 }

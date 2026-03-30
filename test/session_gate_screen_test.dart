@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:mobile/core/wallet.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/session_gate_screen.dart';
 import 'package:mobile/services/app_lock_service.dart';
@@ -88,6 +89,44 @@ void main() {
     expect(find.text('Onboarding flow'), findsOneWidget);
   });
 
+  testWidgets('recovery phrase can unlock the saved account', (tester) async {
+    final service = _FakeAppLockService(
+      status: const AppLockStatus(
+        canAuthenticate: false,
+        message: 'Reset required.',
+      ),
+    );
+    final wallet = _wallet();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SessionGateScreen(
+          initialWallet: wallet,
+          appLockService: service,
+          unlockedBuilder: (_) => const Text('Unlocked home'),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unlock with recovery phrase'), findsOneWidget);
+
+    await tester.tap(find.text('Unlock with recovery phrase'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unlock with recovery phrase'), findsWidgets);
+    await tester.enterText(
+      find.byKey(const Key('recovery_phrase_unlock_field')),
+      wallet.mnemonic.join(' '),
+    );
+    await tester.tap(find.text('Unlock').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unlocked home'), findsOneWidget);
+    expect(find.text('Saved account locked'), findsNothing);
+  });
+
   testWidgets('resume after timeout re-locks the saved account', (
     tester,
   ) async {
@@ -136,13 +175,30 @@ class _FakeAppLockService extends AppLockService {
 }
 
 WalletModel _wallet() => WalletModel(
-  privateKeyHex:
-      '0000000000000000000000000000000000000000000000000000000000000001',
-  publicKeyHex:
-      '1111111111111111111111111111111111111111111111111111111111111111',
+  privateKeyHex: _walletKeypair.$1,
+  publicKeyHex: _walletKeypair.$2,
   npub: 'npub1test',
-  mnemonic: const ['test'],
+  mnemonic: _mnemonic,
   deviceId: 'device-1',
   isRevoked: false,
   createdAt: DateTime.utc(2026, 3, 29),
+);
+
+const List<String> _mnemonic = [
+  'abandon',
+  'abandon',
+  'abandon',
+  'abandon',
+  'abandon',
+  'abandon',
+  'abandon',
+  'abandon',
+  'abandon',
+  'abandon',
+  'abandon',
+  'about',
+];
+
+final (String, String) _walletKeypair = WalletService.keypairFromMnemonic(
+  _mnemonic,
 );

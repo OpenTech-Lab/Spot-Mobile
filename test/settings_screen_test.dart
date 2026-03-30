@@ -51,8 +51,10 @@ void main() {
     expect(find.text('Log out?'), findsOneWidget);
     expect(
       find.text(
-        'This will sign you out on this device and erase local app data. '
-        'Your Supabase account and remote posts will remain intact.',
+        'Before logging out, make sure you have saved your 12-word recovery '
+        'phrase. You will need it to restore this same identity later. '
+        'Logging out will sign you out on this device and erase local app '
+        'data. Your Supabase account and remote posts will remain intact.',
       ),
       findsOneWidget,
     );
