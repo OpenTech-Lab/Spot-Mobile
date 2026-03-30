@@ -5,9 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:mobile/core/app_config.dart';
 import 'package:mobile/models/wallet_model.dart';
-import 'package:mobile/screens/altcha_gate_screen.dart';
-import 'package:mobile/screens/onboarding_screen.dart';
-import 'package:mobile/screens/splash_screen.dart';
+import 'package:mobile/screens/session_gate_screen.dart';
+import 'package:mobile/services/app_lock_service.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/services/storage_service.dart';
@@ -51,9 +50,10 @@ Future<void> main() async {
 }
 
 class SpotApp extends StatelessWidget {
-  const SpotApp({super.key, this.initialWallet});
+  const SpotApp({super.key, this.initialWallet, this.appLockService});
 
   final WalletModel? initialWallet;
+  final AppLockService? appLockService;
 
   @override
   Widget build(BuildContext context) {
@@ -63,11 +63,10 @@ class SpotApp extends StatelessWidget {
       theme: SpotTheme.build(),
       builder: (context, child) =>
           DismissKeyboardOnTap(child: child ?? const SizedBox.shrink()),
-      // Returning users: silent splash + ALTCHA, then HomeScreen.
-      // New users: explicit ALTCHA gate, then OnboardingScreen.
-      home: initialWallet != null
-          ? SplashScreen(wallet: initialWallet!)
-          : AltchaGateScreen(next: const OnboardingScreen()),
+      home: SessionGateScreen(
+        initialWallet: initialWallet,
+        appLockService: appLockService,
+      ),
     );
   }
 }
