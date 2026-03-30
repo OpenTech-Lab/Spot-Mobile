@@ -241,6 +241,9 @@ class _CameraScreenState extends State<CameraScreen>
     } on MissingCategoryTagError catch (e) {
       if (!mounted) return;
       _showError(e.message);
+    } on PublishDeniedError catch (e) {
+      if (!mounted) return;
+      _showError(e.message);
     } catch (e) {
       if (post != null) {
         await PostPublishService.instance.saveFailedPublish(post, e);

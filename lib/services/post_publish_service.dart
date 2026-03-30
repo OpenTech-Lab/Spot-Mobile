@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/features/event/event_repository.dart';
@@ -33,6 +34,53 @@ class MissingCategoryTagError implements Exception {
 
   @override
   String toString() => message;
+}
+
+class PublishDeniedError implements Exception {
+  const PublishDeniedError({required this.code, required this.message});
+
+  final String code;
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+const Map<String, String> _publishDeniedFallbackMessages = {
+  'POSTING_BLOCKED':
+      'This account is blocked from publishing due to spam or bot-like activity.',
+  'THREAD_DAILY_LIMIT_REACHED': 'Daily thread limit reached.',
+  'REPLY_DAILY_LIMIT_REACHED': 'Daily reply limit reached.',
+  'REPLY_TARGET_NOT_FOUND': 'The post you are replying to is unavailable.',
+};
+
+Object normalizePublishError(Object error) {
+  if (error is MissingCategoryTagError || error is PublishDeniedError) {
+    return error;
+  }
+  if (error is! PostgrestException) return error;
+
+  final code = error.details?.toString().trim();
+  if (code == null || code.isEmpty) return error;
+
+  if (code == 'MISSING_CATEGORY_TAG') {
+    return MissingCategoryTagError(_publishErrorMessage(error, code));
+  }
+
+  if (!_publishDeniedFallbackMessages.containsKey(code)) {
+    return error;
+  }
+
+  return PublishDeniedError(
+    code: code,
+    message: _publishErrorMessage(error, code),
+  );
+}
+
+String _publishErrorMessage(PostgrestException error, String code) {
+  final hint = error.hint?.trim();
+  if (hint != null && hint.isNotEmpty) return hint;
+  return _publishDeniedFallbackMessages[code] ?? error.message;
 }
 
 /// Shared publish/persist helper for new posts and retrying failed local posts.
@@ -98,12 +146,13 @@ class PostPublishService {
       debugPrint('[PostPublish] Publish complete for ${published.id}');
       return published;
     } catch (error, stackTrace) {
-      debugPrint('[PostPublish] Failed for ${draft.id}: $error');
+      final normalizedError = normalizePublishError(error);
+      debugPrint('[PostPublish] Failed for ${draft.id}: $normalizedError');
       debugPrintStack(
         label: '[PostPublish] Stack for ${draft.id}',
         stackTrace: stackTrace,
       );
-      rethrow;
+      Error.throwWithStackTrace(normalizedError, stackTrace);
     }
   }
 

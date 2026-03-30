@@ -40,6 +40,40 @@ void main() {
     expect(row['reply_to_id'], 'parent-id');
   });
 
+  test('toPublishRpcParams preserves RPC publish fields', () {
+    final post = MediaPost(
+      id: 'local-id',
+      pubkey: 'pubkey',
+      contentHashes: const ['hash-1', 'hash-2'],
+      mediaPaths: const ['/tmp/photo.jpg'],
+      latitude: 35.68,
+      longitude: 139.76,
+      capturedAt: DateTime.utc(2026, 3, 26, 10, 30),
+      eventTags: const ['tokyo', 'summit'],
+      isDangerMode: true,
+      isVirtual: false,
+      isAiGenerated: true,
+      isTextOnly: false,
+      sourceType: PostSourceType.secondhand,
+      caption: 'hello',
+      replyToId: '123e4567-e89b-12d3-a456-426614174000',
+      tags: const ['source:secondhand'],
+      nostrEventId: 'local-id',
+      spotName: 'Tokyo Station',
+      previewBase64: 'YWJj',
+      previewMimeType: 'image/jpeg',
+    );
+
+    final params = MetadataPostMapper.toPublishRpcParams(post);
+
+    expect(params['p_event_tags'], ['tokyo', 'summit']);
+    expect(params['p_content_hashes'], ['hash-1', 'hash-2']);
+    expect(params['p_media_type'], 'image');
+    expect(params['p_source_type'], 'secondhand');
+    expect(params['p_reply_to_id'], '123e4567-e89b-12d3-a456-426614174000');
+    expect(params['p_spot_name'], 'Tokyo Station');
+  });
+
   test('fromRow maps Supabase post rows back to MediaPost', () {
     final mapped = MetadataPostMapper.fromRow({
       'id': 'post-uuid',

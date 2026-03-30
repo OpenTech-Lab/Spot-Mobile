@@ -387,6 +387,19 @@ class ProfileScreenState extends State<ProfileScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(e.message)));
+    } on PublishDeniedError catch (e) {
+      final failed = await PostPublishService.instance.saveFailedPublish(
+        post,
+        e,
+      );
+      if (!mounted) return;
+      setState(() {
+        _retryingPostIds.remove(post.id);
+        _posts = replacePostsById(_posts, [failed]);
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       final failed = await PostPublishService.instance.saveFailedPublish(
         post,

@@ -24,6 +24,26 @@ abstract final class MetadataPostMapper {
     'created_at': post.capturedAt.toUtc().toIso8601String(),
   };
 
+  static Map<String, dynamic> toPublishRpcParams(MediaPost post) => {
+    'p_event_tags': post.eventTags,
+    'p_content_hashes': post.contentHashes,
+    'p_media_type': _primaryMediaType(post),
+    'p_caption': post.caption,
+    'p_latitude': post.latitude,
+    'p_longitude': post.longitude,
+    'p_preview_base64': post.previewBase64,
+    'p_preview_mime_type': post.previewMimeType,
+    'p_source_type': post.sourceType.name,
+    'p_is_danger_mode': post.isDangerMode,
+    'p_is_virtual': post.isVirtual,
+    'p_is_ai_generated': post.isAiGenerated,
+    'p_is_text_only': post.isTextOnly,
+    'p_reply_to_id': _normalizedOptionalText(post.replyToId),
+    'p_spot_name': _normalizedOptionalText(post.spotName),
+    'p_tags': post.tags,
+    'p_created_at': post.capturedAt.toUtc().toIso8601String(),
+  };
+
   static MediaPost fromRow(
     Map<String, dynamic> row, {
     required String authorKey,
@@ -82,5 +102,11 @@ abstract final class MetadataPostMapper {
       return 'video';
     }
     return 'image';
+  }
+
+  static String? _normalizedOptionalText(String? value) {
+    final normalized = value?.trim();
+    if (normalized == null || normalized.isEmpty) return null;
+    return normalized;
   }
 }

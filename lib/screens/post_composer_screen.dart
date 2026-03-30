@@ -398,6 +398,8 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
       Navigator.of(context).pop(); // overlay
       if (e is MissingCategoryTagError) {
         _showSnack(e.message);
+      } else if (e is PublishDeniedError) {
+        _showSnack(e.message);
       } else if (post != null) {
         await PostPublishService.instance.saveFailedPublish(post, e);
         if (!mounted) return;

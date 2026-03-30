@@ -328,31 +328,19 @@ class MetadataService {
     );
     await syncLegacyProfile(wallet);
 
-    for (final tag in normalizedDraft.eventTags.toSet()) {
-      await client.rpc(
-        'ensure_event_exists',
-        params: {
-          'p_hashtag': tag,
-          'p_title': '#$tag',
-          'p_latitude': normalizedDraft.latitude,
-          'p_longitude': normalizedDraft.longitude,
-        },
-      );
-    }
-
     final user = client.auth.currentUser;
     if (user == null) {
       throw StateError('Missing Supabase user after profile sync');
     }
 
-    final inserted = await client
-        .from('posts')
-        .insert({
-          ...MetadataPostMapper.toInsertRow(normalizedDraft),
-          'user_id': user.id,
-        })
-        .select()
-        .single();
+    final response = await client.rpc(
+      'publish_post_with_limits',
+      params: MetadataPostMapper.toPublishRpcParams(normalizedDraft),
+    );
+    final inserted = _singleRowFromRpcResponse(
+      response,
+      functionName: 'publish_post_with_limits',
+    );
 
     final mapped = (await mapPostRows([inserted])).single;
     return mapped.copyWith(
@@ -362,6 +350,22 @@ class MetadataService {
       visibleLocationLabel: normalizedDraft.visibleLocationLabel,
       deliveryState: PostDeliveryState.sent,
       lastPublishError: null,
+    );
+  }
+
+  Map<String, dynamic> _singleRowFromRpcResponse(
+    dynamic response, {
+    required String functionName,
+  }) {
+    if (response is Map) {
+      return Map<String, dynamic>.from(response);
+    }
+    if (response is List && response.isNotEmpty && response.first is Map) {
+      return Map<String, dynamic>.from(response.first as Map);
+    }
+    throw StateError(
+      '$functionName returned an unexpected response shape: '
+      '${response.runtimeType}',
     );
   }
 
