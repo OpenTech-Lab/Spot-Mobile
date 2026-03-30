@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Spot needs camera access to record geo-tagged photos and videos for citizen reporting.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Spot uses Face ID or your device passcode to unlock a saved account on this device.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Spot needs microphone access to record audio with your videos.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
