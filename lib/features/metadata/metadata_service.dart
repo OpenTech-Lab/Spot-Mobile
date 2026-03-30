@@ -7,6 +7,7 @@ import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/features/metadata/metadata_post_mapper.dart';
 import 'package:mobile/models/follow_stats.dart';
 import 'package:mobile/models/media_post.dart';
+import 'package:mobile/models/posting_quota_status.dart';
 import 'package:mobile/models/profile_model.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/models/witness_model.dart';
@@ -362,6 +363,18 @@ class MetadataService {
       deliveryState: PostDeliveryState.sent,
       lastPublishError: null,
     );
+  }
+
+  Future<PostingQuotaStatus> fetchCurrentPostingQuotaStatus(
+    WalletModel wallet,
+  ) async {
+    await syncLegacyProfile(wallet);
+    final response = await client.rpc('get_posting_limit_status');
+    final row = _singleRowFromRpcResponse(
+      response,
+      functionName: 'get_posting_limit_status',
+    );
+    return PostingQuotaStatus.fromRpcRow(row);
   }
 
   Map<String, dynamic> _singleRowFromRpcResponse(

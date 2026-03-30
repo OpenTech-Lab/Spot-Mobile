@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:mobile/features/metadata/metadata_service.dart';
+import 'package:mobile/models/posting_quota_status.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/altcha_gate_screen.dart';
 import 'package:mobile/screens/onboarding_screen.dart';
@@ -14,9 +15,10 @@ import 'package:mobile/theme/spot_theme.dart';
 
 /// Account screen for device and account controls.
 class WalletScreen extends StatefulWidget {
-  const WalletScreen({super.key, required this.wallet});
+  const WalletScreen({super.key, required this.wallet, this.loadPostingQuota});
 
   final WalletModel wallet;
+  final Future<PostingQuotaStatus> Function()? loadPostingQuota;
 
   @override
   State<WalletScreen> createState() => _WalletScreenState();
@@ -25,6 +27,27 @@ class WalletScreen extends StatefulWidget {
 class _WalletScreenState extends State<WalletScreen> {
   bool _isDeletingAccount = false;
   bool _isRecoveryPhraseVisible = false;
+  late Future<PostingQuotaStatus> _postingQuotaFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _postingQuotaFuture = _loadPostingQuota();
+  }
+
+  Future<PostingQuotaStatus> _loadPostingQuota() {
+    final loader = widget.loadPostingQuota;
+    if (loader != null) {
+      return loader();
+    }
+    return MetadataService.instance.fetchCurrentPostingQuotaStatus(
+      widget.wallet,
+    );
+  }
+
+  void _retryPostingQuota() {
+    setState(() => _postingQuotaFuture = _loadPostingQuota());
+  }
 
   Future<void> _confirmDeleteAccount() async {
     if (_isDeletingAccount) return;
@@ -148,6 +171,30 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
             const SizedBox(height: SpotSpacing.lg),
             _Section(
+              title: 'Posting limits',
+              child: FutureBuilder<PostingQuotaStatus>(
+                future: _postingQuotaFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const _InlineLoadingState(
+                      label: 'Checking your current daily limits…',
+                    );
+                  }
+
+                  if (snapshot.hasError) {
+                    return _InlineErrorState(
+                      message: 'Could not load your posting limits right now.',
+                      onRetry: _retryPostingQuota,
+                    );
+                  }
+
+                  final quota = snapshot.data!;
+                  return _PostingLimitSummary(quota: quota);
+                },
+              ),
+            ),
+            const SizedBox(height: SpotSpacing.lg),
+            _Section(
               title: 'Recovery phrase',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -251,6 +298,24 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 }
 
+String formatPostingTierName(String tierName) {
+  final words = tierName
+      .trim()
+      .split(RegExp(r'[_\s]+'))
+      .where((word) => word.isNotEmpty)
+      .map(
+        (word) => '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}',
+      );
+  return words.isEmpty ? 'Unknown' : words.join(' ');
+}
+
+String formatPostingResetTime(DateTime resetsAt) {
+  final local = resetsAt.toLocal();
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$hour:$minute local time';
+}
+
 class _RecoveryPhraseChip extends StatelessWidget {
   const _RecoveryPhraseChip({required this.index, required this.word});
 
@@ -314,6 +379,115 @@ class _Avatar extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PostingLimitSummary extends StatelessWidget {
+  const _PostingLimitSummary({required this.quota});
+
+  final PostingQuotaStatus quota;
+
+  @override
+  Widget build(BuildContext context) {
+    final blockReason = quota.postingBlockReason?.trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (quota.isPostingBlocked) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(SpotSpacing.md),
+            decoration: SpotDecoration.danger(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Posting is currently blocked for this account.',
+                  style: SpotType.body.copyWith(color: SpotColors.danger),
+                ),
+                if (blockReason != null && blockReason.isNotEmpty) ...[
+                  const SizedBox(height: SpotSpacing.xs),
+                  Text(blockReason, style: SpotType.bodySecondary),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: SpotSpacing.md),
+        ],
+        Text(
+          'You can check your remaining thread and reply publishes here '
+          'before opening the composer.',
+          style: SpotType.bodySecondary,
+        ),
+        const SizedBox(height: SpotSpacing.lg),
+        _MetaRow(
+          label: 'Tier',
+          value: formatPostingTierName(quota.currentTierName),
+        ),
+        _MetaRow(
+          label: 'Threads',
+          value:
+              '${quota.threadRemainingToday} left of ${quota.threadLimitPerDay}',
+        ),
+        _MetaRow(
+          label: 'Replies',
+          value:
+              '${quota.replyRemainingToday} left of ${quota.replyLimitPerDay}',
+        ),
+        _MetaRow(
+          label: 'Used',
+          value:
+              '${quota.threadCountToday} threads, ${quota.replyCountToday} replies',
+        ),
+        const SizedBox(height: SpotSpacing.sm),
+        Text(
+          'Resets at ${formatPostingResetTime(quota.resetsAt)} '
+          '(next UTC midnight).',
+          style: SpotType.caption,
+        ),
+      ],
+    );
+  }
+}
+
+class _InlineLoadingState extends StatelessWidget {
+  const _InlineLoadingState({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(strokeWidth: 1.5),
+        ),
+        const SizedBox(width: SpotSpacing.sm),
+        Expanded(child: Text(label, style: SpotType.bodySecondary)),
+      ],
+    );
+  }
+}
+
+class _InlineErrorState extends StatelessWidget {
+  const _InlineErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(message, style: SpotType.body.copyWith(color: SpotColors.danger)),
+        const SizedBox(height: SpotSpacing.md),
+        OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+      ],
     );
   }
 }
