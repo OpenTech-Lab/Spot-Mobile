@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/asset_transport_policy.dart';
+import 'package:mobile/models/profile_model.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/altcha_gate_screen.dart';
 import 'package:mobile/screens/asset_transport_settings_screen.dart';
@@ -27,10 +31,26 @@ String favoriteTopicsSummary(Iterable<String> topics) {
   return '#${unique[0]}, #${unique[1]} +${unique.length - 2}';
 }
 
+typedef LoadSettingsProfile = Future<ProfileModel> Function(WalletModel wallet);
+typedef SaveProfileVisibility =
+    Future<ProfileModel> Function(
+      WalletModel wallet, {
+      bool? threadsPublic,
+      bool? repliesPublic,
+      bool? footprintMapPublic,
+    });
+
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.wallet});
+  const SettingsScreen({
+    super.key,
+    required this.wallet,
+    this.loadProfileSettings,
+    this.saveProfileVisibility,
+  });
 
   final WalletModel wallet;
+  final LoadSettingsProfile? loadProfileSettings;
+  final SaveProfileVisibility? saveProfileVisibility;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -38,18 +58,119 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoggingOut = false;
+  bool _isLoadingVisibility = true;
+  bool _isSavingVisibility = false;
+  bool _threadsPublic = true;
+  bool _repliesPublic = true;
+  bool _footprintMapPublic = false;
 
   AssetTransportPolicy get _assetTransportPolicy =>
       UserPrefsService.instance.assetTransportPolicy;
   String get _favoriteTopicsValue =>
       favoriteTopicsSummary(UserPrefsService.instance.interests);
-  bool get _footprintMapPublic => UserPrefsService.instance.footprintMapPublic;
 
-  Future<void> _toggleFootprintMapPublic() async {
-    await UserPrefsService.instance.saveFootprintMapPublic(
-      !_footprintMapPublic,
-    );
-    if (mounted) setState(() {});
+  LoadSettingsProfile get _profileLoader =>
+      widget.loadProfileSettings ??
+      MetadataService.instance.fetchCurrentProfile;
+  SaveProfileVisibility get _visibilitySaver =>
+      widget.saveProfileVisibility ??
+      (wallet, {threadsPublic, repliesPublic, footprintMapPublic}) =>
+          MetadataService.instance.updateCurrentProfileVisibility(
+            wallet: wallet,
+            threadsPublic: threadsPublic,
+            repliesPublic: repliesPublic,
+            footprintMapPublic: footprintMapPublic,
+          );
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadProfileVisibility());
+  }
+
+  void _applyProfileVisibility(ProfileModel profile) {
+    _threadsPublic = profile.areThreadsPublic;
+    _repliesPublic = profile.areRepliesPublic;
+    _footprintMapPublic = profile.isFootprintMapPublic;
+  }
+
+  Future<void> _loadProfileVisibility() async {
+    try {
+      final profile = await _profileLoader(widget.wallet);
+      if (!mounted) return;
+      setState(() {
+        _applyProfileVisibility(profile);
+        _isLoadingVisibility = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isLoadingVisibility = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load privacy settings: $error')),
+      );
+    }
+  }
+
+  Future<void> _saveVisibility({
+    bool? threadsPublic,
+    bool? repliesPublic,
+    bool? footprintMapPublic,
+  }) async {
+    if (_isSavingVisibility) return;
+
+    final previousThreadsPublic = _threadsPublic;
+    final previousRepliesPublic = _repliesPublic;
+    final previousFootprintMapPublic = _footprintMapPublic;
+
+    setState(() {
+      if (threadsPublic != null) {
+        _threadsPublic = threadsPublic;
+      }
+      if (repliesPublic != null) {
+        _repliesPublic = repliesPublic;
+      }
+      if (footprintMapPublic != null) {
+        _footprintMapPublic = footprintMapPublic;
+      }
+      _isSavingVisibility = true;
+    });
+
+    try {
+      final profile = await _visibilitySaver(
+        widget.wallet,
+        threadsPublic: threadsPublic,
+        repliesPublic: repliesPublic,
+        footprintMapPublic: footprintMapPublic,
+      );
+      if (!mounted) return;
+      setState(() {
+        _applyProfileVisibility(profile);
+        _isSavingVisibility = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _threadsPublic = previousThreadsPublic;
+        _repliesPublic = previousRepliesPublic;
+        _footprintMapPublic = previousFootprintMapPublic;
+        _isSavingVisibility = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update privacy settings: $error')),
+      );
+    }
+  }
+
+  Future<void> _setThreadsPublic(bool isPublic) async {
+    await _saveVisibility(threadsPublic: isPublic);
+  }
+
+  Future<void> _setRepliesPublic(bool isPublic) async {
+    await _saveVisibility(repliesPublic: isPublic);
+  }
+
+  Future<void> _setFootprintMapPublic(bool isPublic) async {
+    await _saveVisibility(footprintMapPublic: isPublic);
   }
 
   Future<void> _openAssetTransportSettings() async {
@@ -303,15 +424,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: SpotSpacing.xl),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: SpotSpacing.sm),
-            child: Text('ACTIVITY', style: SpotType.label),
-          ),
+          const SizedBox(height: SpotSpacing.sm),
           _SettingsRow(
-            icon: CupertinoIcons.text_bubble,
-            label: 'Public Activity',
-            value: 'Threads / Replies',
+            icon: CupertinoIcons.list_bullet,
+            label: 'View My Activity',
             onTap: _openPublicActivityMenu,
           ),
           const SizedBox(height: SpotSpacing.xl),
@@ -319,11 +435,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: EdgeInsets.symmetric(vertical: SpotSpacing.sm),
             child: Text('PRIVACY', style: SpotType.label),
           ),
-          _SettingsRow(
+          _SettingsSwitchRow(
             icon: CupertinoIcons.map,
             label: 'Footprint Map',
-            value: _footprintMapPublic ? 'Public' : 'Private',
-            onTap: _toggleFootprintMapPublic,
+            value: _footprintMapPublic,
+            onChanged: _isLoadingVisibility || _isSavingVisibility
+                ? null
+                : _setFootprintMapPublic,
+          ),
+          const SizedBox(height: SpotSpacing.sm),
+          _SettingsSwitchRow(
+            icon: CupertinoIcons.text_bubble,
+            label: 'Public Threads',
+            value: _threadsPublic,
+            onChanged: _isLoadingVisibility || _isSavingVisibility
+                ? null
+                : _setThreadsPublic,
+          ),
+          const SizedBox(height: SpotSpacing.sm),
+          _SettingsSwitchRow(
+            icon: CupertinoIcons.reply,
+            label: 'Public Replies',
+            value: _repliesPublic,
+            onChanged: _isLoadingVisibility || _isSavingVisibility
+                ? null
+                : _setRepliesPublic,
           ),
           const SizedBox(height: SpotSpacing.xl),
           const Padding(
@@ -354,6 +490,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: SpotSpacing.xxl),
         ],
+      ),
+    );
+  }
+}
+
+class _SettingsSwitchRow extends StatelessWidget {
+  const _SettingsSwitchRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onChanged == null ? null : () => onChanged!(!value),
+      borderRadius: BorderRadius.circular(SpotRadius.md),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: SpotSpacing.lg,
+          vertical: SpotSpacing.sm,
+        ),
+        decoration: SpotDecoration.cardBordered(),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: SpotColors.textSecondary),
+            const SizedBox(width: SpotSpacing.md),
+            Expanded(child: Text(label, style: SpotType.body)),
+            Switch.adaptive(value: value, onChanged: onChanged),
+          ],
+        ),
       ),
     );
   }

@@ -432,13 +432,28 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Widget build(BuildContext context) {
     final threads = topLevelThreadPosts(_posts);
     final replies = replyPosts(_posts);
+    final hasVisibilitySettings = _profile != null;
+    final threadsPublic = _profile?.areThreadsPublic ?? true;
+    final repliesPublic = _profile?.areRepliesPublic ?? true;
+    final footprintMapPublic = _profile?.isFootprintMapPublic ?? false;
+    final publicProfilePosts = <MediaPost>[
+      if (!hasVisibilitySettings || threadsPublic) ...threads,
+      if (!hasVisibilitySettings || repliesPublic) ...replies,
+    ];
     final tabIndex = _contentTabController.index;
     final showReplies = tabIndex == 1;
     final showMap = tabIndex == 2;
-    final visiblePosts = showReplies ? replies : threads;
+    final threadsHidden =
+        hasVisibilitySettings && !showReplies && !showMap && !threadsPublic;
+    final repliesHidden =
+        hasVisibilitySettings && showReplies && !repliesPublic;
+    final mapHidden = hasVisibilitySettings && showMap && !footprintMapPublic;
+    final visiblePosts = showReplies
+        ? (repliesHidden ? const <MediaPost>[] : replies)
+        : (threadsHidden ? const <MediaPost>[] : threads);
     final emptyTitle = showReplies ? 'No replies yet' : 'No threads yet';
     final activitySummary = buildProfileActivitySummary(
-      posts: _posts,
+      posts: publicProfilePosts,
       accountCreatedAt: _profile?.createdAt,
     );
     return Scaffold(
@@ -470,7 +485,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             SliverToBoxAdapter(
               child: _UserProfileHeader(
                 pubkey: widget.pubkey,
-                postCount: _posts.length,
+                postCount: publicProfilePosts.length,
                 followStats: _followStats,
                 isFollowing: _isFollowing,
                 isTogglingFollow: _isTogglingFollow,
@@ -483,7 +498,31 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             SliverToBoxAdapter(
               child: ProfileThreadTabBar(controller: _contentTabController),
             ),
-            if (showMap)
+            if (threadsHidden)
+              const SliverFillRemaining(
+                child: _PrivateProfileSection(
+                  title: 'Threads are private',
+                  subtitle:
+                      'This account is not sharing top-level threads on its public profile.',
+                ),
+              )
+            else if (repliesHidden)
+              const SliverFillRemaining(
+                child: _PrivateProfileSection(
+                  title: 'Replies are private',
+                  subtitle:
+                      'This account is not sharing replies on its public profile.',
+                ),
+              )
+            else if (mapHidden)
+              const SliverFillRemaining(
+                child: _PrivateProfileSection(
+                  title: 'Footprint map is private',
+                  subtitle:
+                      'This account is not sharing its footprint map with other users.',
+                ),
+              )
+            else if (showMap)
               SliverLayoutBuilder(
                 builder: (context, constraints) => SliverToBoxAdapter(
                   child: SizedBox(
@@ -549,8 +588,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                         onPublished: (reply) {
                           if (!mounted) return;
                           setState(
-                            () => _posts =
-                                mergePostsPreservingLocalState(_posts, [reply]),
+                            () => _posts = mergePostsPreservingLocalState(
+                              _posts,
+                              [reply],
+                            ),
                           );
                         },
                       ),
@@ -558,6 +599,40 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   );
                 }, childCount: visiblePosts.length),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PrivateProfileSection extends StatelessWidget {
+  const _PrivateProfileSection({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              CupertinoIcons.lock_circle,
+              color: SpotColors.overlay,
+              size: 36,
+            ),
+            const SizedBox(height: SpotSpacing.lg),
+            Text(title, style: SpotType.bodySecondary),
+            const SizedBox(height: SpotSpacing.xs),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: SpotType.caption,
+            ),
           ],
         ),
       ),

@@ -14,6 +14,9 @@ void main() {
       'device_id': 'device-1',
       'avatar_seed': 'seed-1',
       'avatar_content_hash': 'hash-1',
+      'threads_public': false,
+      'replies_public': true,
+      'footprint_map_public': true,
     });
 
     expect(profile.id, 'user-1');
@@ -22,5 +25,8 @@ void main() {
     expect(profile.description, 'Citizen reporter in Tokyo.');
     expect(profile.legacyPubkey, 'pubkey-1');
     expect(profile.avatarContentHash, 'hash-1');
+    expect(profile.areThreadsPublic, isFalse);
+    expect(profile.areRepliesPublic, isTrue);
+    expect(profile.isFootprintMapPublic, isTrue);
   });
 }

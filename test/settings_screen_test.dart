@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:mobile/models/profile_model.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/settings_screen.dart';
 
@@ -19,8 +20,14 @@ void main() {
 
   testWidgets('settings can open the favorite topics editor', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(home: SettingsScreen(wallet: _wallet())),
+      MaterialApp(
+        home: SettingsScreen(
+          wallet: _wallet(),
+          loadProfileSettings: (_) async => _profile(),
+        ),
+      ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.text('Favorite Topics'), findsOneWidget);
 
@@ -36,15 +43,22 @@ void main() {
 
   testWidgets('settings exposes a logout action', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(home: SettingsScreen(wallet: _wallet())),
+      MaterialApp(
+        home: SettingsScreen(
+          wallet: _wallet(),
+          loadProfileSettings: (_) async => _profile(),
+        ),
+      ),
     );
+    await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
       find.text('Log Out'),
       200,
       scrollable: find.byType(Scrollable),
     );
-
+    await tester.drag(find.byType(Scrollable), const Offset(0, -80));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Log Out'));
     await tester.pumpAndSettle();
 
@@ -60,20 +74,98 @@ void main() {
     );
   });
 
-  testWidgets('settings exposes a public activity menu', (tester) async {
+  testWidgets('settings exposes profile visibility switches', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(home: SettingsScreen(wallet: _wallet())),
+      MaterialApp(
+        home: SettingsScreen(
+          wallet: _wallet(),
+          loadProfileSettings: (_) async => _profile(
+            areThreadsPublic: true,
+            areRepliesPublic: false,
+            isFootprintMapPublic: true,
+          ),
+        ),
+      ),
     );
+    await tester.pumpAndSettle();
 
-    expect(find.text('Public Activity'), findsOneWidget);
+    expect(find.text('Public Threads'), findsOneWidget);
+    expect(find.text('Public Replies'), findsOneWidget);
+    expect(find.text('Footprint Map'), findsOneWidget);
+    expect(find.text('ACTIVITY'), findsNothing);
+    expect(find.text('PRIVACY'), findsOneWidget);
 
-    await tester.tap(find.text('Public Activity'));
+    final switches = tester.widgetList<Switch>(find.byType(Switch)).toList();
+    expect(switches, hasLength(3));
+    expect(switches[0].value, isTrue);
+    expect(switches[1].value, isTrue);
+    expect(switches[2].value, isFalse);
+  });
+
+  testWidgets('settings saves updated thread visibility from switch row', (
+    tester,
+  ) async {
+    bool? savedThreadsPublic;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsScreen(
+          wallet: _wallet(),
+          loadProfileSettings: (_) async => _profile(areThreadsPublic: true),
+          saveProfileVisibility:
+              (
+                _, {
+                bool? threadsPublic,
+                bool? repliesPublic,
+                bool? footprintMapPublic,
+              }) async {
+                savedThreadsPublic = threadsPublic;
+                return _profile(areThreadsPublic: threadsPublic ?? true);
+              },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Public Threads'));
+    await tester.pumpAndSettle();
+
+    expect(savedThreadsPublic, isFalse);
+  });
+
+  testWidgets('settings exposes the my activity menu', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsScreen(
+          wallet: _wallet(),
+          loadProfileSettings: (_) async => _profile(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('View My Activity'), findsOneWidget);
+
+    await tester.tap(find.text('View My Activity'));
     await tester.pumpAndSettle();
 
     expect(find.text('Posted Threads'), findsOneWidget);
     expect(find.text('Replied Threads'), findsOneWidget);
   });
 }
+
+ProfileModel _profile({
+  bool areThreadsPublic = true,
+  bool areRepliesPublic = true,
+  bool isFootprintMapPublic = false,
+}) => ProfileModel(
+  id: 'user-1',
+  createdAt: DateTime.utc(2026, 3, 29, 10, 30),
+  displayName: 'Citizen Tokyo',
+  areThreadsPublic: areThreadsPublic,
+  areRepliesPublic: areRepliesPublic,
+  isFootprintMapPublic: isFootprintMapPublic,
+);
 
 WalletModel _wallet() => WalletModel(
   privateKeyHex:

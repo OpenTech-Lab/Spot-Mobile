@@ -33,6 +33,11 @@ Map<String, dynamic> buildSoftDeletePostParams({
   return params;
 }
 
+const _profileSelectColumns =
+    'id, created_at, display_name, description, legacy_pubkey, legacy_npub, '
+    'device_id, avatar_seed, avatar_content_hash, threads_public, '
+    'replies_public, footprint_map_public';
+
 /// Supabase-backed metadata service for posts, events, reports, and witnesses.
 ///
 /// The old Nostr wallet identity is still synced into `profiles.legacy_pubkey`
@@ -139,10 +144,7 @@ class MetadataService {
     final rows = List<Map<String, dynamic>>.from(
       await client
           .from('profiles')
-          .select(
-            'id, created_at, display_name, description, legacy_pubkey, legacy_npub, device_id, '
-            'avatar_seed, avatar_content_hash',
-          )
+          .select(_profileSelectColumns)
           .inFilter('id', authorIds)
           .limit(1),
     );
@@ -181,28 +183,19 @@ class MetadataService {
     await collectMatches(
       client
           .from('profiles')
-          .select(
-            'id, created_at, display_name, description, legacy_pubkey, legacy_npub, device_id, '
-            'avatar_seed, avatar_content_hash',
-          )
+          .select(_profileSelectColumns)
           .ilike('display_name', pattern),
     );
     await collectMatches(
       client
           .from('profiles')
-          .select(
-            'id, created_at, display_name, description, legacy_pubkey, legacy_npub, device_id, '
-            'avatar_seed, avatar_content_hash',
-          )
+          .select(_profileSelectColumns)
           .ilike('description', pattern),
     );
     await collectMatches(
       client
           .from('profiles')
-          .select(
-            'id, created_at, display_name, description, legacy_pubkey, legacy_npub, device_id, '
-            'avatar_seed, avatar_content_hash',
-          )
+          .select(_profileSelectColumns)
           .ilike('legacy_pubkey', pattern),
     );
 
@@ -245,6 +238,40 @@ class MetadataService {
     final updatedProfile = await _fetchProfileById(user.id);
     if (updatedProfile == null) {
       throw StateError('Supabase profile row missing after update');
+    }
+    return updatedProfile;
+  }
+
+  Future<ProfileModel> updateCurrentProfileVisibility({
+    required WalletModel wallet,
+    bool? threadsPublic,
+    bool? repliesPublic,
+    bool? footprintMapPublic,
+  }) async {
+    await syncLegacyProfile(wallet);
+    final user = client.auth.currentUser;
+    if (user == null) {
+      throw StateError('Missing Supabase user after profile sync');
+    }
+
+    final existingProfile = await _fetchProfileById(user.id);
+    await client.from('profiles').upsert({
+      'id': user.id,
+      'legacy_pubkey': wallet.publicKeyHex,
+      'legacy_npub': wallet.npub,
+      'device_id': wallet.deviceId,
+      'threads_public':
+          threadsPublic ?? existingProfile?.areThreadsPublic ?? true,
+      'replies_public':
+          repliesPublic ?? existingProfile?.areRepliesPublic ?? true,
+      'footprint_map_public':
+          footprintMapPublic ?? existingProfile?.isFootprintMapPublic ?? false,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'id');
+
+    final updatedProfile = await _fetchProfileById(user.id);
+    if (updatedProfile == null) {
+      throw StateError('Supabase profile row missing after visibility update');
     }
     return updatedProfile;
   }
@@ -722,10 +749,7 @@ class MetadataService {
     final rows = List<Map<String, dynamic>>.from(
       await client
           .from('profiles')
-          .select(
-            'id, created_at, display_name, description, legacy_pubkey, legacy_npub, device_id, '
-            'avatar_seed, avatar_content_hash',
-          )
+          .select(_profileSelectColumns)
           .eq('id', userId)
           .limit(1),
     );
