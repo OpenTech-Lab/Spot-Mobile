@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'package:mobile/models/media_post.dart';
@@ -75,40 +76,42 @@ void main() {
     expect(find.byIcon(CupertinoIcons.back), findsOneWidget);
   });
 
-  testWidgets('full-screen footprint map shows hint and zoom controls', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: FootprintMapScreen(
-          posts: [
-            _post(id: '1', latitude: 0, longitude: 0),
-            _post(id: '2', latitude: 1, longitude: 1),
-          ],
-          shapeLoader: () async => const [
-            FootprintCountryShape(
-              name: 'Testland',
-              points: [
-                LatLng(-70, -170),
-                LatLng(-70, 170),
-                LatLng(80, 170),
-                LatLng(80, -170),
-              ],
-            ),
-          ],
-          resolveCountry: (latitude, longitude) =>
-              const GeoLocation(city: 'Test City', country: 'Testland'),
+  testWidgets(
+    'full-screen footprint map hides the bottom hint and keeps zoom controls',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FootprintMapScreen(
+            posts: [
+              _post(id: '1', latitude: 0, longitude: 0),
+              _post(id: '2', latitude: 1, longitude: 1),
+            ],
+            shapeLoader: () async => const [
+              FootprintCountryShape(
+                name: 'Testland',
+                points: [
+                  LatLng(-70, -170),
+                  LatLng(-70, 170),
+                  LatLng(80, 170),
+                  LatLng(80, -170),
+                ],
+              ),
+            ],
+            resolveCountry: (latitude, longitude) =>
+                const GeoLocation(city: 'Test City', country: 'Testland'),
+          ),
         ),
-      ),
-    );
+      );
 
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text(footprintMapSelectionHint), findsOneWidget);
-    expect(find.byIcon(CupertinoIcons.plus), findsOneWidget);
-    expect(find.byIcon(CupertinoIcons.minus), findsOneWidget);
-  });
+      expect(find.byType(SafeArea), findsWidgets);
+      expect(find.text(footprintMapSelectionHint), findsNothing);
+      expect(find.byIcon(CupertinoIcons.plus), findsOneWidget);
+      expect(find.byIcon(CupertinoIcons.minus), findsOneWidget);
+    },
+  );
 }
 
 MediaPost _post({

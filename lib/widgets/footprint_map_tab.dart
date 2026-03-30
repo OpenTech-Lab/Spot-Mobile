@@ -167,11 +167,14 @@ class FootprintMapScreen extends StatelessWidget {
         ),
         title: const Text(footprintMapTitle, style: SpotType.subheading),
       ),
-      body: FootprintMapTab(
-        posts: posts,
-        isFullScreen: true,
-        shapeLoader: shapeLoader,
-        resolveCountry: resolveCountry,
+      body: SafeArea(
+        top: false,
+        child: FootprintMapTab(
+          posts: posts,
+          isFullScreen: true,
+          shapeLoader: shapeLoader,
+          resolveCountry: resolveCountry,
+        ),
       ),
     );
   }
@@ -199,6 +202,8 @@ class FootprintMapTab extends StatefulWidget {
 }
 
 class _FootprintMapTabState extends State<FootprintMapTab> {
+  static const double _selectionPopupWidth = 56;
+  static const double _selectionPopupHeight = 44;
   static final LatLngBounds _worldBounds = LatLngBounds(
     const LatLng(-75, -180),
     const LatLng(85, 180),
@@ -213,6 +218,7 @@ class _FootprintMapTabState extends State<FootprintMapTab> {
   bool _isMapReady = false;
   String? _selectedCountryName;
   int? _selectedCountryVisits;
+  Offset? _selectedCountryTapPosition;
 
   @override
   void initState() {
@@ -282,6 +288,11 @@ class _FootprintMapTabState extends State<FootprintMapTab> {
       if (_selectedCountryName != null) {
         _selectedCountryVisits =
             counts[normalizeFootprintCountryName(_selectedCountryName!)] ?? 0;
+        if ((_selectedCountryVisits ?? 0) <= 0) {
+          _selectedCountryName = null;
+          _selectedCountryVisits = null;
+          _selectedCountryTapPosition = null;
+        }
       }
     });
   }
@@ -313,31 +324,71 @@ class _FootprintMapTabState extends State<FootprintMapTab> {
 
   void _handlePositionChanged(MapCamera camera, bool hasGesture) {
     final nextZoom = clampFootprintMapZoom(camera.zoom);
-    if ((_currentZoom - nextZoom).abs() < 0.01) return;
-    setState(() => _currentZoom = nextZoom);
+    final shouldClearSelection =
+        hasGesture && _selectedCountryTapPosition != null;
+    if ((_currentZoom - nextZoom).abs() < 0.01 && !shouldClearSelection) {
+      return;
+    }
+    setState(() {
+      _currentZoom = nextZoom;
+      if (shouldClearSelection) {
+        _selectedCountryName = null;
+        _selectedCountryVisits = null;
+        _selectedCountryTapPosition = null;
+      }
+    });
   }
 
-  void _handleCountryTap() {
+  void _handleCountryTap(Offset tapPosition) {
     final hitValues = _hitNotifier.value?.hitValues.toSet().toList(
       growable: false,
     );
     if (hitValues == null || hitValues.isEmpty) {
-      if (_selectedCountryName == null && _selectedCountryVisits == null) {
+      if (_selectedCountryName == null &&
+          _selectedCountryVisits == null &&
+          _selectedCountryTapPosition == null) {
         return;
       }
       setState(() {
         _selectedCountryName = null;
         _selectedCountryVisits = null;
+        _selectedCountryTapPosition = null;
       });
       return;
     }
 
     final countryName = hitValues.first;
+    final visitCount =
+        _visitCounts[normalizeFootprintCountryName(countryName)] ?? 0;
+
+    if (visitCount <= 0) {
+      setState(() {
+        _selectedCountryName = null;
+        _selectedCountryVisits = null;
+        _selectedCountryTapPosition = null;
+      });
+      return;
+    }
+
     setState(() {
       _selectedCountryName = countryName;
-      _selectedCountryVisits =
-          _visitCounts[normalizeFootprintCountryName(countryName)] ?? 0;
+      _selectedCountryVisits = visitCount;
+      _selectedCountryTapPosition = tapPosition;
     });
+  }
+
+  double _clampPopupLeft(double desiredLeft, double maxWidth) {
+    return desiredLeft.clamp(
+      SpotSpacing.md,
+      maxWidth - _selectionPopupWidth - SpotSpacing.md,
+    );
+  }
+
+  double _clampPopupTop(double desiredTop, double maxHeight) {
+    return desiredTop.clamp(
+      SpotSpacing.md,
+      maxHeight - _selectionPopupHeight - SpotSpacing.md,
+    );
   }
 
   List<Polygon<String>> _buildPolygons() {
@@ -379,124 +430,122 @@ class _FootprintMapTabState extends State<FootprintMapTab> {
     final visitedCountryCount = _visitCounts.length;
     final canZoomIn = _currentZoom < footprintMapMaxZoom - 0.01;
     final canZoomOut = _currentZoom > footprintMapMinZoom + 0.01;
-    final selectionLabel =
-        _selectedCountryName == null || _selectedCountryVisits == null
-        ? footprintMapSelectionHint
-        : footprintCountryVisitLabel(
-            _selectedCountryName!,
-            _selectedCountryVisits!,
-          );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tapPosition = _selectedCountryTapPosition;
+        final showPopup =
+            widget.isFullScreen &&
+            tapPosition != null &&
+            (_selectedCountryVisits ?? 0) > 0;
+        final popupLeft = showPopup
+            ? _clampPopupLeft(
+                tapPosition.dx - (_selectionPopupWidth / 2),
+                constraints.maxWidth,
+              )
+            : 0.0;
+        final popupTop = showPopup
+            ? _clampPopupTop(
+                tapPosition.dy - _selectionPopupHeight - SpotSpacing.md,
+                constraints.maxHeight,
+              )
+            : 0.0;
 
-    return Stack(
-      children: [
-        FlutterMap(
-          mapController: _mapController,
-          options: MapOptions(
-            initialCameraFit: CameraFit.bounds(
-              bounds: _worldBounds,
-              padding: const EdgeInsets.all(8),
-            ),
-            minZoom: footprintMapMinZoom,
-            maxZoom: footprintMapMaxZoom,
-            backgroundColor: SpotColors.bg,
-            interactionOptions: InteractionOptions(
-              flags: widget.isFullScreen
-                  ? InteractiveFlag.drag |
-                        InteractiveFlag.pinchZoom |
-                        InteractiveFlag.doubleTapZoom
-                  : InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom,
-            ),
-            onMapReady: () {
-              if (!mounted) return;
-              setState(() {
-                _isMapReady = true;
-                _currentZoom = clampFootprintMapZoom(
-                  _mapController.camera.zoom,
-                );
-              });
-            },
-            onPositionChanged: _handlePositionChanged,
-          ),
+        return Stack(
           children: [
-            GestureDetector(
-              onTapUp: (_) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCameraFit: CameraFit.bounds(
+                  bounds: _worldBounds,
+                  padding: const EdgeInsets.all(8),
+                ),
+                minZoom: footprintMapMinZoom,
+                maxZoom: footprintMapMaxZoom,
+                backgroundColor: SpotColors.bg,
+                interactionOptions: InteractionOptions(
+                  flags: widget.isFullScreen
+                      ? InteractiveFlag.drag |
+                            InteractiveFlag.pinchZoom |
+                            InteractiveFlag.doubleTapZoom
+                      : InteractiveFlag.pinchZoom |
+                            InteractiveFlag.doubleTapZoom,
+                ),
+                onMapReady: () {
                   if (!mounted) return;
-                  _handleCountryTap();
-                });
-              },
-              child: PolygonLayer<String>(
-                hitNotifier: _hitNotifier,
-                simplificationTolerance: 0,
-                polygons: _buildPolygons(),
+                  setState(() {
+                    _isMapReady = true;
+                    _currentZoom = clampFootprintMapZoom(
+                      _mapController.camera.zoom,
+                    );
+                  });
+                },
+                onPositionChanged: _handlePositionChanged,
               ),
+              children: [
+                GestureDetector(
+                  onTapUp: (details) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!mounted) return;
+                      _handleCountryTap(details.localPosition);
+                    });
+                  },
+                  child: PolygonLayer<String>(
+                    hitNotifier: _hitNotifier,
+                    simplificationTolerance: 0,
+                    polygons: _buildPolygons(),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        Positioned(
-          top: SpotSpacing.md,
-          left: SpotSpacing.md,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: SpotSpacing.md,
-              vertical: SpotSpacing.xs,
-            ),
-            decoration: SpotDecoration.cardBordered(),
-            child: Text(
-              '$visitedCountryCount ${visitedCountryCount == 1 ? 'country' : 'countries'} visited',
-              style: SpotType.caption.copyWith(color: SpotColors.textSecondary),
-            ),
-          ),
-        ),
-        if (!widget.isFullScreen)
-          Positioned(
-            top: SpotSpacing.md,
-            right: SpotSpacing.md,
-            child: _FootprintMapIconButton(
-              icon: CupertinoIcons.arrow_up_left_arrow_down_right,
-              tooltip: 'Open full screen map',
-              onTap: _openFullScreen,
-            ),
-          ),
-        if (widget.isFullScreen)
-          Positioned(
-            right: SpotSpacing.md,
-            bottom: SpotSpacing.md,
-            child: _FootprintMapZoomControls(
-              canZoomIn: _isMapReady && canZoomIn,
-              canZoomOut: _isMapReady && canZoomOut,
-              onZoomIn: () => _adjustZoom(footprintMapZoomStep),
-              onZoomOut: () => _adjustZoom(-footprintMapZoomStep),
-            ),
-          ),
-        if (widget.isFullScreen)
-          Positioned(
-            left: SpotSpacing.md,
-            right: SpotSpacing.huge,
-            bottom: SpotSpacing.md,
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: SpotSpacing.md,
-                vertical: SpotSpacing.sm,
-              ),
-              decoration: BoxDecoration(
-                color: SpotColors.bg.withAlpha(224),
-                borderRadius: BorderRadius.circular(SpotRadius.sm),
-                border: Border.all(color: SpotColors.border, width: 0.5),
-              ),
-              child: Text(
-                selectionLabel,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: SpotType.bodySecondary.copyWith(
-                  color: _selectedCountryName == null
-                      ? SpotColors.textSecondary
-                      : SpotColors.textPrimary,
+            Positioned(
+              top: SpotSpacing.md,
+              left: SpotSpacing.md,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SpotSpacing.md,
+                  vertical: SpotSpacing.xs,
+                ),
+                decoration: SpotDecoration.cardBordered(),
+                child: Text(
+                  '$visitedCountryCount ${visitedCountryCount == 1 ? 'country' : 'countries'} visited',
+                  style: SpotType.caption.copyWith(
+                    color: SpotColors.textSecondary,
+                  ),
                 ),
               ),
             ),
-          ),
-      ],
+            if (!widget.isFullScreen)
+              Positioned(
+                top: SpotSpacing.md,
+                right: SpotSpacing.md,
+                child: _FootprintMapIconButton(
+                  icon: CupertinoIcons.arrow_up_left_arrow_down_right,
+                  tooltip: 'Open full screen map',
+                  onTap: _openFullScreen,
+                ),
+              ),
+            if (widget.isFullScreen)
+              Positioned(
+                right: SpotSpacing.md,
+                bottom: SpotSpacing.md,
+                child: _FootprintMapZoomControls(
+                  canZoomIn: _isMapReady && canZoomIn,
+                  canZoomOut: _isMapReady && canZoomOut,
+                  onZoomIn: () => _adjustZoom(footprintMapZoomStep),
+                  onZoomOut: () => _adjustZoom(-footprintMapZoomStep),
+                ),
+              ),
+            if (showPopup)
+              Positioned(
+                left: popupLeft,
+                top: popupTop,
+                child: _FootprintMapSelectionPopup(
+                  visits: _selectedCountryVisits!,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -612,6 +661,35 @@ class _FootprintMapZoomButton extends StatelessWidget {
           width: 36,
           height: 36,
           child: Center(child: Icon(icon, size: 16, color: iconColor)),
+        ),
+      ),
+    );
+  }
+}
+
+class _FootprintMapSelectionPopup extends StatelessWidget {
+  const _FootprintMapSelectionPopup({required this.visits});
+
+  final int visits;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('footprint_map_visit_popup'),
+      width: _FootprintMapTabState._selectionPopupWidth,
+      height: _FootprintMapTabState._selectionPopupHeight,
+      decoration: BoxDecoration(
+        color: SpotColors.bg.withAlpha(232),
+        borderRadius: BorderRadius.circular(SpotRadius.sm),
+        border: Border.all(color: SpotColors.accent.withAlpha(120), width: 0.5),
+      ),
+      child: Center(
+        child: Text(
+          '$visits',
+          style: SpotType.subheading.copyWith(
+            color: SpotColors.textPrimary,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
     );
