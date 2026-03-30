@@ -14,6 +14,7 @@ import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/thread_screen.dart';
 import 'package:mobile/screens/user_profile_screen.dart';
+import 'package:mobile/services/app_data_reset_service.dart';
 import 'package:mobile/services/discover_feed_service.dart';
 import 'package:mobile/services/feed_scoring_service.dart';
 import 'package:mobile/services/follow_service.dart';
@@ -230,12 +231,15 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   late final EventRepository _repo;
-  StreamSubscription<CivicEvent>? _sub;
+  StreamSubscription<void>? _repoSub;
   StreamSubscription<List<MediaPost>>? _localSub;
   StreamSubscription<void>? _followChangesSub;
+  StreamSubscription<void>? _resetSub;
   final TextEditingController _searchController = TextEditingController();
 
   List<MediaPost> _posts = [];
+  List<MediaPost> _remotePosts = [];
+  List<MediaPost> _persistedPosts = [];
   bool _isLoading = true;
   final Set<String> _loadingMediaPostIds = {};
   String _searchQuery = '';
@@ -254,6 +258,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     _tabController.addListener(_onTabChanged);
     _repo = EventRepository();
     _localSub ??= LocalPostStore.instance.changes.listen(_onLocalPostsChanged);
+    _resetSub ??= AppDataResetService.instance.localDataCleared.listen((_) {
+      unawaited(_handleLocalDataCleared());
+    });
     _searchQuery = widget.initialSearchQuery;
     _searchController.text = widget.initialSearchQuery;
     _initFeed();
@@ -265,9 +272,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   void dispose() {
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
-    _sub?.cancel();
+    _repoSub?.cancel();
     _localSub?.cancel();
     _followChangesSub?.cancel();
+    _resetSub?.cancel();
     _repo.dispose();
     _searchController.dispose();
     super.dispose();
@@ -351,26 +359,37 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     });
     try {
       await _loadPersistedPosts();
-      _sub = _repo.subscribeToEvents().listen(_onEvent);
+      _repoSub ??= _repo.subscribeToChanges().listen((_) => _onRepoChanged());
+      _onRepoChanged();
     } catch (_) {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _onEvent(CivicEvent event) {
+  void _onRepoChanged() {
     if (!mounted) return;
-    final merged = _mergePosts(_posts, event.posts);
-    if (orderedPostsEqual(merged, _posts)) return;
-    unawaited(LocalPostStore.instance.savePosts(event.posts));
-    setState(() => _posts = merged);
+    final nextRemotePosts = _repo.getAllPosts();
+    final remoteChanged = !orderedPostsEqual(nextRemotePosts, _remotePosts);
+    _remotePosts = nextRemotePosts;
+    if (remoteChanged && nextRemotePosts.isNotEmpty) {
+      unawaited(LocalPostStore.instance.savePosts(nextRemotePosts));
+    }
+    _syncVisiblePosts();
   }
 
   Future<void> _refresh() async {
-    await _sub?.cancel();
-    _repo.reset();
-    setState(() => _posts = []);
-    await _initFeed();
+    setState(() {
+      _isLoading = true;
+      _remotePosts = [];
+      _posts = [];
+    });
+    try {
+      await _loadPersistedPosts();
+      await _repo.refresh();
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _loadLocation() async {
@@ -385,25 +404,39 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   Future<void> _loadPersistedPosts() async {
     final persisted = await LocalPostStore.instance.loadPosts();
-    final visible = _visiblePersistedPosts(persisted);
-    if (!mounted || visible.isEmpty) return;
-    setState(() => _posts = _mergePosts(_posts, visible));
+    _persistedPosts = _visiblePersistedPosts(persisted);
+    _syncVisiblePosts();
   }
-
-  List<MediaPost> _mergePosts(
-    List<MediaPost> current,
-    Iterable<MediaPost> incoming,
-  ) => mergePostsPreservingLocalState(current, incoming);
 
   List<MediaPost> _visiblePersistedPosts(Iterable<MediaPost> posts) {
     return posts.where((post) => !post.isPendingRetry).toList(growable: false);
   }
 
-  void _onLocalPostsChanged(List<MediaPost> persisted) {
+  void _syncVisiblePosts() {
     if (!mounted) return;
-    final merged = _mergePosts(_posts, _visiblePersistedPosts(persisted));
-    if (orderedPostsEqual(merged, _posts)) return;
-    setState(() => _posts = merged);
+    final rebuilt = reconcilePostsPreservingLocalState(_posts, [
+      _remotePosts,
+      _persistedPosts,
+    ]);
+    if (orderedPostsEqual(rebuilt, _posts)) return;
+    setState(() => _posts = rebuilt);
+  }
+
+  void _onLocalPostsChanged(List<MediaPost> persisted) {
+    _persistedPosts = _visiblePersistedPosts(persisted);
+    _syncVisiblePosts();
+  }
+
+  Future<void> _handleLocalDataCleared() async {
+    if (!mounted) return;
+    setState(() {
+      _persistedPosts = [];
+      _remotePosts = [];
+      _posts = [];
+    });
+    try {
+      await _repo.refresh();
+    } catch (_) {}
   }
 
   void _toggleLike(MediaPost post) {

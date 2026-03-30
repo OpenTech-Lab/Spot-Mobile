@@ -4,12 +4,17 @@ import 'package:flutter/material.dart';
 
 import 'package:mobile/core/altcha.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/screens/altcha_gate_screen.dart';
 import 'package:mobile/screens/home_screen.dart';
+import 'package:mobile/screens/onboarding_screen.dart';
 import 'package:mobile/services/app_refresh_service.dart';
+import 'package:mobile/services/session_logout_service.dart';
 import 'package:mobile/widgets/app_loading_view.dart';
 
 typedef SplashHomeBuilder = Widget Function(WalletModel wallet);
 typedef SplashVerificationRunner = Future<void> Function();
+typedef SplashLogoutRunner = Future<void> Function();
+typedef SplashLoggedOutBuilder = Widget Function();
 
 /// Session entry screen for signed-in users.
 ///
@@ -23,12 +28,16 @@ class SplashScreen extends StatefulWidget {
     this.refreshService,
     this.homeBuilder,
     this.verificationRunner,
+    this.logoutRunner,
+    this.loggedOutBuilder,
   });
 
   final WalletModel wallet;
   final AppRefreshService? refreshService;
   final SplashHomeBuilder? homeBuilder;
   final SplashVerificationRunner? verificationRunner;
+  final SplashLogoutRunner? logoutRunner;
+  final SplashLoggedOutBuilder? loggedOutBuilder;
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -42,6 +51,8 @@ class _SplashScreenState extends State<SplashScreen>
 
   AppRefreshService get _refreshService =>
       widget.refreshService ?? AppRefreshService.instance;
+  SplashLogoutRunner get _logoutRunner =>
+      widget.logoutRunner ?? SessionLogoutService.instance.logout;
 
   @override
   void initState() {
@@ -66,7 +77,15 @@ class _SplashScreenState extends State<SplashScreen>
     if (_isRefreshing) return;
     setState(() => _isRefreshing = true);
 
-    await _runRefreshSequence(includeVerification: true);
+    try {
+      await _runRefreshSequence(includeVerification: true);
+    } on ProfileLoadFailedException catch (error) {
+      debugPrint('[SplashScreen] Profile load failed on startup: $error');
+      await _logoutAndRedirect();
+      return;
+    } catch (error) {
+      debugPrint('[SplashScreen] Session refresh failed: $error');
+    }
 
     if (!mounted) return;
     setState(() {
@@ -79,7 +98,11 @@ class _SplashScreenState extends State<SplashScreen>
     if (_isRefreshing) return;
     setState(() => _isRefreshing = true);
 
-    await _runRefreshSequence(includeVerification: false);
+    try {
+      await _runRefreshSequence(includeVerification: false);
+    } catch (error) {
+      debugPrint('[SplashScreen] Resume refresh failed: $error');
+    }
     await _homeKey.currentState?.triggerSessionRefresh();
 
     if (!mounted) return;
@@ -101,8 +124,30 @@ class _SplashScreenState extends State<SplashScreen>
     }
 
     if (lastError != null) {
-      debugPrint('[SplashScreen] Session refresh failed: $lastError');
+      throw lastError;
     }
+  }
+
+  Future<void> _logoutAndRedirect() async {
+    try {
+      await _logoutRunner();
+    } catch (error) {
+      debugPrint('[SplashScreen] Logout after profile failure failed: $error');
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isRefreshing = false;
+      _isReady = false;
+    });
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            widget.loggedOutBuilder?.call() ??
+            const AltchaGateScreen(next: OnboardingScreen()),
+      ),
+      (route) => false,
+    );
   }
 
   Future<void> _runVerification() async {

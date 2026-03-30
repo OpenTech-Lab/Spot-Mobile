@@ -23,8 +23,11 @@ class LocalPostStore {
   /// Serialises all mutating operations (save / replace / remove / setLiked)
   /// so that each read→merge→write cycle completes before the next begins.
   Future<void> _pendingWrite = Future<void>.value();
+  int _writePauseDepth = 0;
 
   Stream<List<MediaPost>> get changes => _changes.stream;
+
+  bool get _writesPaused => _writePauseDepth > 0;
 
   Future<List<MediaPost>> loadPosts({
     String? authorPubkey,
@@ -47,7 +50,9 @@ class LocalPostStore {
   }
 
   Future<void> savePosts(Iterable<MediaPost> incoming) async {
+    if (_writesPaused) return;
     await _enqueue(() async {
+      if (_writesPaused) return;
       final posts = await _readPosts();
       final byId = {for (final existing in posts) existing.id: existing};
       for (final post in incoming) {
@@ -61,7 +66,9 @@ class LocalPostStore {
   }
 
   Future<void> replacePost(String oldPostId, MediaPost replacement) async {
+    if (_writesPaused) return;
     await _enqueue(() async {
+      if (_writesPaused) return;
       final posts = await _readPosts();
       final byId = {for (final existing in posts) existing.id: existing};
       byId.remove(oldPostId);
@@ -75,7 +82,9 @@ class LocalPostStore {
 
   Future<MediaPost> setLikedByMe(MediaPost post, bool isLikedByMe) async {
     final updated = post.copyWith(isLikedByMe: isLikedByMe);
+    if (_writesPaused) return updated;
     await _enqueue(() async {
+      if (_writesPaused) return;
       final posts = await _readPosts();
       final byId = {for (final existing in posts) existing.id: existing};
       byId[updated.id] = updated;
@@ -89,7 +98,9 @@ class LocalPostStore {
     String? displayName,
     String? avatarContentHash,
   }) async {
+    if (_writesPaused) return;
     await _enqueue(() async {
+      if (_writesPaused) return;
       final posts = await _readPosts();
       final updated = posts
           .map((post) {
@@ -105,7 +116,9 @@ class LocalPostStore {
   }
 
   Future<void> removePost(String postId) async {
+    if (_writesPaused) return;
     await _enqueue(() async {
+      if (_writesPaused) return;
       final posts = await _readPosts();
       posts.removeWhere((post) => post.id == postId);
       await _writePosts(posts);
@@ -114,7 +127,9 @@ class LocalPostStore {
 
   Future<void> removeMatchingPost(MediaPost target) async {
     final contentHashes = target.contentHashes.toSet();
+    if (_writesPaused) return;
     await _enqueue(() async {
+      if (_writesPaused) return;
       final posts = await _readPosts();
       posts.removeWhere(
         (post) =>
@@ -126,10 +141,22 @@ class LocalPostStore {
     });
   }
 
-  Future<void> clearAll() async {
+  Future<void> clearAll({bool force = false}) async {
+    if (_writesPaused && !force) return;
     await _enqueue(() async {
+      if (_writesPaused && !force) return;
       await _writePosts([]);
     });
+  }
+
+  Future<T> runWithWritesPaused<T>(Future<T> Function() action) async {
+    _writePauseDepth++;
+    try {
+      await _pendingWrite;
+      return await action();
+    } finally {
+      _writePauseDepth--;
+    }
   }
 
   void debugSetStorageDirectory(Directory? directory) {

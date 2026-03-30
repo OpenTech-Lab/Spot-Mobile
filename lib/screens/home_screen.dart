@@ -385,7 +385,7 @@ class _EventsListTab extends StatefulWidget {
 
 class _EventsListTabState extends State<_EventsListTab>
     with SingleTickerProviderStateMixin {
-  StreamSubscription<CivicEvent>? _eventsSub;
+  StreamSubscription<void>? _eventsSub;
   StreamSubscription<void>? _followSub;
   late final TabController _tabController;
   bool _followReady = false;
@@ -394,7 +394,7 @@ class _EventsListTabState extends State<_EventsListTab>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _eventsSub = widget.eventRepo.subscribeToEvents().listen((_) {
+    _eventsSub = widget.eventRepo.subscribeToChanges().listen((_) {
       if (mounted) setState(() {});
     });
     unawaited(_initFollowState());

@@ -89,6 +89,39 @@ void main() {
     expect(find.text('Refreshing data…'), findsNothing);
     expect(find.text('Home ready'), findsOneWidget);
   });
+
+  testWidgets(
+    'SplashScreen logs out and redirects to onboarding when profile load fails on startup',
+    (tester) async {
+      var logoutCalls = 0;
+      final service = AppRefreshService(
+        initFollowState: () async {},
+        fetchCurrentProfile: (_) async => throw StateError('profile missing'),
+        fetchPosts: ({authorPubkey, limit = 20}) async => const [],
+        savePosts: (_) async {},
+        updateAuthorProfile:
+            ({required authorPubkey, displayName, avatarContentHash}) async {},
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SplashScreen(
+            wallet: _wallet(),
+            refreshService: service,
+            verificationRunner: () async {},
+            logoutRunner: () async => logoutCalls++,
+            loggedOutBuilder: () => const Text('Onboarding welcome'),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(logoutCalls, 1);
+      expect(find.text('Onboarding welcome'), findsOneWidget);
+      expect(find.text('Home ready'), findsNothing);
+    },
+  );
 }
 
 AppRefreshService _refreshServiceWithBlockers(

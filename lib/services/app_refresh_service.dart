@@ -18,6 +18,15 @@ typedef SessionAuthorProfileUpdater =
     });
 typedef SessionFollowStateInitializer = Future<void> Function();
 
+class ProfileLoadFailedException implements Exception {
+  ProfileLoadFailedException(this.cause);
+
+  final Object cause;
+
+  @override
+  String toString() => 'Profile load failed: $cause';
+}
+
 class AppRefreshService {
   AppRefreshService({
     SessionProfileFetcher? fetchCurrentProfile,
@@ -48,7 +57,12 @@ class AppRefreshService {
   }) async {
     await _initFollowState();
 
-    final profile = await _fetchCurrentProfile(wallet);
+    late final ProfileModel profile;
+    try {
+      profile = await _fetchCurrentProfile(wallet);
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(ProfileLoadFailedException(error), stackTrace);
+    }
     final recentPosts = await _fetchPosts(limit: recentLimit);
     final authorPosts = await _fetchPosts(
       authorPubkey: wallet.publicKeyHex,

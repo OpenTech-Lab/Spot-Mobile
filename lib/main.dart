@@ -19,6 +19,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await dotenv.load(fileName: '.env');
+  final supabaseHost = Uri.parse(AppConfig.supabaseUrl).host;
+  debugPrint('[Config] Supabase host: $supabaseHost');
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,

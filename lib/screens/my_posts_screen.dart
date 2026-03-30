@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
-import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/discover_screen.dart';
+import 'package:mobile/services/app_data_reset_service.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/media_resolver.dart';
@@ -30,9 +30,12 @@ class MyPostsScreen extends StatefulWidget {
 
 class _MyPostsScreenState extends State<MyPostsScreen> {
   late final EventRepository _repo;
-  StreamSubscription<CivicEvent>? _sub;
+  StreamSubscription<void>? _repoSub;
+  StreamSubscription<void>? _resetSub;
 
   List<MediaPost> _posts = [];
+  List<MediaPost> _remotePosts = [];
+  List<MediaPost> _persistedPosts = [];
   final Set<String> _loadingMediaPostIds = {};
   bool _isLoading = true;
   String? _error;
@@ -41,12 +44,16 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
   void initState() {
     super.initState();
     _repo = EventRepository();
+    _resetSub ??= AppDataResetService.instance.localDataCleared.listen((_) {
+      unawaited(_handleLocalDataCleared());
+    });
     _initFeed();
   }
 
   @override
   void dispose() {
-    _sub?.cancel();
+    _repoSub?.cancel();
+    _resetSub?.cancel();
     _repo.dispose();
     super.dispose();
   }
@@ -58,7 +65,10 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
     });
     try {
       await _loadPersistedPosts();
-      _sub = _repo.subscribeToEvents().listen(_onEvent);
+      _repoSub ??= _repo
+          .subscribeToAuthorChanges(widget.wallet.publicKeyHex)
+          .listen((_) => _onRepoChanged());
+      _onRepoChanged();
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
@@ -66,42 +76,76 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
     }
   }
 
-  void _onEvent(CivicEvent event) {
+  void _onRepoChanged() {
     if (!mounted) return;
-    final mine = event.posts
-        .where((p) => p.pubkey == widget.wallet.publicKeyHex)
-        .toList();
-    if (mine.isEmpty) return;
-    final merged = _mergePosts(_posts, mine);
-    if (orderedPostsEqual(merged, _posts)) return;
-    setState(() => _posts = merged);
+    _remotePosts = _visibleRemotePosts(
+      _repo.getPostsForAuthor(widget.wallet.publicKeyHex),
+    );
+    _syncVisiblePosts();
   }
 
   Future<void> _refresh() async {
-    await _sub?.cancel();
-    setState(() => _posts = []);
-    await _initFeed();
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _remotePosts = [];
+      _posts = [];
+    });
+    try {
+      await _loadPersistedPosts();
+      await _repo.refresh();
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _loadPersistedPosts() async {
     final persisted = await LocalPostStore.instance.loadPosts(
       authorPubkey: widget.wallet.publicKeyHex,
     );
-    final visible = persisted
+    _persistedPosts = persisted
         .where(
           (post) => post.contentHashes.every(
             (hash) => !CacheManager.instance.isBlocked(hash),
           ),
         )
-        .toList();
-    if (!mounted || visible.isEmpty) return;
-    setState(() => _posts = _mergePosts(_posts, visible));
+        .toList(growable: false);
+    _syncVisiblePosts();
   }
 
-  List<MediaPost> _mergePosts(
-    List<MediaPost> current,
-    Iterable<MediaPost> incoming,
-  ) => mergePostsPreservingLocalState(current, incoming);
+  List<MediaPost> _visibleRemotePosts(Iterable<MediaPost> posts) {
+    return posts
+        .where(
+          (post) => post.contentHashes.every(
+            (hash) => !CacheManager.instance.isBlocked(hash),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  void _syncVisiblePosts() {
+    if (!mounted) return;
+    final rebuilt = reconcilePostsPreservingLocalState(_posts, [
+      _remotePosts,
+      _persistedPosts,
+    ]);
+    if (orderedPostsEqual(rebuilt, _posts)) return;
+    setState(() => _posts = rebuilt);
+  }
+
+  Future<void> _handleLocalDataCleared() async {
+    if (!mounted) return;
+    setState(() {
+      _persistedPosts = [];
+      _remotePosts = [];
+      _posts = [];
+    });
+    try {
+      await _repo.refresh();
+    } catch (_) {}
+  }
 
   void _toggleLike(MediaPost post) {
     final updated = post.copyWith(isLikedByMe: !post.isLikedByMe);

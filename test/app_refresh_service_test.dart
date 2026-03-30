@@ -66,6 +66,28 @@ void main() {
       expect(updatedAvatarHash, 'avatar-hash');
     },
   );
+
+  test('refreshSessionData throws ProfileLoadFailedException on profile failure', () async {
+    final service = AppRefreshService(
+      initFollowState: () async {},
+      fetchCurrentProfile: (_) async => throw StateError('profile missing'),
+      fetchPosts: ({authorPubkey, limit = 20}) async => const [],
+      savePosts: (_) async {},
+      updateAuthorProfile:
+          ({required authorPubkey, displayName, avatarContentHash}) async {},
+    );
+
+    expect(
+      () => service.refreshSessionData(_wallet()),
+      throwsA(
+        isA<ProfileLoadFailedException>().having(
+          (error) => error.cause.toString(),
+          'cause',
+          contains('profile missing'),
+        ),
+      ),
+    );
+  });
 }
 
 WalletModel _wallet() => WalletModel(

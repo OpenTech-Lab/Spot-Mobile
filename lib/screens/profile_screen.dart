@@ -12,7 +12,6 @@ import 'package:mobile/core/wallet.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
-import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/follow_stats.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/profile_model.dart';
@@ -21,6 +20,7 @@ import 'package:mobile/screens/discover_screen.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/settings_screen.dart';
 import 'package:mobile/screens/thread_screen.dart';
+import 'package:mobile/services/app_data_reset_service.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/cdn_media_service.dart';
 import 'package:mobile/services/follow_service.dart';
@@ -57,12 +57,15 @@ class ProfileScreen extends StatefulWidget {
 class ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
   EventRepository get _repo => widget.eventRepo;
-  StreamSubscription<CivicEvent>? _sub;
+  StreamSubscription<void>? _repoSub;
   StreamSubscription<List<MediaPost>>? _localSub;
   StreamSubscription<void>? _followSub;
+  StreamSubscription<void>? _resetSub;
   late final TabController _contentTabController;
 
   List<MediaPost> _posts = [];
+  List<MediaPost> _remotePosts = [];
+  List<MediaPost> _persistedPosts = [];
   final Set<String> _loadingMediaPostIds = {};
   bool _isLoading = true;
   String? _error;
@@ -83,9 +86,10 @@ class ProfileScreenState extends State<ProfileScreen>
 
   @override
   void dispose() {
-    _sub?.cancel();
+    _repoSub?.cancel();
     _localSub?.cancel();
     _followSub?.cancel();
+    _resetSub?.cancel();
     _contentTabController.dispose();
     super.dispose();
   }
@@ -99,15 +103,19 @@ class ProfileScreenState extends State<ProfileScreen>
       _localSub ??= LocalPostStore.instance.changes.listen(
         _onLocalPostsChanged,
       );
+      _resetSub ??= AppDataResetService.instance.localDataCleared.listen((_) {
+        unawaited(_handleLocalDataCleared());
+      });
       _followSub ??= FollowService.instance.changes.listen((_) {
         unawaited(_loadFollowStats());
       });
       await _loadPersistedPosts();
       await _loadProfile();
       await _loadFollowStats();
-      _sub = _repo
-          .subscribeToAuthorPosts(widget.wallet.publicKeyHex)
-          .listen(_onEvent);
+      _repoSub ??= _repo
+          .subscribeToAuthorChanges(widget.wallet.publicKeyHex)
+          .listen((_) => _onRepoChanged());
+      _onRepoChanged();
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
@@ -115,22 +123,31 @@ class ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  void _onEvent(CivicEvent event) {
+  void _onRepoChanged() {
     if (!mounted) return;
-    final mine = event.posts
-        .where((p) => p.pubkey == widget.wallet.publicKeyHex)
-        .toList();
-    if (mine.isEmpty) return;
-    final merged = _mergePosts(_posts, mine);
-    if (orderedPostsEqual(merged, _posts)) return;
-    setState(() => _posts = merged);
+    _remotePosts = _visibleRemotePosts(
+      _repo.getPostsForAuthor(widget.wallet.publicKeyHex),
+    );
+    _syncVisiblePosts();
   }
 
   Future<void> _refresh() async {
-    await _sub?.cancel();
-    _repo.reset();
-    setState(() => _posts = []);
-    await _initFeed();
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _remotePosts = [];
+      _posts = [];
+    });
+    try {
+      await _loadPersistedPosts();
+      await _repo.refresh();
+      await _loadProfile();
+      await _loadFollowStats();
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> triggerRefresh() async {
@@ -144,9 +161,8 @@ class ProfileScreenState extends State<ProfileScreen>
       authorPubkey: widget.wallet.publicKeyHex,
       includeFailedToSend: true,
     );
-    final visible = _visiblePersistedPosts(persisted);
-    if (!mounted) return;
-    setState(() => _posts = _mergePersistedPosts(visible));
+    _persistedPosts = _visiblePersistedPosts(persisted);
+    _syncVisiblePosts();
   }
 
   Future<void> _loadProfile() async {
@@ -189,11 +205,6 @@ class ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  List<MediaPost> _mergePosts(
-    List<MediaPost> current,
-    Iterable<MediaPost> incoming,
-  ) => mergePostsPreservingLocalState(current, incoming);
-
   List<MediaPost> _visiblePersistedPosts(Iterable<MediaPost> posts) {
     return posts
         .where(
@@ -206,16 +217,42 @@ class ProfileScreenState extends State<ProfileScreen>
         .toList();
   }
 
-  List<MediaPost> _mergePersistedPosts(Iterable<MediaPost> persisted) {
-    final nonPending = _posts.where((post) => !post.isPendingRetry).toList();
-    return _mergePosts(nonPending, persisted);
+  List<MediaPost> _visibleRemotePosts(Iterable<MediaPost> posts) {
+    return posts
+        .where(
+          (post) => post.contentHashes.every(
+            (hash) => !CacheManager.instance.isBlocked(hash),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  void _syncVisiblePosts() {
+    if (!mounted) return;
+    final rebuilt = reconcilePostsPreservingLocalState(_posts, [
+      _remotePosts,
+      _persistedPosts,
+    ]);
+    if (orderedPostsEqual(rebuilt, _posts)) return;
+    setState(() => _posts = rebuilt);
   }
 
   void _onLocalPostsChanged(List<MediaPost> persisted) {
+    _persistedPosts = _visiblePersistedPosts(persisted);
+    _syncVisiblePosts();
+  }
+
+  Future<void> _handleLocalDataCleared() async {
     if (!mounted) return;
-    final merged = _mergePersistedPosts(_visiblePersistedPosts(persisted));
-    if (orderedPostsEqual(merged, _posts)) return;
-    setState(() => _posts = merged);
+    setState(() {
+      _persistedPosts = [];
+      _remotePosts = [];
+      _posts = [];
+    });
+    try {
+      await _repo.refresh();
+      await _loadFollowStats();
+    } catch (_) {}
   }
 
   void _toggleLike(MediaPost post) {
@@ -316,7 +353,7 @@ class ProfileScreenState extends State<ProfileScreen>
       );
       if (mounted) {
         setState(() {
-          _posts = _mergePosts(_posts, [post]);
+          _posts = mergePostsPreservingLocalState(_posts, [post]);
         });
         ScaffoldMessenger.of(
           context,
@@ -339,7 +376,7 @@ class ProfileScreenState extends State<ProfileScreen>
       final withoutOld = _posts.where((item) => item.id != post.id).toList();
       setState(() {
         _retryingPostIds.remove(post.id);
-        _posts = _mergePosts(withoutOld, [published]);
+        _posts = mergePostsPreservingLocalState(withoutOld, [published]);
       });
       ScaffoldMessenger.of(
         context,

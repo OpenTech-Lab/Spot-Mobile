@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
-import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/follow_stats.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/profile_model.dart';
@@ -14,6 +13,7 @@ import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/discover_screen.dart';
 import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/thread_screen.dart';
+import 'package:mobile/services/app_data_reset_service.dart';
 import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/media_resolver.dart';
@@ -48,10 +48,13 @@ class UserProfileScreen extends StatefulWidget {
 class _UserProfileScreenState extends State<UserProfileScreen>
     with SingleTickerProviderStateMixin {
   late final EventRepository _repo;
-  StreamSubscription<CivicEvent>? _sub;
+  StreamSubscription<void>? _repoSub;
+  StreamSubscription<void>? _resetSub;
   late final TabController _contentTabController;
 
   List<MediaPost> _posts = [];
+  List<MediaPost> _remotePosts = [];
+  List<MediaPost> _persistedPosts = [];
   final Set<String> _loadingMediaPostIds = {};
   bool _isLoading = true;
   bool _isFollowing = false;
@@ -67,13 +70,17 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       ..addListener(() {
         if (mounted) setState(() {});
       });
+    _resetSub ??= AppDataResetService.instance.localDataCleared.listen((_) {
+      unawaited(_handleLocalDataCleared());
+    });
     _initFeed();
     _loadProfile();
   }
 
   @override
   void dispose() {
-    _sub?.cancel();
+    _repoSub?.cancel();
+    _resetSub?.cancel();
     _contentTabController.dispose();
     _repo.dispose();
     super.dispose();
@@ -85,42 +92,70 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     setState(() => _isLoading = true);
     try {
       await _loadPersistedPosts();
-      _sub = _repo.subscribeToAuthorPosts(widget.pubkey).listen(_onEvent);
+      _repoSub ??= _repo
+          .subscribeToAuthorChanges(widget.pubkey)
+          .listen((_) => _onRepoChanged());
+      _onRepoChanged();
     } catch (_) {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _onEvent(CivicEvent event) {
+  void _onRepoChanged() {
     if (!mounted) return;
-    final posts = event.posts.where((p) => p.pubkey == widget.pubkey).toList();
-    if (posts.isEmpty) return;
-    final merged = _mergePosts(_posts, posts);
-    if (orderedPostsEqual(merged, _posts)) return;
-    unawaited(LocalPostStore.instance.savePosts(posts));
-    setState(() => _posts = merged);
+    final nextRemotePosts = _repo.getPostsForAuthor(widget.pubkey);
+    final remoteChanged = !orderedPostsEqual(nextRemotePosts, _remotePosts);
+    _remotePosts = nextRemotePosts;
+    if (remoteChanged && nextRemotePosts.isNotEmpty) {
+      unawaited(LocalPostStore.instance.savePosts(nextRemotePosts));
+    }
+    _syncVisiblePosts();
   }
 
   Future<void> _refresh() async {
-    await _sub?.cancel();
-    _repo.reset();
-    setState(() => _posts = []);
-    await _initFeed();
-    await _loadProfile();
+    setState(() {
+      _isLoading = true;
+      _remotePosts = [];
+      _posts = [];
+    });
+    try {
+      await _loadPersistedPosts();
+      await _repo.refresh();
+      await _loadProfile();
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
-
-  List<MediaPost> _mergePosts(
-    List<MediaPost> current,
-    Iterable<MediaPost> incoming,
-  ) => mergePostsPreservingLocalState(current, incoming);
 
   Future<void> _loadPersistedPosts() async {
     final persisted = await LocalPostStore.instance.loadPosts(
       authorPubkey: widget.pubkey,
     );
-    if (!mounted || persisted.isEmpty) return;
-    setState(() => _posts = _mergePosts(_posts, persisted));
+    _persistedPosts = persisted;
+    _syncVisiblePosts();
+  }
+
+  void _syncVisiblePosts() {
+    if (!mounted) return;
+    final rebuilt = reconcilePostsPreservingLocalState(_posts, [
+      _remotePosts,
+      _persistedPosts,
+    ]);
+    if (orderedPostsEqual(rebuilt, _posts)) return;
+    setState(() => _posts = rebuilt);
+  }
+
+  Future<void> _handleLocalDataCleared() async {
+    if (!mounted) return;
+    setState(() {
+      _persistedPosts = [];
+      _remotePosts = [];
+      _posts = [];
+    });
+    try {
+      await _repo.refresh();
+    } catch (_) {}
   }
 
   Future<void> _loadProfile() async {
@@ -513,7 +548,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                         replyToPost: post,
                         onPublished: (reply) {
                           if (!mounted) return;
-                          setState(() => _posts = _mergePosts(_posts, [reply]));
+                          setState(
+                            () => _posts =
+                                mergePostsPreservingLocalState(_posts, [reply]),
+                          );
                         },
                       ),
                     ),

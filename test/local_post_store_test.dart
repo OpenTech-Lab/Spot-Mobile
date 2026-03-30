@@ -142,6 +142,21 @@ void main() {
       expect(untouched.authorAvatarContentHash, isNull);
     },
   );
+
+  test('runWithWritesPaused prevents background saves from repopulating data', () async {
+    await LocalPostStore.instance.savePost(_post(id: 'original-post'));
+
+    await LocalPostStore.instance.runWithWritesPaused(() async {
+      await LocalPostStore.instance.clearAll(force: true);
+      await LocalPostStore.instance.savePost(_post(id: 'repopulated-post'));
+    });
+
+    final posts = await LocalPostStore.instance.loadPosts(
+      includeFailedToSend: true,
+    );
+
+    expect(posts, isEmpty);
+  });
 }
 
 MediaPost _post({

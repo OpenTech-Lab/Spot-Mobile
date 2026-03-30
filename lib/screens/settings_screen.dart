@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 
 import 'package:mobile/models/asset_transport_policy.dart';
 import 'package:mobile/models/wallet_model.dart';
+import 'package:mobile/screens/altcha_gate_screen.dart';
 import 'package:mobile/screens/asset_transport_settings_screen.dart';
 import 'package:mobile/screens/interests_screen.dart';
+import 'package:mobile/screens/onboarding_screen.dart';
 import 'package:mobile/screens/wallet_screen.dart';
+import 'package:mobile/services/app_data_reset_service.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/services/follow_service.dart';
 import 'package:mobile/services/local_post_store.dart';
+import 'package:mobile/services/session_logout_service.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
@@ -32,6 +36,8 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  bool _isLoggingOut = false;
+
   AssetTransportPolicy get _assetTransportPolicy =>
       UserPrefsService.instance.assetTransportPolicy;
   String get _favoriteTopicsValue =>
@@ -146,13 +152,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     if (confirmed == true && mounted) {
-      await Future.wait([
-        CacheManager.instance.purgeAll(),
-        CacheManager.instance.clearBlocklist(),
-        LocalPostStore.instance.clearAll(),
-        FollowService.instance.clearAll(),
-        UserPrefsService.instance.clearAll(),
-      ]);
+      await LocalPostStore.instance.runWithWritesPaused(() async {
+        await Future.wait([
+          CacheManager.instance.purgeAll(),
+          CacheManager.instance.clearBlocklist(),
+          LocalPostStore.instance.clearAll(force: true),
+          FollowService.instance.clearAll(),
+          UserPrefsService.instance.clearAll(),
+        ]);
+        AppDataResetService.instance.notifyLocalDataCleared();
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -160,6 +169,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _confirmLogout() async {
+    if (_isLoggingOut) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SpotColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(SpotRadius.md),
+        ),
+        title: const Text('Log out?', style: SpotType.subheading),
+        content: const Text(
+          'This will sign you out on this device and erase local app data. '
+          'Your Supabase account and remote posts will remain intact.',
+          style: SpotType.bodySecondary,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel', style: SpotType.bodySecondary),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              'Log Out',
+              style: SpotType.body.copyWith(color: SpotColors.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _logout();
+    }
+  }
+
+  Future<void> _logout() async {
+    if (_isLoggingOut) return;
+    setState(() => _isLoggingOut = true);
+    try {
+      await SessionLogoutService.instance.logout();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (_) => const AltchaGateScreen(next: OnboardingScreen()),
+        ),
+        (route) => false,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to log out: $error')));
+      setState(() => _isLoggingOut = false);
     }
   }
 
@@ -199,6 +266,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 builder: (_) => WalletScreen(wallet: widget.wallet),
               ),
             ),
+          ),
+          const SizedBox(height: SpotSpacing.sm),
+          _SettingsRow(
+            icon: CupertinoIcons.square_arrow_right,
+            label: 'Log Out',
+            value: _isLoggingOut ? 'Signing out…' : null,
+            onTap: _confirmLogout,
           ),
           const SizedBox(height: SpotSpacing.xl),
           const Padding(

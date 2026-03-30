@@ -56,6 +56,50 @@ void main() {
     expect(merged.single.mediaPaths, ['/tmp/cached-image.jpg']);
   });
 
+  test(
+    'reconcilePostsPreservingLocalState drops posts missing from all sources',
+    () {
+      final current = [
+        _post(id: 'stale-post', capturedAt: DateTime.utc(2026, 3, 22)),
+      ];
+
+      final reconciled = reconcilePostsPreservingLocalState(current, const []);
+
+      expect(reconciled, isEmpty);
+    },
+  );
+
+  test(
+    'reconcilePostsPreservingLocalState keeps local state for authoritative rows',
+    () {
+      final current = [
+        _post(
+          id: 'post-id',
+          likeCount: 2,
+          isLikedByMe: true,
+          mediaPaths: const ['/tmp/cached-image.jpg'],
+          capturedAt: DateTime.utc(2026, 3, 22),
+        ),
+      ];
+      final remote = [
+        _post(
+          id: 'post-id',
+          likeCount: 2,
+          caption: 'fresh metadata',
+          capturedAt: DateTime.utc(2026, 3, 23),
+        ),
+      ];
+
+      final reconciled = reconcilePostsPreservingLocalState(current, [remote]);
+
+      expect(reconciled, hasLength(1));
+      expect(reconciled.single.caption, 'fresh metadata');
+      expect(reconciled.single.isLikedByMe, isTrue);
+      expect(reconciled.single.mediaPaths, ['/tmp/cached-image.jpg']);
+      expect(reconciled.single.displayLikeCount, 3);
+    },
+  );
+
   test('replacePostsById applies a local liked-state update', () {
     final current = [_post(likeCount: 2)];
     final updated = _post(likeCount: 2, isLikedByMe: true);
@@ -84,6 +128,7 @@ void main() {
 }
 
 MediaPost _post({
+  String id = 'post-id',
   int likeCount = 0,
   bool isLikedByMe = false,
   String? caption,
@@ -92,9 +137,9 @@ MediaPost _post({
   String? previewBase64,
   String? previewMimeType,
 }) => MediaPost(
-  id: 'post-id',
+  id: id,
   pubkey: 'pubkey',
-  contentHashes: const ['post-id'],
+  contentHashes: [id],
   mediaPaths: mediaPaths,
   capturedAt: capturedAt ?? DateTime.utc(2026, 3, 23),
   eventTags: const ['tokyo'],
@@ -103,5 +148,5 @@ MediaPost _post({
   isLikedByMe: isLikedByMe,
   previewBase64: previewBase64,
   previewMimeType: previewMimeType,
-  nostrEventId: 'post-id',
+  nostrEventId: id,
 );

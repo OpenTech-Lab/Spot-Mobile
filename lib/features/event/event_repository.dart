@@ -18,6 +18,7 @@ class EventRepository {
   final Map<String, CivicEvent> _cache = {};
   final Map<String, MediaPost> _optimisticPostsById = {};
   final _controller = StreamController<CivicEvent>.broadcast();
+  final _changes = StreamController<void>.broadcast();
 
   StreamSubscription<List<Map<String, dynamic>>>? _globalPostsSub;
   StreamSubscription<List<Map<String, dynamic>>>? _profileSub;
@@ -33,6 +34,7 @@ class EventRepository {
   bool _globalRequested = false;
   bool _rebuildInFlight = false;
   bool _rebuildQueued = false;
+  Future<void> _pendingRefresh = Future<void>.value();
 
   // ── Subscription ──────────────────────────────────────────────────────────
 
@@ -46,6 +48,18 @@ class EventRepository {
     _authorPostRows.putIfAbsent(authorPubkey, () => const []);
     unawaited(_attachStreams(authorPubkey: authorPubkey));
     return _controller.stream;
+  }
+
+  Stream<void> subscribeToChanges() {
+    _globalRequested = true;
+    unawaited(_attachStreams());
+    return _changes.stream;
+  }
+
+  Stream<void> subscribeToAuthorChanges(String authorPubkey) {
+    _authorPostRows.putIfAbsent(authorPubkey, () => const []);
+    unawaited(_attachStreams(authorPubkey: authorPubkey));
+    return _changes.stream;
   }
 
   Future<void> _attachStreams({String? authorPubkey}) async {
@@ -125,6 +139,23 @@ class EventRepository {
     return sortEventsByLastActivity(_cache.values);
   }
 
+  List<MediaPost> getAllPosts() {
+    final byId = <String, MediaPost>{};
+    for (final event in _cache.values) {
+      for (final post in event.posts) {
+        byId[post.id] = post;
+      }
+    }
+    return byId.values.toList(growable: false)
+      ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+  }
+
+  List<MediaPost> getPostsForAuthor(String authorPubkey) {
+    return getAllPosts()
+        .where((post) => post.pubkey == authorPubkey)
+        .toList(growable: false);
+  }
+
   Future<List<MediaPost>> fetchPostsPage({DateTime? before, int limit = 20}) =>
       _metadata.fetchPosts(before: before, limit: limit);
 
@@ -140,15 +171,20 @@ class EventRepository {
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-  void reset() {
-    unawaited(refresh());
-  }
+  Future<void> reset() => refresh();
 
   Future<void> refresh() async {
-    _cache.clear();
-    _globalPostRows = const [];
-    _authorPostRows.updateAll((_, currentRows) => const []);
-    await _restartStreams();
+    final next = _pendingRefresh.then((_) async {
+      _cache.clear();
+      _optimisticPostsById.clear();
+      _globalPostRows = const [];
+      _authorPostRows.updateAll((_, currentRows) => const []);
+      _witnessRows = const [];
+      _emitChange();
+      await _restartStreams();
+    });
+    _pendingRefresh = next.catchError((_) {});
+    await next;
   }
 
   Future<void> _restartStreams() async {
@@ -162,6 +198,7 @@ class EventRepository {
   Future<void> dispose() async {
     await _cancelStreams();
     await _controller.close();
+    await _changes.close();
   }
 
   Future<void> _cancelStreams() async {
@@ -352,9 +389,17 @@ class EventRepository {
       ..clear()
       ..addAll(rebuilt);
 
+    _emitChange();
+
     if (_controller.isClosed) return;
     for (final event in getAllEvents()) {
       _controller.add(event);
+    }
+  }
+
+  void _emitChange() {
+    if (!_changes.isClosed) {
+      _changes.add(null);
     }
   }
 

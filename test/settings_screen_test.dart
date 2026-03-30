@@ -33,6 +33,26 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('settings exposes a logout action', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(home: SettingsScreen(wallet: _wallet())),
+    );
+
+    expect(find.text('Log Out'), findsOneWidget);
+
+    await tester.tap(find.text('Log Out'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Log out?'), findsOneWidget);
+    expect(
+      find.text(
+        'This will sign you out on this device and erase local app data. '
+        'Your Supabase account and remote posts will remain intact.',
+      ),
+      findsOneWidget,
+    );
+  });
 }
 
 WalletModel _wallet() => WalletModel(
