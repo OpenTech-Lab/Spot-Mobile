@@ -106,10 +106,22 @@ class UserPrefsService {
 
   /// Whether the footprint map is visible to other users.
   /// Defaults to false (private) until the user explicitly enables it.
-  bool get footprintMapPublic => _data['footprint_map_public'] as bool? ?? false;
+  bool get footprintMapPublic =>
+      _data['footprint_map_public'] as bool? ?? false;
 
   Future<void> saveFootprintMapPublic(bool isPublic) async {
     _data = {..._data, 'footprint_map_public': isPublic};
+    await _save();
+  }
+
+  // ── Session safety ────────────────────────────────────────────────────────
+
+  /// Whether a saved account should require local unlock on app open/resume.
+  /// Defaults to true so existing installs keep the current safer behavior.
+  bool get safeModeEnabled => _data['safe_mode_enabled'] as bool? ?? true;
+
+  Future<void> saveSafeModeEnabled(bool enabled) async {
+    _data = {..._data, 'safe_mode_enabled': enabled};
     await _save();
   }
 

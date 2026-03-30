@@ -39,6 +39,8 @@ typedef SaveProfileVisibility =
       bool? repliesPublic,
       bool? footprintMapPublic,
     });
+typedef ReadSafeModeEnabled = bool Function();
+typedef SaveSafeModeEnabled = Future<void> Function(bool enabled);
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -46,11 +48,15 @@ class SettingsScreen extends StatefulWidget {
     required this.wallet,
     this.loadProfileSettings,
     this.saveProfileVisibility,
+    this.readSafeModeEnabled,
+    this.saveSafeModeEnabled,
   });
 
   final WalletModel wallet;
   final LoadSettingsProfile? loadProfileSettings;
   final SaveProfileVisibility? saveProfileVisibility;
+  final ReadSafeModeEnabled? readSafeModeEnabled;
+  final SaveSafeModeEnabled? saveSafeModeEnabled;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -60,9 +66,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoggingOut = false;
   bool _isLoadingVisibility = true;
   bool _isSavingVisibility = false;
+  bool _isSavingSafeMode = false;
   bool _threadsPublic = true;
   bool _repliesPublic = true;
   bool _footprintMapPublic = false;
+  late bool _safeModeEnabled;
 
   AssetTransportPolicy get _assetTransportPolicy =>
       UserPrefsService.instance.assetTransportPolicy;
@@ -81,10 +89,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             repliesPublic: repliesPublic,
             footprintMapPublic: footprintMapPublic,
           );
+  ReadSafeModeEnabled get _safeModeReader =>
+      widget.readSafeModeEnabled ??
+      () => UserPrefsService.instance.safeModeEnabled;
+  SaveSafeModeEnabled get _safeModeWriter =>
+      widget.saveSafeModeEnabled ??
+      UserPrefsService.instance.saveSafeModeEnabled;
 
   @override
   void initState() {
     super.initState();
+    _safeModeEnabled = _safeModeReader();
     unawaited(_loadProfileVisibility());
   }
 
@@ -171,6 +186,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _setFootprintMapPublic(bool isPublic) async {
     await _saveVisibility(footprintMapPublic: isPublic);
+  }
+
+  Future<void> _setSafeModeEnabled(bool enabled) async {
+    if (_isSavingSafeMode) return;
+
+    final previousValue = _safeModeEnabled;
+    setState(() {
+      _safeModeEnabled = enabled;
+      _isSavingSafeMode = true;
+    });
+
+    try {
+      await _safeModeWriter(enabled);
+      if (!mounted) return;
+      setState(() => _isSavingSafeMode = false);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _safeModeEnabled = previousValue;
+        _isSavingSafeMode = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update safe mode: $error')),
+      );
+    }
   }
 
   Future<void> _openAssetTransportSettings() async {
@@ -482,6 +522,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: EdgeInsets.symmetric(vertical: SpotSpacing.sm),
             child: Text('SESSION', style: SpotType.label),
           ),
+          _SettingsSwitchRow(
+            icon: CupertinoIcons.lock,
+            label: 'Safe Mode',
+            value: _safeModeEnabled,
+            onChanged: _isSavingSafeMode ? null : _setSafeModeEnabled,
+          ),
+          const SizedBox(height: SpotSpacing.sm),
           _SettingsRow(
             icon: CupertinoIcons.square_arrow_right,
             label: 'Log Out',

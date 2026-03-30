@@ -9,6 +9,7 @@ import 'package:mobile/screens/onboarding_screen.dart';
 import 'package:mobile/screens/splash_screen.dart';
 import 'package:mobile/services/app_lock_service.dart';
 import 'package:mobile/services/session_logout_service.dart';
+import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/app_loading_view.dart';
 
@@ -47,6 +48,7 @@ class SessionGateScreen extends StatefulWidget {
     this.logoutRunner,
     this.unlockedBuilder,
     this.onboardingBuilder,
+    this.safeModeEnabled,
     this.relockAfter = const Duration(minutes: 2),
   });
 
@@ -55,6 +57,7 @@ class SessionGateScreen extends StatefulWidget {
   final SessionLogoutRunner? logoutRunner;
   final SessionUnlockedBuilder? unlockedBuilder;
   final SessionOnboardingBuilder? onboardingBuilder;
+  final bool? safeModeEnabled;
   final Duration relockAfter;
 
   @override
@@ -75,14 +78,16 @@ class _SessionGateScreenState extends State<SessionGateScreen>
       widget.appLockService ?? AppLockService.instance;
   SessionLogoutRunner get _logoutRunner =>
       widget.logoutRunner ?? SessionLogoutService.instance.logout;
+  bool get _safeModeEnabled =>
+      widget.safeModeEnabled ?? UserPrefsService.instance.safeModeEnabled;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _wallet = widget.initialWallet;
-    _isLocked = _wallet != null;
-    if (_wallet != null) {
+    _isLocked = _wallet != null && _safeModeEnabled;
+    if (_wallet != null && _safeModeEnabled) {
       unawaited(_prepareLock(autoUnlock: true));
     }
   }
@@ -95,7 +100,7 @@ class _SessionGateScreenState extends State<SessionGateScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_wallet == null) return;
+    if (_wallet == null || !_safeModeEnabled) return;
 
     switch (state) {
       case AppLifecycleState.inactive:
@@ -280,6 +285,11 @@ class _SessionGateScreenState extends State<SessionGateScreen>
     if (wallet == null) {
       return widget.onboardingBuilder?.call() ??
           const AltchaGateScreen(next: OnboardingScreen());
+    }
+
+    if (!_safeModeEnabled) {
+      return widget.unlockedBuilder?.call(wallet) ??
+          SplashScreen(wallet: wallet);
     }
 
     if (_isCheckingLock || _lockStatus == null) {

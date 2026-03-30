@@ -24,6 +24,7 @@ void main() {
         home: SettingsScreen(
           wallet: _wallet(),
           loadProfileSettings: (_) async => _profile(),
+          readSafeModeEnabled: () => true,
         ),
       ),
     );
@@ -47,6 +48,7 @@ void main() {
         home: SettingsScreen(
           wallet: _wallet(),
           loadProfileSettings: (_) async => _profile(),
+          readSafeModeEnabled: () => true,
         ),
       ),
     );
@@ -84,6 +86,7 @@ void main() {
             areRepliesPublic: false,
             isFootprintMapPublic: true,
           ),
+          readSafeModeEnabled: () => true,
         ),
       ),
     );
@@ -112,6 +115,7 @@ void main() {
         home: SettingsScreen(
           wallet: _wallet(),
           loadProfileSettings: (_) async => _profile(areThreadsPublic: true),
+          readSafeModeEnabled: () => true,
           saveProfileVisibility:
               (
                 _, {
@@ -139,6 +143,7 @@ void main() {
         home: SettingsScreen(
           wallet: _wallet(),
           loadProfileSettings: (_) async => _profile(),
+          readSafeModeEnabled: () => true,
         ),
       ),
     );
@@ -151,6 +156,40 @@ void main() {
 
     expect(find.text('Posted Threads'), findsOneWidget);
     expect(find.text('Replied Threads'), findsOneWidget);
+  });
+
+  testWidgets('settings exposes and saves the safe mode switch', (
+    tester,
+  ) async {
+    bool? savedSafeModeEnabled;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsScreen(
+          wallet: _wallet(),
+          loadProfileSettings: (_) async => _profile(),
+          readSafeModeEnabled: () => true,
+          saveSafeModeEnabled: (enabled) async {
+            savedSafeModeEnabled = enabled;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Safe Mode'),
+      200,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Safe Mode'), findsOneWidget);
+
+    await tester.tap(find.text('Safe Mode'));
+    await tester.pumpAndSettle();
+
+    expect(savedSafeModeEnabled, isFalse);
   });
 }
 

@@ -159,6 +159,33 @@ void main() {
     expect(find.text('Saved account locked'), findsOneWidget);
     expect(find.text('Unlocked home'), findsNothing);
   });
+
+  testWidgets('safe mode off bypasses the saved-account lock screen', (
+    tester,
+  ) async {
+    final service = _FakeAppLockService(
+      status: const AppLockStatus(
+        canAuthenticate: true,
+        message: 'Unlock this saved account.',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SessionGateScreen(
+          initialWallet: _wallet(),
+          appLockService: service,
+          safeModeEnabled: false,
+          unlockedBuilder: (_) => const Text('Unlocked home'),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unlocked home'), findsOneWidget);
+    expect(find.text('Saved account locked'), findsNothing);
+  });
 }
 
 class _FakeAppLockService extends AppLockService {
