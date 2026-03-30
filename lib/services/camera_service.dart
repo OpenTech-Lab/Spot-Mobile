@@ -74,7 +74,8 @@ class CameraService {
     FaceRegionDetector? faceRegionDetector,
     Future<Directory> Function()? blurDirectoryLoader,
   }) : _faceRegionDetector = faceRegionDetector ?? MlKitFaceRegionDetector(),
-       _blurDirectoryLoader = blurDirectoryLoader ?? getApplicationSupportDirectory;
+       _blurDirectoryLoader =
+           blurDirectoryLoader ?? getApplicationSupportDirectory;
 
   static final CameraService instance = CameraService._();
 
@@ -161,7 +162,9 @@ class CameraService {
       );
 
       try {
-        final faceBounds = await _faceRegionDetector.detectFaces(normalizedInput);
+        final faceBounds = await _faceRegionDetector.detectFaces(
+          normalizedInput,
+        );
         if (faceBounds.isEmpty) {
           return imageFile;
         }
@@ -190,28 +193,28 @@ class CameraService {
 
   void _blurFaceRegion(img.Image image, Rect rawBounds) {
     final expanded = Rect.fromLTRB(
-      math.max(0.0, rawBounds.left - rawBounds.width * 0.18),
-      math.max(0.0, rawBounds.top - rawBounds.height * 0.22),
+      math.max(0.0, rawBounds.left - rawBounds.width * 0.08),
+      math.max(0.0, rawBounds.top - rawBounds.height * 0.10),
       math.min(
         image.width.toDouble(),
-        rawBounds.right + rawBounds.width * 0.18,
+        rawBounds.right + rawBounds.width * 0.08,
       ),
       math.min(
         image.height.toDouble(),
-        rawBounds.bottom + rawBounds.height * 0.22,
+        rawBounds.bottom + rawBounds.height * 0.10,
       ),
     );
 
     final x = expanded.left.floor().clamp(0, image.width - 1).toInt();
     final y = expanded.top.floor().clamp(0, image.height - 1).toInt();
-    final width = math.max(
-      1,
-      expanded.width.ceil(),
-    ).clamp(1, image.width - x).toInt();
-    final height = math.max(
-      1,
-      expanded.height.ceil(),
-    ).clamp(1, image.height - y).toInt();
+    final width = math
+        .max(1, expanded.width.ceil())
+        .clamp(1, image.width - x)
+        .toInt();
+    final height = math
+        .max(1, expanded.height.ceil())
+        .clamp(1, image.height - y)
+        .toInt();
 
     final faceCrop = img.copyCrop(
       image,
@@ -220,9 +223,82 @@ class CameraService {
       width: width,
       height: height,
     );
-    final blurRadius = math.max(12, (math.min(width, height) / 6).round());
-    final blurredCrop = img.gaussianBlur(faceCrop, radius: blurRadius);
-    img.compositeImage(image, blurredCrop, dstX: x, dstY: y);
+    final obscuredCrop = _pixelateFaceCrop(faceCrop);
+
+    final centerX = (width - 1) / 2;
+    final centerY = (height - 1) / 2;
+    final radiusX = math.max(1.0, width * 0.46);
+    final radiusY = math.max(1.0, height * 0.46);
+
+    for (var localY = 0; localY < height; localY++) {
+      for (var localX = 0; localX < width; localX++) {
+        final blurAlpha = _ellipticalBlurAlpha(
+          localX: localX,
+          localY: localY,
+          centerX: centerX,
+          centerY: centerY,
+          radiusX: radiusX,
+          radiusY: radiusY,
+        );
+        if (blurAlpha <= 0) continue;
+
+        final originalPixel = faceCrop.getPixel(localX, localY);
+        final blurredPixel = obscuredCrop.getPixel(localX, localY);
+        image.setPixelRgba(
+          x + localX,
+          y + localY,
+          _blendChannel(originalPixel.r, blurredPixel.r, blurAlpha),
+          _blendChannel(originalPixel.g, blurredPixel.g, blurAlpha),
+          _blendChannel(originalPixel.b, blurredPixel.b, blurAlpha),
+          originalPixel.a.toInt(),
+        );
+      }
+    }
+  }
+
+  img.Image _pixelateFaceCrop(img.Image faceCrop) {
+    final sampleWidth = math.max(4, (faceCrop.width / 6).round());
+    final sampleHeight = math.max(4, (faceCrop.height / 6).round());
+    final reduced = img.copyResize(
+      faceCrop,
+      width: sampleWidth,
+      height: sampleHeight,
+      interpolation: img.Interpolation.average,
+    );
+    return img.copyResize(
+      reduced,
+      width: faceCrop.width,
+      height: faceCrop.height,
+      interpolation: img.Interpolation.nearest,
+    );
+  }
+
+  double _ellipticalBlurAlpha({
+    required int localX,
+    required int localY,
+    required double centerX,
+    required double centerY,
+    required double radiusX,
+    required double radiusY,
+  }) {
+    final normalizedX = ((localX + 0.5) - centerX) / radiusX;
+    final normalizedY = ((localY + 0.5) - centerY) / radiusY;
+    final distance = math.sqrt(
+      normalizedX * normalizedX + normalizedY * normalizedY,
+    );
+    if (distance >= 1.0) return 0.0;
+
+    const featherFraction = 0.24;
+    final featherStart = 1.0 - featherFraction;
+    if (distance <= featherStart) return 1.0;
+
+    final progress = ((1.0 - distance) / featherFraction).clamp(0.0, 1.0);
+    return progress * progress * (3 - 2 * progress);
+  }
+
+  int _blendChannel(num original, num blurred, double alpha) {
+    final blended = original + (blurred - original) * alpha;
+    return blended.round().clamp(0, 255).toInt();
   }
 
   Future<File> _writeBlurImage(
