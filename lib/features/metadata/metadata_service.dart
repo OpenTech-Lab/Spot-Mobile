@@ -357,6 +357,8 @@ class MetadataService {
     final mapped = (await mapPostRows([inserted])).single;
     return mapped.copyWith(
       mediaPaths: normalizedDraft.mediaPaths,
+      previewBase64: normalizedDraft.previewBase64,
+      previewMimeType: normalizedDraft.previewMimeType,
       deliveryState: PostDeliveryState.sent,
       lastPublishError: null,
     );

@@ -204,6 +204,8 @@ class _CameraScreenState extends State<CameraScreen>
         eventTags: effectiveTag != null ? [effectiveTag] : const [],
         isDangerMode: _isDangerMode,
         isVirtual: _isVirtualMode,
+        previewBase64: preparedMedia.previewBase64,
+        previewMimeType: preparedMedia.previewMimeType,
         caption: caption.isEmpty ? null : caption,
         replyToId: widget.replyToPost?.nostrEventId,
         nostrEventId: primaryHash,

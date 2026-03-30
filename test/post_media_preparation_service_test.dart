@@ -7,21 +7,21 @@ import 'package:mobile/services/post_media_preparation_service.dart';
 void main() {
   group('PostMediaPreparationService.prepareAssets', () {
     test('blurs only photo assets when blurFaces is enabled', () async {
-      final tempDir = await Directory.systemTemp.createTemp('spot_post_media_prep');
+      final tempDir = await Directory.systemTemp.createTemp(
+        'spot_post_media_prep',
+      );
       addTearDown(() async {
         if (tempDir.existsSync()) {
           await tempDir.delete(recursive: true);
         }
       });
 
-      final photo = await File('${tempDir.path}/photo.jpg').writeAsBytes(
-        const [1, 2, 3],
-        flush: true,
-      );
-      final video = await File('${tempDir.path}/video.mp4').writeAsBytes(
-        const [4, 5, 6],
-        flush: true,
-      );
+      final photo = await File(
+        '${tempDir.path}/photo.jpg',
+      ).writeAsBytes(const [1, 2, 3], flush: true);
+      final video = await File(
+        '${tempDir.path}/video.mp4',
+      ).writeAsBytes(const [4, 5, 6], flush: true);
 
       var blurCalls = 0;
       final optimizedIsVideo = <bool>[];
@@ -29,7 +29,9 @@ void main() {
       final service = PostMediaPreparationService.forTesting(
         faceBlurApplier: (file) async {
           blurCalls++;
-          final blurred = File('${tempDir.path}/blurred_${file.uri.pathSegments.last}');
+          final blurred = File(
+            '${tempDir.path}/blurred_${file.uri.pathSegments.last}',
+          );
           await blurred.writeAsBytes(const [9, 9, 9], flush: true);
           return blurred;
         },
@@ -39,13 +41,10 @@ void main() {
         },
       );
 
-      final prepared = await service.prepareAssets(
-        [
-          PostMediaAsset(file: photo, isVideo: false),
-          PostMediaAsset(file: video, isVideo: true),
-        ],
-        blurFaces: true,
-      );
+      final prepared = await service.prepareAssets([
+        PostMediaAsset(file: photo, isVideo: false),
+        PostMediaAsset(file: video, isVideo: true),
+      ], blurFaces: true);
 
       expect(blurCalls, 1);
       expect(optimizedIsVideo, [false, true]);
@@ -56,17 +55,18 @@ void main() {
     });
 
     test('skips face blur entirely when blurFaces is disabled', () async {
-      final tempDir = await Directory.systemTemp.createTemp('spot_post_media_no_blur');
+      final tempDir = await Directory.systemTemp.createTemp(
+        'spot_post_media_no_blur',
+      );
       addTearDown(() async {
         if (tempDir.existsSync()) {
           await tempDir.delete(recursive: true);
         }
       });
 
-      final photo = await File('${tempDir.path}/photo.jpg').writeAsBytes(
-        const [1, 2, 3],
-        flush: true,
-      );
+      final photo = await File(
+        '${tempDir.path}/photo.jpg',
+      ).writeAsBytes(const [1, 2, 3], flush: true);
 
       var blurCalls = 0;
 
@@ -78,12 +78,66 @@ void main() {
         uploadOptimizer: (file, {required isVideo}) async => file,
       );
 
-      await service.prepareAssets(
-        [PostMediaAsset(file: photo, isVideo: false)],
-        blurFaces: false,
-      );
+      await service.prepareAssets([
+        PostMediaAsset(file: photo, isVideo: false),
+      ], blurFaces: false);
 
       expect(blurCalls, 0);
     });
+
+    test(
+      'builds thread preview from the final processed protected image',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp(
+          'spot_post_media_preview',
+        );
+        addTearDown(() async {
+          if (tempDir.existsSync()) {
+            await tempDir.delete(recursive: true);
+          }
+        });
+
+        final photo = await File(
+          '${tempDir.path}/photo.jpg',
+        ).writeAsBytes(const [1, 2, 3], flush: true);
+
+        var previewCalls = 0;
+        String? previewPath;
+
+        final service = PostMediaPreparationService.forTesting(
+          faceBlurApplier: (file) async {
+            final blurred = File(
+              '${tempDir.path}/blurred_${file.uri.pathSegments.last}',
+            );
+            await blurred.writeAsBytes(const [9, 9, 9], flush: true);
+            return blurred;
+          },
+          uploadOptimizer: (file, {required isVideo}) async {
+            final optimized = File(
+              '${tempDir.path}/optimized_${file.uri.pathSegments.last}',
+            );
+            await optimized.writeAsBytes(const [7, 7, 7], flush: true);
+            return optimized;
+          },
+          previewBuilder: (file, {required isVideo}) async {
+            previewCalls++;
+            previewPath = file.path;
+            return const PostMediaPreviewData(
+              base64: 'YWJj',
+              mimeType: 'image/jpeg',
+            );
+          },
+        );
+
+        final prepared = await service.prepareAssets([
+          PostMediaAsset(file: photo, isVideo: false),
+        ], blurFaces: true);
+
+        expect(prepared.previewBase64, 'YWJj');
+        expect(prepared.previewMimeType, 'image/jpeg');
+        expect(previewCalls, 1);
+        expect(previewPath, contains('optimized_blurred_photo.jpg'));
+      },
+    );
   });
 }

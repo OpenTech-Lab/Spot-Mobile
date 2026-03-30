@@ -333,6 +333,8 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
         isVirtual: _isVirtual,
         isAiGenerated: _isAiGenerated,
         isTextOnly: isTextOnly,
+        previewBase64: preparedMedia.previewBase64,
+        previewMimeType: preparedMedia.previewMimeType,
         sourceType: _sourceType,
         caption: caption.isEmpty ? null : caption,
         replyToId: widget.replyToPost?.nostrEventId,
