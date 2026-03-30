@@ -53,6 +53,20 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('settings exposes a public activity menu', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(home: SettingsScreen(wallet: _wallet())),
+    );
+
+    expect(find.text('Public Activity'), findsOneWidget);
+
+    await tester.tap(find.text('Public Activity'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Posted Threads'), findsOneWidget);
+    expect(find.text('Replied Threads'), findsOneWidget);
+  });
 }
 
 WalletModel _wallet() => WalletModel(

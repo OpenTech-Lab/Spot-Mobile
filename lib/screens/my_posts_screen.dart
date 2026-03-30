@@ -18,11 +18,33 @@ import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
+enum MyPostsScreenMode { threads, replies }
+
 /// Shows only the posts authored by the current wallet owner.
 class MyPostsScreen extends StatefulWidget {
-  const MyPostsScreen({super.key, required this.wallet});
+  const MyPostsScreen({
+    super.key,
+    required this.wallet,
+    this.mode = MyPostsScreenMode.threads,
+  });
 
   final WalletModel wallet;
+  final MyPostsScreenMode mode;
+
+  String get title => switch (mode) {
+    MyPostsScreenMode.threads => 'Posted Threads',
+    MyPostsScreenMode.replies => 'Replied Threads',
+  };
+
+  String get emptyTitle => switch (mode) {
+    MyPostsScreenMode.threads => 'No threads yet',
+    MyPostsScreenMode.replies => 'No replies yet',
+  };
+
+  String get emptySubtitle => switch (mode) {
+    MyPostsScreenMode.threads => 'Threads you post publicly will appear here',
+    MyPostsScreenMode.replies => 'Replies you post publicly will appear here',
+  };
 
   @override
   State<MyPostsScreen> createState() => _MyPostsScreenState();
@@ -199,13 +221,18 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
           color: SpotColors.textSecondary,
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('My Posts', style: SpotType.subheading),
+        title: Text(widget.title, style: SpotType.subheading),
       ),
       body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
+    final visiblePosts = switch (widget.mode) {
+      MyPostsScreenMode.threads => topLevelThreadPosts(_posts),
+      MyPostsScreenMode.replies => replyPosts(_posts),
+    };
+
     if (_isLoading && _posts.isEmpty) {
       return const Center(
         child: Column(
@@ -261,7 +288,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
       );
     }
 
-    if (_posts.isEmpty) {
+    if (visiblePosts.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -273,14 +300,14 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
             ),
             const SizedBox(height: SpotSpacing.lg),
             Text(
-              'No posts yet',
+              widget.emptyTitle,
               style: SpotType.bodySecondary.copyWith(
                 fontWeight: FontWeight.w300,
               ),
             ),
             const SizedBox(height: SpotSpacing.xs),
-            const Text(
-              'Capture a moment to see it here',
+            Text(
+              widget.emptySubtitle,
               style: SpotType.caption,
             ),
           ],
@@ -295,19 +322,18 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
       onRefresh: _refresh,
       child: Builder(
         builder: (ctx) {
-          final entries = buildThreadedPostEntries(_posts);
           return ListView.builder(
             padding: const EdgeInsets.only(
               top: SpotSpacing.sm,
               bottom: SpotSpacing.xl,
             ),
-            itemCount: entries.length,
+            itemCount: visiblePosts.length,
             itemBuilder: (ctx, i) => PostThreadRow(
-              post: entries[i].post,
-              isLast: isLastInThread(entries, i),
-              isMediaLoading: _loadingMediaPostIds.contains(entries[i].post.id),
+              post: visiblePosts[i],
+              isLast: true,
+              isMediaLoading: _loadingMediaPostIds.contains(visiblePosts[i].id),
               onTagTap: (tag) => _openDiscoverTag(ctx, tag),
-              onLike: () => _toggleLike(entries[i].post),
+              onLike: () => _toggleLike(visiblePosts[i]),
               onMediaUpdated: _hydrateMediaPost,
             ),
           );

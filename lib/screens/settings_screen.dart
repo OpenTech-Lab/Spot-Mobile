@@ -6,6 +6,7 @@ import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/altcha_gate_screen.dart';
 import 'package:mobile/screens/asset_transport_settings_screen.dart';
 import 'package:mobile/screens/interests_screen.dart';
+import 'package:mobile/screens/my_posts_screen.dart';
 import 'package:mobile/screens/onboarding_screen.dart';
 import 'package:mobile/screens/wallet_screen.dart';
 import 'package:mobile/services/app_data_reset_service.dart';
@@ -230,6 +231,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _openPublicActivityMenu() async {
+    final selection = await showCupertinoModalPopup<MyPostsScreenMode>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: const Text('Public Activity'),
+        message: const Text('Choose which of your public posts to open.'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () =>
+                Navigator.of(ctx).pop(MyPostsScreenMode.threads),
+            child: const Text('Posted Threads'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () =>
+                Navigator.of(ctx).pop(MyPostsScreenMode.replies),
+            child: const Text('Replied Threads'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Cancel'),
+        ),
+      ),
+    );
+
+    if (!mounted || selection == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => MyPostsScreen(wallet: widget.wallet, mode: selection),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -273,6 +307,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             label: 'Log Out',
             value: _isLoggingOut ? 'Signing out…' : null,
             onTap: _confirmLogout,
+          ),
+          const SizedBox(height: SpotSpacing.xl),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: SpotSpacing.sm),
+            child: Text('ACTIVITY', style: SpotType.label),
+          ),
+          _SettingsRow(
+            icon: CupertinoIcons.text_bubble,
+            label: 'Public Activity',
+            value: 'Threads / Replies',
+            onTap: _openPublicActivityMenu,
           ),
           const SizedBox(height: SpotSpacing.xl),
           const Padding(
