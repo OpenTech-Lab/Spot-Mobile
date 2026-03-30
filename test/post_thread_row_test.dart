@@ -417,6 +417,44 @@ void main() {
   });
 
   testWidgets(
+    'PostThreadRow shows unavailable message after a failed preview load cycle and stops retry taps',
+    (tester) async {
+      final harnessKey = GlobalKey<_FailedPreviewLoadHarnessState>();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ListView(
+              children: [
+                _FailedPreviewLoadHarness(
+                  key: harnessKey,
+                  post: _post(
+                    eventTags: const ['tokyo'],
+                    previewBase64: _tinyPngBase64,
+                    previewMimeType: 'image/png',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Loading full image…'), findsOneWidget);
+
+      harnessKey.currentState!.finishFailedLoad();
+      await tester.pump();
+
+      expect(find.text('Image unavailable now'), findsOneWidget);
+
+      await tester.tap(find.text('Image unavailable now'));
+      await tester.pump();
+
+      expect(harnessKey.currentState!.updateCalls, 0);
+    },
+  );
+
+  testWidgets(
     'PostThreadRow feed media keeps the default inset gap before swiping',
     (tester) async {
       tester.view.devicePixelRatio = 1;
@@ -650,6 +688,35 @@ class _LikeHarnessState extends State<_LikeHarness> {
           _post = _post.copyWith(isLikedByMe: !_post.isLikedByMe);
         });
       },
+    );
+  }
+}
+
+class _FailedPreviewLoadHarness extends StatefulWidget {
+  const _FailedPreviewLoadHarness({super.key, required this.post});
+
+  final MediaPost post;
+
+  @override
+  State<_FailedPreviewLoadHarness> createState() =>
+      _FailedPreviewLoadHarnessState();
+}
+
+class _FailedPreviewLoadHarnessState extends State<_FailedPreviewLoadHarness> {
+  bool isMediaLoading = true;
+  int updateCalls = 0;
+
+  void finishFailedLoad() {
+    setState(() => isMediaLoading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PostThreadRow(
+      post: widget.post,
+      isLast: true,
+      isMediaLoading: isMediaLoading,
+      onMediaUpdated: (_) => updateCalls++,
     );
   }
 }

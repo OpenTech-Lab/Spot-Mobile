@@ -477,6 +477,7 @@ class _PostMedia extends StatefulWidget {
 
 class _PostMediaState extends State<_PostMedia> {
   bool _hasTriedAutoLoad = false;
+  bool _isMediaUnavailableNow = false;
   double _feedEdgeSwipeProgress = 0;
   late final ScrollController _mediaScrollController;
 
@@ -501,6 +502,7 @@ class _PostMediaState extends State<_PostMedia> {
     super.didUpdateWidget(oldWidget);
     if (widget.post.id != oldWidget.post.id) {
       _hasTriedAutoLoad = false;
+      _isMediaUnavailableNow = false;
       _feedEdgeSwipeProgress = 0;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_mediaScrollController.hasClients) return;
@@ -508,17 +510,27 @@ class _PostMediaState extends State<_PostMedia> {
         _mediaScrollController.jumpTo(0);
       });
       _tryAutoLoad();
+      return;
+    }
+
+    final hasLocalMedia = _hasLocalMedia();
+    if (hasLocalMedia) {
+      _isMediaUnavailableNow = false;
+      return;
+    }
+
+    if (oldWidget.isMediaLoading && !widget.isMediaLoading) {
+      _isMediaUnavailableNow = true;
     }
   }
 
   void _tryAutoLoad() {
     if (_hasTriedAutoLoad || widget.isMediaLoading) return;
+    if (_isMediaUnavailableNow) return;
     if (widget.post.isTextOnly) return;
 
     // Check if media is already available
-    final hasLocalMedia = widget.post.mediaPaths.any(
-      (path) => File(path).existsSync(),
-    );
+    final hasLocalMedia = _hasLocalMedia();
     if (hasLocalMedia) return;
 
     // Auto-load if only preview is available
@@ -679,11 +691,9 @@ class _PostMediaState extends State<_PostMedia> {
     final previewBytes = _decodePreviewBytes();
     if (previewBytes != null) {
       return GestureDetector(
-        onTap: () {
-          if (!widget.isMediaLoading) {
-            widget.onPostUpdated?.call(widget.post);
-          }
-        },
+        onTap: _canRequestMedia()
+            ? () => widget.onPostUpdated?.call(widget.post)
+            : null,
         behavior: HitTestBehavior.opaque,
         child: SizedBox(
           height: _PostMedia.maxImageHeight,
@@ -710,6 +720,8 @@ class _PostMediaState extends State<_PostMedia> {
                   child: _TransportStatusChip(
                     label: widget.isMediaLoading
                         ? 'Loading full image…'
+                        : _isMediaUnavailableNow
+                        ? 'Image unavailable now'
                         : 'Tap to load full',
                     showSpinner: widget.isMediaLoading,
                   ),
@@ -743,13 +755,13 @@ class _PostMediaState extends State<_PostMedia> {
     }
 
     return GestureDetector(
-      onTap: () {
-        if (!widget.isMediaLoading) {
-          // Trigger media fetch via CDN / P2P instead of opening an empty
-          // detail screen.
-          widget.onPostUpdated?.call(widget.post);
-        }
-      },
+      onTap: _canRequestMedia()
+          ? () {
+              // Trigger media fetch via CDN / P2P instead of opening an empty
+              // detail screen.
+              widget.onPostUpdated?.call(widget.post);
+            }
+          : null,
       behavior: HitTestBehavior.opaque,
       child: _mediaShell(
         child: Column(
@@ -761,14 +773,18 @@ class _PostMediaState extends State<_PostMedia> {
                 child: CupertinoActivityIndicator(radius: 10),
               )
             else
-              const Icon(
-                CupertinoIcons.cloud_download,
+              Icon(
+                _isMediaUnavailableNow
+                    ? CupertinoIcons.exclamationmark_triangle
+                    : CupertinoIcons.cloud_download,
                 color: SpotColors.overlay,
                 size: 26,
               ),
             Text(
               widget.isMediaLoading
                   ? 'Loading full media…'
+                  : _isMediaUnavailableNow
+                  ? 'Image unavailable now'
                   : 'Tap to load media',
               style: SpotType.caption.copyWith(color: SpotColors.textTertiary),
             ),
@@ -776,6 +792,8 @@ class _PostMediaState extends State<_PostMedia> {
             Text(
               widget.isMediaLoading
                   ? 'Downloading from CDN…'
+                  : _isMediaUnavailableNow
+                  ? 'Check back later'
                   : 'Downloads via CDN or P2P',
               style: SpotType.caption.copyWith(
                 color: SpotColors.textTertiary.withAlpha(150),
@@ -823,6 +841,11 @@ class _PostMediaState extends State<_PostMedia> {
       return null;
     }
   }
+
+  bool _hasLocalMedia() =>
+      widget.post.mediaPaths.any((path) => File(path).existsSync());
+
+  bool _canRequestMedia() => !widget.isMediaLoading && !_isMediaUnavailableNow;
 
   static bool _isVideo(String path) {
     final p = path.toLowerCase();
