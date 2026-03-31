@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/models/posting_quota_status.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/wallet_screen.dart';
@@ -11,6 +13,12 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
         home: WalletScreen(
           wallet: _wallet(),
           loadPostingQuota: () async => _quota(),

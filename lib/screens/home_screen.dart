@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/event/event_screen.dart';
@@ -182,6 +183,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBottomNav() {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       decoration: const BoxDecoration(color: SpotColors.bg),
       child: SafeArea(
@@ -193,7 +195,7 @@ class HomeScreenState extends State<HomeScreen> {
               _NavItem(
                 icon: CupertinoIcons.house,
                 selectedIcon: CupertinoIcons.house_fill,
-                label: 'Home',
+                label: l10n.homeNavLabel,
                 selected: _selectedTab == 0,
                 onTap: () => setState(() => _selectedTab = 0),
                 onDoubleTap: () {
@@ -203,21 +205,21 @@ class HomeScreenState extends State<HomeScreen> {
               ),
               _NavItem(
                 icon: CupertinoIcons.compass,
-                label: 'Discover',
+                label: l10n.discoverNavLabel,
                 selected: _selectedTab == 1,
                 onTap: () => setState(() => _selectedTab = 1),
               ),
               _NavItem(
                 icon: CupertinoIcons.folder,
                 selectedIcon: CupertinoIcons.folder_fill,
-                label: 'Events',
+                label: l10n.eventsNavLabel,
                 selected: _selectedTab == 2,
                 onTap: () => setState(() => _selectedTab = 2),
               ),
               _NavItem(
                 icon: CupertinoIcons.person,
                 selectedIcon: CupertinoIcons.person_fill,
-                label: 'Profile',
+                label: l10n.profileNavLabel,
                 selected: _selectedTab == 3,
                 onTap: () => setState(() => _selectedTab = 3),
               ),
@@ -425,6 +427,7 @@ class _EventsListTabState extends State<_EventsListTab>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final events = widget.eventRepo.getAllEvents();
     final followedEvents = _followReady
         ? eventsForFollowedTags(
@@ -437,17 +440,17 @@ class _EventsListTabState extends State<_EventsListTab>
       bottom: false,
       child: Column(
         children: [
-          const SpotTabbedScreenHeader(
+          SpotTabbedScreenHeader(
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text('Events', style: SpotType.subheading),
+              child: Text(l10n.eventsTabTitle, style: SpotType.subheading),
             ),
           ),
           SpotTabbedScreenTabBar(
             controller: _tabController,
-            tabs: const [
-              Tab(text: 'ALL'),
-              Tab(text: 'FOLLOWING'),
+            tabs: [
+              Tab(text: l10n.allEventsTabLabel),
+              Tab(text: l10n.followingTabLabel),
             ],
           ),
           Expanded(
@@ -559,6 +562,7 @@ class _EventRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(SpotRadius.sm),
@@ -577,7 +581,10 @@ class _EventRow extends StatelessWidget {
                   Text('#${event.hashtag}', style: SpotType.body),
                   const SizedBox(height: 3),
                   Text(
-                    '${event.posts.length} posts · ${event.participantCount} contributors',
+                    l10n.eventPostsContributors(
+                      event.posts.length,
+                      event.participantCount,
+                    ),
                     style: SpotType.caption,
                   ),
                   const SizedBox(height: SpotSpacing.sm),
@@ -585,7 +592,7 @@ class _EventRow extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _EventDateChip(
-                          label: 'Created',
+                          label: l10n.createdLabel,
                           icon: Icons.event_outlined,
                           value: formatEventListDate(event.firstSeen),
                         ),
@@ -593,7 +600,7 @@ class _EventRow extends StatelessWidget {
                       const SizedBox(width: SpotSpacing.xs),
                       Expanded(
                         child: _EventDateChip(
-                          label: 'Post',
+                          label: l10n.eventPostLabel,
                           icon: Icons.article_outlined,
                           value: formatEventListDate(event.lastPostAt),
                         ),
@@ -601,7 +608,7 @@ class _EventRow extends StatelessWidget {
                       const SizedBox(width: SpotSpacing.xs),
                       Expanded(
                         child: _EventDateChip(
-                          label: 'Reply',
+                          label: l10n.eventReplyLabel,
                           icon: Icons.reply,
                           value: formatEventListDate(event.lastReplyAt),
                         ),
@@ -687,6 +694,7 @@ class _EventsEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -698,7 +706,7 @@ class _EventsEmptyState extends StatelessWidget {
           ),
           const SizedBox(height: SpotSpacing.lg),
           Text(
-            'No events yet',
+            l10n.noEventsYet,
             style: SpotType.bodySecondary.copyWith(fontWeight: FontWeight.w300),
           ),
         ],
@@ -714,12 +722,13 @@ class _FollowingEventsEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final title = hasFollowedTags
-        ? 'No followed events live'
-        : 'No followed tags yet';
+        ? l10n.noFollowedEventsLive
+        : l10n.noFollowedTagsYet;
     final body = hasFollowedTags
-        ? 'Followed tags will show up here when matching live events appear.'
-        : 'Follow a tag from Discover or an event detail screen to see it here.';
+        ? l10n.followedTagsDescription
+        : l10n.followTagPrompt;
 
     return Center(
       child: Padding(

@@ -31,6 +31,7 @@ import 'package:mobile/services/media_processing_service.dart';
 import 'package:mobile/services/post_publish_service.dart';
 import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/footprint_map_tab.dart';
 import 'package:mobile/widgets/profile_avatar.dart';
@@ -308,6 +309,7 @@ class ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _deletePost(MediaPost post) async {
+    final l10n = AppLocalizations.of(context)!;
     // Optimistic removal from UI
     setState(() {
       _posts = _posts
@@ -324,7 +326,7 @@ class ProfileScreenState extends State<ProfileScreen>
       await _purgePostCache(post);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Removed local unsent post')),
+          SnackBar(content: Text(l10n.removedLocalPost)),
         );
       }
       return;
@@ -338,11 +340,7 @@ class ProfileScreenState extends State<ProfileScreen>
       await _purgePostCache(post);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Post deleted. Swarm participants will be notified to remove local copies.',
-            ),
-          ),
+          SnackBar(content: Text(l10n.postDeleted)),
         );
       }
     } catch (e) {
@@ -357,12 +355,13 @@ class ProfileScreenState extends State<ProfileScreen>
         });
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Failed to delete post')));
+        ).showSnackBar(SnackBar(content: Text(l10n.failedDeletePost)));
       }
     }
   }
 
   Future<void> _retryPost(MediaPost post) async {
+    final l10n = AppLocalizations.of(context)!;
     if (_retryingPostIds.contains(post.id)) return;
     setState(() => _retryingPostIds.add(post.id));
     try {
@@ -380,7 +379,7 @@ class ProfileScreenState extends State<ProfileScreen>
       });
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Post sent')));
+      ).showSnackBar(SnackBar(content: Text(l10n.postSent)));
     } on MissingCategoryTagError catch (e) {
       if (!mounted) return;
       setState(() => _retryingPostIds.remove(post.id));
@@ -411,14 +410,13 @@ class ProfileScreenState extends State<ProfileScreen>
         _posts = replacePostsById(_posts, [failed]);
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Retry failed. The post is still saved locally.'),
-        ),
+        SnackBar(content: Text(l10n.retryFailed)),
       );
     }
   }
 
   Future<void> _reportPost(MediaPost post) async {
+    final l10n = AppLocalizations.of(context)!;
     try {
       await MetadataService.instance.reportContent(
         postId: post.nostrEventId,
@@ -430,7 +428,7 @@ class ProfileScreenState extends State<ProfileScreen>
       setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reported. Content hidden.')),
+          SnackBar(content: Text(l10n.reportedContentHidden)),
         );
       }
     } catch (_) {}
@@ -471,6 +469,7 @@ class ProfileScreenState extends State<ProfileScreen>
         ),
       ),
       builder: (sheetContext) {
+        final l10n = AppLocalizations.of(sheetContext)!;
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
             final descriptionWordCount = countProfileDescriptionWords(
@@ -491,7 +490,7 @@ class ProfileScreenState extends State<ProfileScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Edit Profile', style: SpotType.subheading),
+                  Text(l10n.editProfileTitle, style: SpotType.subheading),
                   const SizedBox(height: SpotSpacing.lg),
                   Center(
                     child: GestureDetector(
@@ -529,7 +528,7 @@ class ProfileScreenState extends State<ProfileScreen>
                   const SizedBox(height: SpotSpacing.sm),
                   Center(
                     child: Text(
-                      'Tap avatar to choose a new image',
+                      l10n.tapAvatarHint,
                       style: SpotType.caption,
                     ),
                   ),
@@ -538,9 +537,9 @@ class ProfileScreenState extends State<ProfileScreen>
                     controller: nameController,
                     enabled: !_isSavingProfile,
                     maxLength: 32,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      hintText: 'Citizen name',
+                    decoration: InputDecoration(
+                      labelText: l10n.usernameFieldLabel,
+                      hintText: l10n.usernameFieldHint,
                     ),
                   ),
                   const SizedBox(height: SpotSpacing.md),
@@ -551,12 +550,14 @@ class ProfileScreenState extends State<ProfileScreen>
                     maxLines: 3,
                     onChanged: (_) => setSheetState(() {}),
                     decoration: InputDecoration(
-                      labelText: 'Description',
-                      hintText: 'Simple description about you',
-                      helperText:
-                          '$descriptionWordCount/$maxProfileDescriptionWords words',
+                      labelText: l10n.descriptionFieldLabel,
+                      hintText: l10n.descriptionFieldHint,
+                      helperText: l10n.descriptionWordCountHelper(
+                        descriptionWordCount,
+                        maxProfileDescriptionWords,
+                      ),
                       errorText: isDescriptionTooLong
-                          ? 'Use 100 words or fewer'
+                          ? l10n.descriptionTooLongError
                           : null,
                     ),
                   ),
@@ -575,7 +576,7 @@ class ProfileScreenState extends State<ProfileScreen>
                               );
                             },
                       child: Text(
-                        _isSavingProfile ? 'Saving…' : 'Save Profile',
+                        _isSavingProfile ? l10n.savingLabel : l10n.saveProfileButton,
                       ),
                     ),
                   ),
@@ -593,6 +594,7 @@ class ProfileScreenState extends State<ProfileScreen>
     required String description,
     XFile? selectedAvatar,
   }) async {
+    final l10n = AppLocalizations.of(context)!;
     setState(() => _isSavingProfile = true);
     try {
       String? avatarContentHash = _profile?.avatarContentHash;
@@ -627,7 +629,7 @@ class ProfileScreenState extends State<ProfileScreen>
           );
         } catch (error) {
           avatarContentHash = _profile?.avatarContentHash;
-          avatarUploadWarning = _avatarUploadWarningMessage(error);
+          avatarUploadWarning = _avatarUploadWarningMessage(error, l10n);
         }
       }
 
@@ -664,8 +666,8 @@ class ProfileScreenState extends State<ProfileScreen>
         _posts = updatedPosts;
       });
       final successMessage = avatarUploadWarning == null
-          ? 'Profile updated'
-          : 'Profile updated. $avatarUploadWarning';
+          ? l10n.profileUpdated
+          : l10n.profileUpdatedWithWarning(avatarUploadWarning!);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(successMessage)));
@@ -678,19 +680,19 @@ class ProfileScreenState extends State<ProfileScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to update profile: $e')));
+      ).showSnackBar(SnackBar(content: Text(l10n.failedUpdateProfile(e.toString()))));
     } finally {
       if (mounted) setState(() => _isSavingProfile = false);
     }
   }
 
-  String _avatarUploadWarningMessage(Object error) {
+  String _avatarUploadWarningMessage(Object error, AppLocalizations l10n) {
     final message = error.toString().toLowerCase();
     if (message.contains('device time appears out of sync') ||
         message.contains('timestamp too far from server time')) {
-      return 'Avatar not updated. Turn on automatic date & time and try again.';
+      return l10n.avatarNotUpdatedTimeSync;
     }
-    return 'Avatar not updated. Please try again.';
+    return l10n.avatarNotUpdated;
   }
 
   String _profileImageContentType(String path, {String? mimeType}) {
@@ -703,16 +705,17 @@ class ProfileScreenState extends State<ProfileScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final threads = topLevelThreadPosts(_posts);
     final replies = replyPosts(_posts);
     final tabIndex = _contentTabController.index;
     final showReplies = tabIndex == 1;
     final showMap = tabIndex == 2;
     final visiblePosts = showReplies ? replies : threads;
-    final emptyTitle = showReplies ? 'No replies yet' : 'No threads yet';
+    final emptyTitle = showReplies ? l10n.noRepliesYet : l10n.noThreadsYet;
     final emptySubtitle = showReplies
-        ? 'Replies you posted will appear here'
-        : 'Capture a moment to see it here';
+        ? l10n.repliesPostedHint
+        : l10n.captureAMomentHint;
     final summaryPosts = _posts.where((post) => !post.isPendingRetry);
     final activitySummary = buildProfileActivitySummary(
       posts: summaryPosts,
@@ -722,12 +725,12 @@ class ProfileScreenState extends State<ProfileScreen>
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
         backgroundColor: SpotColors.bg,
-        title: const Text('Profile', style: SpotType.subheading),
+        title: Text(l10n.profileTitle, style: SpotType.subheading),
         actions: [
           IconButton(
             icon: const Icon(CupertinoIcons.settings, size: 20),
             color: SpotColors.textSecondary,
-            tooltip: 'Settings',
+            tooltip: l10n.settingsTooltip,
             onPressed: _openSettings,
           ),
         ],
@@ -786,7 +789,7 @@ class ProfileScreenState extends State<ProfileScreen>
               SliverFillRemaining(
                 child: Center(
                   child: Text(
-                    'Could not load posts',
+                    l10n.couldNotLoadPosts,
                     style: SpotType.bodySecondary,
                   ),
                 ),
@@ -879,6 +882,7 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         SpotSpacing.lg,
@@ -917,7 +921,7 @@ class _ProfileHeader extends StatelessWidget {
           Text(
             profile?.displayName?.trim().isNotEmpty == true
                 ? profile!.displayName!.trim()
-                : 'You',
+                : l10n.youLabel,
             style: SpotType.subheading,
           ),
           if (profile?.description?.trim().isNotEmpty == true) ...[
@@ -931,7 +935,7 @@ class _ProfileHeader extends StatelessWidget {
             width: double.infinity,
             child: OutlinedButton(
               onPressed: isSavingProfile ? null : onEdit,
-              child: Text(isSavingProfile ? 'Saving…' : 'Edit Profile'),
+              child: Text(isSavingProfile ? l10n.savingLabel : l10n.editProfileTitle),
             ),
           ),
         ],

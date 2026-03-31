@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/posting_quota_status.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -52,6 +53,7 @@ class _WalletScreenState extends State<WalletScreen> {
   Future<void> _confirmDeleteAccount() async {
     if (_isDeletingAccount) return;
 
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -59,22 +61,20 @@ class _WalletScreenState extends State<WalletScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(SpotRadius.md),
         ),
-        title: const Text('Delete this account?', style: SpotType.subheading),
-        content: const Text(
-          'This will permanently remove your Spot profile and posts from '
-          'Supabase, then erase local app data from this device. This cannot '
-          'be undone.',
+        title: Text(l10n.deleteAccountDialogTitle, style: SpotType.subheading),
+        content: Text(
+          l10n.deleteAccountDialogContent,
           style: SpotType.bodySecondary,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel', style: SpotType.bodySecondary),
+            child: Text(l10n.cancelAction, style: SpotType.bodySecondary),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
-              'Delete',
+              l10n.deleteButton,
               style: SpotType.body.copyWith(color: SpotColors.danger),
             ),
           ),
@@ -88,6 +88,7 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Future<void> _deleteAccount() async {
+    final l10n = AppLocalizations.of(context)!;
     setState(() => _isDeletingAccount = true);
     try {
       await MetadataService.instance.deleteCurrentAccount();
@@ -108,32 +109,34 @@ class _WalletScreenState extends State<WalletScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to delete account: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.failedDeleteAccount(e.toString()))),
+      );
       setState(() => _isDeletingAccount = false);
     }
   }
 
   Future<void> _copyRecoveryPhrase() async {
+    final l10n = AppLocalizations.of(context)!;
     await Clipboard.setData(
       ClipboardData(text: widget.wallet.mnemonic.join(' ')),
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Recovery phrase copied')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.recoveryPhraseCopied)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final wallet = widget.wallet;
 
     return Scaffold(
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
         backgroundColor: SpotColors.bg,
-        title: const Text('Account', style: SpotType.subheading),
+        title: Text(l10n.walletAccountTitle, style: SpotType.subheading),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(SpotSpacing.lg),
@@ -143,24 +146,23 @@ class _WalletScreenState extends State<WalletScreen> {
             Center(child: _Avatar(pubkeyHex: wallet.publicKeyHex)),
             const SizedBox(height: SpotSpacing.lg),
             _Section(
-              title: 'This device',
+              title: l10n.thisDeviceSectionTitle,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Profile name and avatar are edited from the Profile tab. '
-                    'Device signing keys stay internal to the app.',
+                  Text(
+                    l10n.deviceSectionDescription,
                     style: SpotType.bodySecondary,
                   ),
                   const SizedBox(height: SpotSpacing.lg),
                   _MetaRow(
-                    label: 'Device',
+                    label: l10n.deviceLabel,
                     value: wallet.deviceId.length > 20
                         ? '${wallet.deviceId.substring(0, 14)}…'
                         : wallet.deviceId,
                   ),
                   _MetaRow(
-                    label: 'Created',
+                    label: l10n.createdLabel,
                     value: wallet.createdAt.toLocal().toString().substring(
                       0,
                       16,
@@ -171,19 +173,19 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
             const SizedBox(height: SpotSpacing.lg),
             _Section(
-              title: 'Posting limits',
+              title: l10n.postingLimitsSectionTitle,
               child: FutureBuilder<PostingQuotaStatus>(
                 future: _postingQuotaFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState != ConnectionState.done) {
-                    return const _InlineLoadingState(
-                      label: 'Checking your current daily limits…',
+                    return _InlineLoadingState(
+                      label: l10n.checkingDailyLimits,
                     );
                   }
 
                   if (snapshot.hasError) {
                     return _InlineErrorState(
-                      message: 'Could not load your posting limits right now.',
+                      message: l10n.postingLimitsLoadError,
                       onRetry: _retryPostingQuota,
                     );
                   }
@@ -195,13 +197,12 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
             const SizedBox(height: SpotSpacing.lg),
             _Section(
-              title: 'Recovery phrase',
+              title: l10n.recoveryPhraseLabel,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'These 12 words are the only way to restore this identity '
-                    'after logging out or moving to a new device.',
+                  Text(
+                    l10n.recoveryPhraseWalletDescription,
                     style: SpotType.bodySecondary,
                   ),
                   const SizedBox(height: SpotSpacing.md),
@@ -212,7 +213,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         onPressed: () {
                           setState(() => _isRecoveryPhraseVisible = true);
                         },
-                        child: const Text('Show recovery phrase'),
+                        child: Text(l10n.showRecoveryPhraseButton),
                       ),
                     )
                   else ...[
@@ -236,7 +237,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         Expanded(
                           child: OutlinedButton(
                             onPressed: _copyRecoveryPhrase,
-                            child: const Text('Copy phrase'),
+                            child: Text(l10n.copyPhraseButton),
                           ),
                         ),
                         const SizedBox(width: SpotSpacing.sm),
@@ -245,7 +246,7 @@ class _WalletScreenState extends State<WalletScreen> {
                             onPressed: () {
                               setState(() => _isRecoveryPhraseVisible = false);
                             },
-                            child: const Text('Hide'),
+                            child: Text(l10n.hideButton),
                           ),
                         ),
                       ],
@@ -256,13 +257,12 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
             const SizedBox(height: SpotSpacing.lg),
             _Section(
-              title: 'Danger zone',
+              title: l10n.dangerZoneSectionTitle,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Delete this account from Supabase and erase local app data '
-                    'from this device.',
+                  Text(
+                    l10n.deleteAccountDescription,
                     style: SpotType.bodySecondary,
                   ),
                   const SizedBox(height: SpotSpacing.md),
@@ -284,7 +284,7 @@ class _WalletScreenState extends State<WalletScreen> {
                                 color: SpotColors.danger,
                               ),
                             )
-                          : const Text('Delete this account'),
+                          : Text(l10n.deleteAccountButton),
                     ),
                   ),
                 ],
@@ -298,7 +298,7 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 }
 
-String formatPostingTierName(String tierName) {
+String formatPostingTierName(String tierName, {String unknown = 'Unknown'}) {
   final words = tierName
       .trim()
       .split(RegExp(r'[_\s]+'))
@@ -306,7 +306,7 @@ String formatPostingTierName(String tierName) {
       .map(
         (word) => '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}',
       );
-  return words.isEmpty ? 'Unknown' : words.join(' ');
+  return words.isEmpty ? unknown : words.join(' ');
 }
 
 String formatPostingResetTime(DateTime resetsAt) {
@@ -390,6 +390,7 @@ class _PostingLimitSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final blockReason = quota.postingBlockReason?.trim();
 
     return Column(
@@ -404,7 +405,7 @@ class _PostingLimitSummary extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Posting is currently blocked for this account.',
+                  l10n.postingBlocked,
                   style: SpotType.body.copyWith(color: SpotColors.danger),
                 ),
                 if (blockReason != null && blockReason.isNotEmpty) ...[
@@ -417,34 +418,41 @@ class _PostingLimitSummary extends StatelessWidget {
           const SizedBox(height: SpotSpacing.md),
         ],
         Text(
-          'You can check your remaining thread and reply publishes here '
-          'before opening the composer.',
+          l10n.postingQuotaDescription,
           style: SpotType.bodySecondary,
         ),
         const SizedBox(height: SpotSpacing.lg),
         _MetaRow(
-          label: 'Tier',
-          value: formatPostingTierName(quota.currentTierName),
+          label: l10n.tierLabel,
+          value: formatPostingTierName(
+            quota.currentTierName,
+            unknown: l10n.unknownLabel,
+          ),
         ),
         _MetaRow(
-          label: 'Threads',
-          value:
-              '${quota.threadRemainingToday} left of ${quota.threadLimitPerDay}',
+          label: l10n.threadsLabel,
+          value: l10n.postingRemainingOf(
+            quota.threadRemainingToday,
+            quota.threadLimitPerDay,
+          ),
         ),
         _MetaRow(
-          label: 'Replies',
-          value:
-              '${quota.replyRemainingToday} left of ${quota.replyLimitPerDay}',
+          label: l10n.repliesLabel,
+          value: l10n.postingRemainingOf(
+            quota.replyRemainingToday,
+            quota.replyLimitPerDay,
+          ),
         ),
         _MetaRow(
-          label: 'Used',
-          value:
-              '${quota.threadCountToday} threads, ${quota.replyCountToday} replies',
+          label: l10n.usedLabel,
+          value: l10n.postingUsedCount(
+            quota.threadCountToday,
+            quota.replyCountToday,
+          ),
         ),
         const SizedBox(height: SpotSpacing.sm),
         Text(
-          'Resets at ${formatPostingResetTime(quota.resetsAt)} '
-          '(next UTC midnight).',
+          l10n.postingQuotaResetsAt(formatPostingResetTime(quota.resetsAt)),
           style: SpotType.caption,
         ),
       ],
@@ -481,12 +489,13 @@ class _InlineErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(message, style: SpotType.body.copyWith(color: SpotColors.danger)),
         const SizedBox(height: SpotSpacing.md),
-        OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+        OutlinedButton(onPressed: onRetry, child: Text(l10n.retryButton)),
       ],
     );
   }

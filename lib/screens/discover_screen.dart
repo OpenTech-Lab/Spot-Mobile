@@ -25,6 +25,7 @@ import 'package:mobile/services/media_sync_service.dart';
 import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/services/user_prefs_service.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 import 'package:mobile/widgets/profile_avatar.dart';
@@ -166,12 +167,15 @@ List<MediaPost> visibleDiscoverThreads(
       .toList(growable: false);
 }
 
-String discoverProfileSearchDisplayName(ProfileModel profile) {
+String discoverProfileSearchDisplayName(
+  ProfileModel profile, {
+  String fallback = 'Citizen',
+}) {
   final displayName = profile.displayName?.trim();
   if (displayName != null && displayName.isNotEmpty) {
     return displayName;
   }
-  return 'Citizen';
+  return fallback;
 }
 
 String? discoverProfileSearchSecondaryText(ProfileModel profile) {
@@ -199,9 +203,10 @@ class _DiscoverSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return CupertinoSearchTextField(
       controller: controller,
-      placeholder: 'Search threads or #tags',
+      placeholder: l10n.discoverSearchPlaceholder,
       backgroundColor: SpotColors.surface,
       itemColor: SpotColors.textSecondary,
       style: SpotType.body.copyWith(color: SpotColors.textPrimary),
@@ -474,6 +479,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   // ── Post actions ──────────────────────────────────────────────────────────
 
   Future<void> _reportPost(MediaPost post) async {
+    final l10n = AppLocalizations.of(context)!;
     try {
       await MetadataService.instance.reportContent(
         postId: post.nostrEventId,
@@ -484,7 +490,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reported. Content hidden.')),
+          SnackBar(content: Text(l10n.reportedContentHidden)),
         );
       }
     } catch (_) {}
@@ -558,6 +564,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return SafeArea(
       bottom: false,
       child: Column(
@@ -577,13 +584,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 children: [
                   _buildScoredList(
                     posts: _trendingPosts,
-                    emptyLabel: 'Nothing trending in the last 48 h',
+                    emptyLabel: l10n.nothingTrending,
                   ),
                   _buildScoredList(
                     posts: _forYouPosts,
                     emptyLabel: UserPrefsService.instance.hasSetInterests
-                        ? 'No recommended posts yet'
-                        : 'Set your interests to see personalised content',
+                        ? l10n.noRecommendedPosts
+                        : l10n.setInterestsPrompt,
                   ),
                   _buildNearbyList(),
                 ],
@@ -596,6 +603,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   }
 
   Widget _buildHeader() {
+    final l10n = AppLocalizations.of(context)!;
     final currentSearchTag = _currentSearchTag;
     return Padding(
       padding: spotTabbedScreenHeaderPadding,
@@ -618,7 +626,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   ),
                   const SizedBox(width: SpotSpacing.sm),
                 ],
-                const Text('Discover', style: SpotType.subheading),
+                Text(l10n.discoverTitle, style: SpotType.subheading),
                 const SizedBox(width: SpotSpacing.md),
                 Expanded(
                   child: _DiscoverSearchField(
@@ -646,8 +654,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   ),
                   label: Text(
                     _isFollowingSearchTag
-                        ? 'Remove Favorite'
-                        : 'Add as Favorite',
+                        ? l10n.removeFavoriteLabel
+                        : l10n.addFavoriteLabel,
                   ),
                 ),
               ],
@@ -659,12 +667,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   }
 
   Widget _buildTabBar() {
+    final l10n = AppLocalizations.of(context)!;
     return SpotTabbedScreenTabBar(
       controller: _tabController,
-      tabs: const [
-        Tab(text: 'TRENDING'),
-        Tab(text: 'FOR YOU'),
-        Tab(text: 'NEARBY'),
+      tabs: [
+        Tab(text: l10n.trendingTabLabel),
+        Tab(text: l10n.forYouTabLabel),
+        Tab(text: l10n.nearbyTabLabel),
       ],
     );
   }
@@ -702,12 +711,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       );
     }
     if (roots.isEmpty) {
+      final l10n = AppLocalizations.of(context)!;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(SpotSpacing.xxxl),
           child: Text(
             normalizeDiscoverSearchQuery(_searchQuery).isNotEmpty
-                ? 'No threads found for "${_searchQuery.trim()}"'
+                ? l10n.noThreadsFound(_searchQuery.trim())
                 : emptyLabel,
             style: SpotType.bodySecondary,
             textAlign: TextAlign.center,
@@ -766,6 +776,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   }
 
   Widget _buildNearbyList() {
+    final l10n = AppLocalizations.of(context)!;
     if (!(_userLat != null)) {
       return Center(
         child: Padding(
@@ -779,8 +790,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 size: 32,
               ),
               const SizedBox(height: SpotSpacing.xl),
-              const Text(
-                'Enable location to see nearby events',
+              Text(
+                l10n.enableLocationPrompt,
                 style: SpotType.bodySecondary,
                 textAlign: TextAlign.center,
               ),
@@ -796,8 +807,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                     border: Border.all(color: SpotColors.border, width: 0.5),
                     borderRadius: BorderRadius.circular(SpotRadius.sm),
                   ),
-                  child: const Text(
-                    'Allow Location',
+                  child: Text(
+                    l10n.allowLocationButton,
                     style: SpotType.bodySecondary,
                   ),
                 ),
@@ -810,7 +821,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
     return _buildScoredList(
       posts: _nearbyPosts,
-      emptyLabel: 'No events near you',
+      emptyLabel: l10n.noEventsNearby,
     );
   }
 }
@@ -1028,6 +1039,7 @@ class _DiscoverSearchResultsScreenState
   }
 
   Future<void> _reportPost(MediaPost post) async {
+    final l10n = AppLocalizations.of(context)!;
     try {
       await MetadataService.instance.reportContent(
         postId: post.nostrEventId,
@@ -1038,7 +1050,7 @@ class _DiscoverSearchResultsScreenState
       setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reported. Content hidden.')),
+          SnackBar(content: Text(l10n.reportedContentHidden)),
         );
       }
     } catch (_) {}
@@ -1133,11 +1145,12 @@ class _DiscoverSearchResultsScreenState
     }
 
     if (roots.isEmpty) {
+      final l10n = AppLocalizations.of(context)!;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(SpotSpacing.xxxl),
           child: Text(
-            'No threads found for "$_queryLabel"',
+            l10n.noThreadsFound(_queryLabel),
             style: SpotType.bodySecondary,
             textAlign: TextAlign.center,
           ),
@@ -1184,6 +1197,7 @@ class _DiscoverSearchResultsScreenState
   }
 
   Widget _buildUsersTab() {
+    final l10n = AppLocalizations.of(context)!;
     if (_isLoadingProfiles) {
       return _buildLoadingState();
     }
@@ -1193,7 +1207,7 @@ class _DiscoverSearchResultsScreenState
         child: Padding(
           padding: const EdgeInsets.all(SpotSpacing.xxxl),
           child: Text(
-            'No users found for "$_queryLabel"',
+            l10n.noUsersFound(_queryLabel),
             style: SpotType.bodySecondary,
             textAlign: TextAlign.center,
           ),
@@ -1242,7 +1256,10 @@ class _DiscoverSearchResultsScreenState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          discoverProfileSearchDisplayName(profile),
+                          discoverProfileSearchDisplayName(
+                            profile,
+                            fallback: l10n.citizenDefaultName,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: SpotType.subheading,
@@ -1276,6 +1293,7 @@ class _DiscoverSearchResultsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return SafeArea(
       bottom: false,
       child: Column(
@@ -1284,9 +1302,9 @@ class _DiscoverSearchResultsScreenState
           if (_usesTabbedLayout)
             SpotTabbedScreenTabBar(
               controller: _tabController,
-              tabs: const [
-                Tab(text: 'THREADS'),
-                Tab(text: 'USERS'),
+              tabs: [
+                Tab(text: l10n.threadsTabLabel),
+                Tab(text: l10n.usersTabLabel),
               ],
             ),
           Expanded(

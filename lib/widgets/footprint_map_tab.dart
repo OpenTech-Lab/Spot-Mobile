@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/theme/spot_theme.dart';
@@ -155,6 +156,7 @@ class FootprintMapScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
@@ -165,7 +167,7 @@ class FootprintMapScreen extends StatelessWidget {
           icon: const Icon(CupertinoIcons.back, size: 20),
           color: SpotColors.textSecondary,
         ),
-        title: const Text(footprintMapTitle, style: SpotType.subheading),
+        title: Text(l10n.footprintMapTitle, style: SpotType.subheading),
       ),
       body: SafeArea(
         top: false,
@@ -427,6 +429,7 @@ class _FootprintMapTabState extends State<FootprintMapTab> {
       );
     }
 
+    final l10n = AppLocalizations.of(context)!;
     final visitedCountryCount = _visitCounts.length;
     final canZoomIn = _currentZoom < footprintMapMaxZoom - 0.01;
     final canZoomOut = _currentZoom > footprintMapMinZoom + 0.01;
@@ -507,7 +510,7 @@ class _FootprintMapTabState extends State<FootprintMapTab> {
                 ),
                 decoration: SpotDecoration.cardBordered(),
                 child: Text(
-                  '$visitedCountryCount ${visitedCountryCount == 1 ? 'country' : 'countries'} visited',
+                  l10n.footprintCountriesVisited(visitedCountryCount),
                   style: SpotType.caption.copyWith(
                     color: SpotColors.textSecondary,
                   ),
@@ -520,7 +523,7 @@ class _FootprintMapTabState extends State<FootprintMapTab> {
                 right: SpotSpacing.md,
                 child: _FootprintMapIconButton(
                   icon: CupertinoIcons.arrow_up_left_arrow_down_right,
-                  tooltip: 'Open full screen map',
+                  tooltip: l10n.openFullScreenMap,
                   onTap: _openFullScreen,
                 ),
               ),
@@ -533,6 +536,8 @@ class _FootprintMapTabState extends State<FootprintMapTab> {
                   canZoomOut: _isMapReady && canZoomOut,
                   onZoomIn: () => _adjustZoom(footprintMapZoomStep),
                   onZoomOut: () => _adjustZoom(-footprintMapZoomStep),
+                  zoomInTooltip: l10n.zoomIn,
+                  zoomOutTooltip: l10n.zoomOut,
                 ),
               ),
             if (showPopup)
@@ -589,12 +594,16 @@ class _FootprintMapZoomControls extends StatelessWidget {
     required this.canZoomOut,
     required this.onZoomIn,
     required this.onZoomOut,
+    required this.zoomInTooltip,
+    required this.zoomOutTooltip,
   });
 
   final bool canZoomIn;
   final bool canZoomOut;
   final VoidCallback onZoomIn;
   final VoidCallback onZoomOut;
+  final String zoomInTooltip;
+  final String zoomOutTooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -609,7 +618,7 @@ class _FootprintMapZoomControls extends StatelessWidget {
         children: [
           _FootprintMapZoomButton(
             icon: CupertinoIcons.plus,
-            tooltip: 'Zoom in',
+            tooltip: zoomInTooltip,
             isEnabled: canZoomIn,
             onTap: onZoomIn,
           ),
@@ -623,7 +632,7 @@ class _FootprintMapZoomControls extends StatelessWidget {
           ),
           _FootprintMapZoomButton(
             icon: CupertinoIcons.minus,
-            tooltip: 'Zoom out',
+            tooltip: zoomOutTooltip,
             isEnabled: canZoomOut,
             onTap: onZoomOut,
           ),

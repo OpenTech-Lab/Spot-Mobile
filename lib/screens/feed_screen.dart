@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/core/tag_normalizer.dart';
 import 'package:mobile/features/event/event_repository.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
@@ -321,6 +322,7 @@ class FeedScreenState extends State<FeedScreen>
   }
 
   Future<void> _reportPost(MediaPost post) async {
+    final l10n = AppLocalizations.of(context)!;
     try {
       await MetadataService.instance.reportContent(
         postId: post.nostrEventId,
@@ -331,7 +333,7 @@ class FeedScreenState extends State<FeedScreen>
       setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reported. Content hidden.')),
+          SnackBar(content: Text(l10n.reportedContentHidden)),
         );
       }
     } catch (_) {}
@@ -476,11 +478,12 @@ class FeedScreenState extends State<FeedScreen>
   }
 
   Widget _buildTabBar() {
+    final l10n = AppLocalizations.of(context)!;
     return SpotTabbedScreenTabBar(
       controller: _tabController,
-      tabs: const [
-        Tab(text: 'LATEST'),
-        Tab(text: 'FOLLOWING'),
+      tabs: [
+        Tab(text: l10n.latestTabLabel),
+        Tab(text: l10n.followingTabLabel),
       ],
     );
   }
@@ -652,94 +655,100 @@ class _LatestTabState extends State<_LatestTab> {
     ),
   );
 
-  Widget _buildError(BuildContext context) => RefreshIndicator(
-    onRefresh: widget.onRefresh,
-    color: SpotColors.accent,
-    backgroundColor: SpotColors.surface,
-    displacement: 28,
-    child: CustomScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      slivers: [
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(SpotSpacing.xxxl),
+  Widget _buildError(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return RefreshIndicator(
+      onRefresh: widget.onRefresh,
+      color: SpotColors.accent,
+      backgroundColor: SpotColors.surface,
+      displacement: 28,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(SpotSpacing.xxxl),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      CupertinoIcons.wifi_slash,
+                      color: SpotColors.textTertiary,
+                      size: 32,
+                    ),
+                    const SizedBox(height: SpotSpacing.xl),
+                    Text(
+                      l10n.couldNotLoadPosts,
+                      style: SpotType.bodySecondary,
+                    ),
+                    const SizedBox(height: SpotSpacing.xl),
+                    GestureDetector(
+                      onTap: widget.onRefresh,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: SpotSpacing.xl,
+                          vertical: SpotSpacing.sm,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: SpotColors.border,
+                            width: 0.5,
+                          ),
+                          borderRadius: BorderRadius.circular(SpotRadius.sm),
+                        ),
+                        child: Text(l10n.retryButton, style: SpotType.bodySecondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmpty() {
+    final l10n = AppLocalizations.of(context)!;
+    return RefreshIndicator(
+      onRefresh: widget.onRefresh,
+      color: SpotColors.accent,
+      backgroundColor: SpotColors.surface,
+      displacement: 28,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(
-                    CupertinoIcons.wifi_slash,
-                    color: SpotColors.textTertiary,
-                    size: 32,
+                    CupertinoIcons.tray,
+                    color: SpotColors.overlay,
+                    size: 36,
                   ),
-                  const SizedBox(height: SpotSpacing.xl),
-                  const Text(
-                    'Could not load posts',
-                    style: SpotType.bodySecondary,
-                  ),
-                  const SizedBox(height: SpotSpacing.xl),
-                  GestureDetector(
-                    onTap: widget.onRefresh,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: SpotSpacing.xl,
-                        vertical: SpotSpacing.sm,
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: SpotColors.border,
-                          width: 0.5,
-                        ),
-                        borderRadius: BorderRadius.circular(SpotRadius.sm),
-                      ),
-                      child: const Text('Retry', style: SpotType.bodySecondary),
+                  const SizedBox(height: SpotSpacing.lg),
+                  Text(
+                    l10n.noPostsYet,
+                    style: SpotType.bodySecondary.copyWith(
+                      fontWeight: FontWeight.w300,
                     ),
                   ),
+                  const SizedBox(height: SpotSpacing.xs),
+                  Text(l10n.beFirstToRecord, style: SpotType.caption),
                 ],
               ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
-
-  Widget _buildEmpty() => RefreshIndicator(
-    onRefresh: widget.onRefresh,
-    color: SpotColors.accent,
-    backgroundColor: SpotColors.surface,
-    displacement: 28,
-    child: CustomScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      slivers: [
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  CupertinoIcons.tray,
-                  color: SpotColors.overlay,
-                  size: 36,
-                ),
-                const SizedBox(height: SpotSpacing.lg),
-                Text(
-                  'No posts yet',
-                  style: SpotType.bodySecondary.copyWith(
-                    fontWeight: FontWeight.w300,
-                  ),
-                ),
-                const SizedBox(height: SpotSpacing.xs),
-                const Text('Be the first to record', style: SpotType.caption),
-              ],
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 // ── Following tab ─────────────────────────────────────────────────────────────
@@ -799,6 +808,7 @@ class _FollowingTab extends StatelessWidget {
       );
     }
     if (posts.isEmpty) {
+      final l10n = AppLocalizations.of(context)!;
       return RefreshIndicator(
         onRefresh: onRefresh,
         color: SpotColors.accent,
@@ -807,28 +817,28 @@ class _FollowingTab extends StatelessWidget {
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            const SliverFillRemaining(
+            SliverFillRemaining(
               hasScrollBody: false,
               child: Center(
                 child: Padding(
-                  padding: EdgeInsets.all(SpotSpacing.xxxl),
+                  padding: const EdgeInsets.all(SpotSpacing.xxxl),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
+                      const Icon(
                         CupertinoIcons.person_2,
                         color: SpotColors.overlay,
                         size: 36,
                       ),
-                      SizedBox(height: SpotSpacing.lg),
+                      const SizedBox(height: SpotSpacing.lg),
                       Text(
-                        'No posts from people you follow',
+                        l10n.noFollowingPosts,
                         style: SpotType.bodySecondary,
                         textAlign: TextAlign.center,
                       ),
-                      SizedBox(height: SpotSpacing.xs),
+                      const SizedBox(height: SpotSpacing.xs),
                       Text(
-                        'Tap an avatar to follow someone',
+                        l10n.tapAvatarToFollow,
                         style: SpotType.caption,
                       ),
                     ],

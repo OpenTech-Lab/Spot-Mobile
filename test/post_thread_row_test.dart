@@ -3,13 +3,25 @@ import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 import 'package:mobile/widgets/profile_avatar.dart';
+
+Widget _localizedApp({required Widget home}) => MaterialApp(
+  localizationsDelegates: const [
+    AppLocalizations.delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ],
+  supportedLocales: AppLocalizations.supportedLocales,
+  home: home,
+);
 
 void main() {
   test(
@@ -143,7 +155,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: Scaffold(
           body: PostThreadRow(
             post: _post(eventTags: const ['tokyo']),
@@ -160,7 +172,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: Scaffold(
           body: PostThreadRow(
             post: _post(eventTags: const ['tokyo', 'news']),
@@ -180,7 +192,7 @@ void main() {
     addTearDown(() => _cleanupTempMediaPaths(mediaPaths));
 
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: Scaffold(
           body: PostThreadRow(
             post: _post(
@@ -208,7 +220,7 @@ void main() {
     'PostThreadRow keeps secondhand posts icon-only without the text badge',
     (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        _localizedApp(
           home: Scaffold(
             body: PostThreadRow(
               post: _post(
@@ -234,7 +246,7 @@ void main() {
     'PostThreadRow moves header status text into lit bottom-right icons',
     (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        _localizedApp(
           home: Scaffold(
             body: PostThreadRow(
               post: _post(
@@ -273,7 +285,7 @@ void main() {
     'PostThreadRow shows author display name and passes avatar hash through',
     (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        _localizedApp(
           home: Scaffold(
             body: PostThreadRow(
               post: _post(
@@ -301,7 +313,7 @@ void main() {
     String? tappedTag;
 
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: Scaffold(
           body: PostThreadRow(
             post: _post(eventTags: const ['tokyo', 'news']),
@@ -322,7 +334,7 @@ void main() {
     'PostThreadRow shows full spot location between body and actions',
     (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        _localizedApp(
           home: Scaffold(
             body: PostThreadRow(
               post: _post(
@@ -345,7 +357,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: Scaffold(
           body: Center(
             child: SizedBox(
@@ -372,7 +384,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: Scaffold(
           body: PostThreadRow(
             post: _post(
@@ -393,7 +405,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: Scaffold(
           body: _LikeHarness(post: _post(eventTags: const ['tokyo'])),
         ),
@@ -418,7 +430,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: Scaffold(
           body: ListView(
             children: [
@@ -447,7 +459,7 @@ void main() {
     var updateCalls = 0;
 
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: Scaffold(
           body: ListView(
             children: [
@@ -476,7 +488,7 @@ void main() {
       final harnessKey = GlobalKey<_FailedPreviewLoadHarnessState>();
 
       await tester.pumpWidget(
-        MaterialApp(
+        _localizedApp(
           home: Scaffold(
             body: ListView(
               children: [
@@ -520,7 +532,7 @@ void main() {
       addTearDown(() => _cleanupTempMediaPaths(mediaPaths));
 
       await tester.pumpWidget(
-        MaterialApp(
+        _localizedApp(
           home: Scaffold(
             body: PostThreadRow(
               post: _post(eventTags: const ['tokyo'], mediaPaths: mediaPaths),
@@ -551,7 +563,7 @@ void main() {
       addTearDown(() => _cleanupTempMediaPaths(mediaPaths));
 
       await tester.pumpWidget(
-        MaterialApp(
+        _localizedApp(
           home: Scaffold(
             body: PostThreadRow(
               post: _post(eventTags: const ['tokyo'], mediaPaths: mediaPaths),
@@ -609,7 +621,7 @@ void main() {
       addTearDown(() => _cleanupTempMediaPaths(mediaPaths));
 
       await tester.pumpWidget(
-        MaterialApp(
+        _localizedApp(
           home: Scaffold(
             body: PostThreadRow(
               post: _post(eventTags: const ['tokyo'], mediaPaths: mediaPaths),

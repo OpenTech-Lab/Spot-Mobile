@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/core/altcha.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/altcha_gate_screen.dart';
 import 'package:mobile/screens/home_screen.dart';
@@ -151,6 +152,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _runVerification() async {
+    final l10n = AppLocalizations.of(context)!;
     if (widget.verificationRunner != null) {
       await widget.verificationRunner!();
       return;
@@ -159,17 +161,18 @@ class _SplashScreenState extends State<SplashScreen>
     final challenge = AltchaService.generate();
     final solution = await AltchaService.solve(challenge);
     if (solution == null || !AltchaService.verify(challenge, solution)) {
-      throw StateError('ALTCHA verification failed');
+      throw StateError(l10n.altchaVerificationFailed);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (!_isReady) {
-      return const Scaffold(
+      return Scaffold(
         body: AppLoadingView(
-          title: 'Loading Spot',
-          subtitle: 'Fetching latest data and saving it locally…',
+          title: l10n.splashLoadingTitle,
+          subtitle: l10n.splashLoadingSubtitle,
         ),
       );
     }
@@ -182,12 +185,12 @@ class _SplashScreenState extends State<SplashScreen>
       children: [
         home,
         if (_isRefreshing)
-          const Positioned.fill(
+          Positioned.fill(
             child: Material(
               color: Colors.transparent,
               child: AppLoadingView(
-                title: 'Refreshing data…',
-                subtitle: 'Checking for new posts and saving updates locally…',
+                title: l10n.splashRefreshingTitle,
+                subtitle: l10n.splashRefreshingSubtitle,
               ),
             ),
           ),

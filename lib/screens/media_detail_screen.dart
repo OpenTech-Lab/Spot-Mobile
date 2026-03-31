@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import 'package:mobile/features/p2p/p2p_service.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/services/local_post_store.dart';
 import 'package:mobile/services/media_resolver.dart';
@@ -71,6 +72,8 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   Future<void> _hydrateCurrentPost() async {
     if (_isHydrating || !_needsHydration(_post)) return;
 
+    final l10n = AppLocalizations.of(context)!;
+
     setState(() {
       _isHydrating = true;
       _statusMessage = null;
@@ -102,14 +105,13 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
         widget.onPostUpdated?.call(hydrated);
       } else if (!_hasAnyLocalMedia(hydrated)) {
         setState(() {
-          _statusMessage =
-              'Full media is still unavailable. Preview only for now.';
+          _statusMessage = l10n.mediaUnavailable;
         });
       }
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _statusMessage = 'Could not load the full media right now.';
+        _statusMessage = l10n.couldNotLoadMedia;
       });
     } finally {
       if (mounted) {
@@ -173,18 +175,19 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     return false;
   }
 
-  String _viewerTitle() {
-    final label = _isVideoAtIndex(_currentIndex) ? 'Video' : 'Image';
+  String _viewerTitle(AppLocalizations l10n) {
+    final label = _isVideoAtIndex(_currentIndex) ? l10n.videoLabel : l10n.imageLabel;
     if (_pageCount <= 1) return label;
-    return '$label ${_currentIndex + 1}/$_pageCount';
+    return l10n.mediaViewerPageTitle(label, _currentIndex + 1, _pageCount);
   }
 
-  String _loadingLabel() => _isVideoAtIndex(_currentIndex)
-      ? 'Loading full video…'
-      : 'Loading full image…';
+  String _loadingLabel(AppLocalizations l10n) => _isVideoAtIndex(_currentIndex)
+      ? l10n.loadingFullVideo
+      : l10n.loadingFullImage;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final canRetry = !_isHydrating && _needsHydration(_post);
 
     return Scaffold(
@@ -193,7 +196,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         title: Text(
-          _viewerTitle(),
+          _viewerTitle(l10n),
           style: SpotType.subheading.copyWith(color: Colors.white),
         ),
         actions: [
@@ -201,7 +204,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
             TextButton(
               onPressed: _hydrateCurrentPost,
               child: Text(
-                'Retry',
+                l10n.retryButton,
                 style: SpotType.bodySecondary.copyWith(color: Colors.white70),
               ),
             ),
@@ -213,7 +216,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
             controller: _pageController,
             itemCount: _pageCount,
             onPageChanged: (index) => setState(() => _currentIndex = index),
-            itemBuilder: (context, index) => _buildPage(index),
+            itemBuilder: (context, index) => _buildPage(index, l10n),
           ),
           if (_pageCount > 1)
             Positioned(
@@ -243,7 +246,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
             ),
           if (_isHydrating && _localPathForIndex(_post, _currentIndex) == null)
             Positioned.fill(
-              child: _LoadingOverlay(label: _loadingLabel(), onTapRetry: null),
+              child: _LoadingOverlay(label: _loadingLabel(l10n), onTapRetry: null),
             )
           else if (_statusMessage != null)
             Positioned(
@@ -260,7 +263,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     );
   }
 
-  Widget _buildPage(int index) {
+  Widget _buildPage(int index, AppLocalizations l10n) {
     final localPath = _localPathForIndex(_post, index);
     if (localPath != null) {
       if (_isVideoPath(localPath)) {
@@ -276,7 +279,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
 
     return _UnavailableMediaStage(
       isVideo: _isVideoAtIndex(index),
-      message: _isHydrating ? _loadingLabel() : 'Tap retry to load full media',
+      message: _isHydrating ? _loadingLabel(l10n) : l10n.tapRetryToLoad,
     );
   }
 }
@@ -294,21 +297,22 @@ class _ImageStage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final image = _isFile
         ? Image.file(
             File(path!),
             fit: BoxFit.contain,
-            errorBuilder: (_, _, _) => const _UnavailableMediaStage(
+            errorBuilder: (_, _, _) => _UnavailableMediaStage(
               isVideo: false,
-              message: 'Could not render this image',
+              message: l10n.couldNotRenderImage,
             ),
           )
         : Image.memory(
             bytes!,
             fit: BoxFit.contain,
-            errorBuilder: (_, _, _) => const _UnavailableMediaStage(
+            errorBuilder: (_, _, _) => _UnavailableMediaStage(
               isVideo: false,
-              message: 'Could not render this preview',
+              message: l10n.couldNotRenderPreview,
             ),
           );
 
@@ -363,14 +367,15 @@ class _VideoDetailPlayerState extends State<_VideoDetailPlayer> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return FutureBuilder<void>(
       future: _initialization,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done ||
             !_controller.value.isInitialized) {
-          return const _UnavailableMediaStage(
+          return _UnavailableMediaStage(
             isVideo: true,
-            message: 'Preparing video…',
+            message: l10n.preparingVideo,
             showSpinner: true,
           );
         }
@@ -416,8 +421,8 @@ class _VideoDetailPlayerState extends State<_VideoDetailPlayer> {
                       ),
                       child: Text(
                         _controller.value.isPlaying
-                            ? 'Tap to pause'
-                            : 'Tap to play',
+                            ? l10n.tapToPause
+                            : l10n.tapToPlay,
                         style: SpotType.caption.copyWith(color: Colors.white70),
                       ),
                     ),
@@ -473,7 +478,10 @@ class _LoadingOverlay extends StatelessWidget {
                 ),
                 if (onTapRetry != null) ...[
                   const SizedBox(height: SpotSpacing.md),
-                  TextButton(onPressed: onTapRetry, child: const Text('Retry')),
+                  TextButton(
+                    onPressed: onTapRetry,
+                    child: Text(AppLocalizations.of(context)!.retryButton),
+                  ),
                 ],
               ],
             ),
@@ -516,7 +524,10 @@ class _StatusBanner extends StatelessWidget {
             ),
             if (onRetry != null) ...[
               const SizedBox(width: SpotSpacing.sm),
-              TextButton(onPressed: onRetry, child: const Text('Retry')),
+              TextButton(
+                onPressed: onRetry,
+                child: Text(AppLocalizations.of(context)!.retryButton),
+              ),
             ],
           ],
         ),

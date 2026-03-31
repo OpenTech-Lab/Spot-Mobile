@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:mobile/core/post_location_formatter.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/screens/media_detail_screen.dart';
 import 'package:mobile/services/geo_lookup.dart';
@@ -112,6 +113,7 @@ class PostThreadRow extends StatelessWidget {
   final ValueChanged<MediaPost>? onMediaUpdated;
 
   void _showPostMenu(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: SpotColors.surface,
@@ -147,9 +149,9 @@ class PostThreadRow extends StatelessWidget {
                     color: SpotColors.danger,
                     size: 20,
                   ),
-                  title: const Text(
-                    'Delete post',
-                    style: TextStyle(color: SpotColors.danger),
+                  title: Text(
+                    l10n.deletePost,
+                    style: const TextStyle(color: SpotColors.danger),
                   ),
                   contentPadding: EdgeInsets.zero,
                   onTap: () {
@@ -165,9 +167,9 @@ class PostThreadRow extends StatelessWidget {
                     color: SpotColors.warning,
                     size: 20,
                   ),
-                  title: const Text(
-                    'Report content',
-                    style: TextStyle(color: SpotColors.warning),
+                  title: Text(
+                    l10n.reportContent,
+                    style: const TextStyle(color: SpotColors.warning),
                   ),
                   contentPadding: EdgeInsets.zero,
                   onTap: () {
@@ -182,9 +184,9 @@ class PostThreadRow extends StatelessWidget {
                   color: SpotColors.textSecondary,
                   size: 20,
                 ),
-                title: const Text(
-                  'Cancel',
-                  style: TextStyle(color: SpotColors.textSecondary),
+                title: Text(
+                  l10n.cancelAction,
+                  style: const TextStyle(color: SpotColors.textSecondary),
                 ),
                 contentPadding: EdgeInsets.zero,
                 onTap: () => Navigator.of(ctx).pop(),
@@ -388,13 +390,18 @@ class PostThreadRow extends StatelessWidget {
                     _PostLocationRow(post: post),
                     if (post.isPendingRetry) ...[
                       const SizedBox(height: SpotSpacing.xs),
-                      Text(
-                        post.lastPublishError?.isNotEmpty == true
-                            ? 'Not posted yet. Tap refresh to resend.'
-                            : 'Saved locally only. Tap refresh to resend.',
-                        style: SpotType.caption.copyWith(
-                          color: SpotColors.warning,
-                        ),
+                      Builder(
+                        builder: (context) {
+                          final l10n = AppLocalizations.of(context)!;
+                          return Text(
+                            post.lastPublishError?.isNotEmpty == true
+                                ? l10n.notPostedYet
+                                : l10n.savedLocallyOnly,
+                            style: SpotType.caption.copyWith(
+                              color: SpotColors.warning,
+                            ),
+                          );
+                        },
                       ),
                     ],
                     // ── Control panel: reply · like · indicators ──
@@ -693,34 +700,44 @@ class _PostMediaState extends State<_PostMedia> {
                 Positioned(
                   left: SpotSpacing.sm,
                   bottom: SpotSpacing.sm,
-                  child: _TransportStatusChip(
-                    label: widget.isMediaLoading
-                        ? 'Loading full image…'
-                        : _isMediaUnavailableNow
-                        ? 'Image unavailable now'
-                        : 'Tap to load full',
-                    showSpinner: widget.isMediaLoading,
+                  child: Builder(
+                    builder: (context) {
+                      final l10n = AppLocalizations.of(context)!;
+                      return _TransportStatusChip(
+                        label: widget.isMediaLoading
+                            ? l10n.loadingFullImage
+                            : _isMediaUnavailableNow
+                            ? l10n.imageUnavailable
+                            : l10n.tapToLoadFull,
+                        showSpinner: widget.isMediaLoading,
+                      );
+                    },
                   ),
                 ),
                 Positioned(
                   right: SpotSpacing.sm,
                   bottom: SpotSpacing.sm,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: SpotSpacing.sm,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xB3000000),
-                      borderRadius: BorderRadius.circular(SpotRadius.full),
-                    ),
-                    child: Text(
-                      'Preview',
-                      style: SpotType.caption.copyWith(
-                        color: Colors.white,
-                        fontSize: 11,
-                      ),
-                    ),
+                  child: Builder(
+                    builder: (context) {
+                      final l10n = AppLocalizations.of(context)!;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: SpotSpacing.sm,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xB3000000),
+                          borderRadius: BorderRadius.circular(SpotRadius.full),
+                        ),
+                        child: Text(
+                          l10n.previewLabel,
+                          style: SpotType.caption.copyWith(
+                            color: Colors.white,
+                            fontSize: 11,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -730,6 +747,7 @@ class _PostMediaState extends State<_PostMedia> {
       );
     }
 
+    final l10n = AppLocalizations.of(context)!;
     return GestureDetector(
       onTap: _canRequestMedia()
           ? () {
@@ -758,19 +776,19 @@ class _PostMediaState extends State<_PostMedia> {
               ),
             Text(
               widget.isMediaLoading
-                  ? 'Loading full media…'
+                  ? l10n.loadingFullMedia
                   : _isMediaUnavailableNow
-                  ? 'Image unavailable now'
-                  : 'Tap to load media',
+                  ? l10n.imageUnavailable
+                  : l10n.tapToLoadMedia,
               style: SpotType.caption.copyWith(color: SpotColors.textTertiary),
             ),
             const SizedBox(height: SpotSpacing.xs),
             Text(
               widget.isMediaLoading
-                  ? 'Downloading from CDN…'
+                  ? l10n.downloadingFromCdn
                   : _isMediaUnavailableNow
-                  ? 'Check back later'
-                  : 'Downloads via CDN or P2P',
+                  ? l10n.mediaCheckBackLater
+                  : l10n.mediaDownloadViaCdnOrP2p,
               style: SpotType.caption.copyWith(
                 color: SpotColors.textTertiary.withAlpha(150),
               ),
@@ -908,9 +926,9 @@ class _VideoThumb extends StatelessWidget {
                   color: Colors.black54,
                   borderRadius: BorderRadius.circular(SpotRadius.xs),
                 ),
-                child: const Text(
-                  'Video',
-                  style: TextStyle(color: Colors.white70, fontSize: 11),
+                child: Text(
+                  AppLocalizations.of(context)!.videoLabel,
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
                 ),
               ),
             ),
@@ -1035,32 +1053,33 @@ class _PostStatusIndicators extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final indicators = <Widget>[
       if (post.isDangerMode)
-        const _PostStatusIndicator(
+        _PostStatusIndicator(
           iconKey: postThreadRowProtectedStatusIconKey,
-          tooltip: 'Protected',
+          tooltip: l10n.protectedTooltip,
           icon: CupertinoIcons.lock_fill,
           color: SpotColors.danger,
         ),
       if (post.isAiGenerated)
-        const _PostStatusIndicator(
+        _PostStatusIndicator(
           iconKey: postThreadRowAiStatusIconKey,
-          tooltip: 'AI-generated',
+          tooltip: l10n.aiGeneratedTooltip,
           icon: CupertinoIcons.sparkles,
           color: SpotColors.warning,
         ),
       if (post.isPendingRetry)
-        const _PostStatusIndicator(
+        _PostStatusIndicator(
           iconKey: postThreadRowRetryStatusIconKey,
-          tooltip: 'Not sent',
+          tooltip: l10n.notSentTooltip,
           icon: CupertinoIcons.exclamationmark_circle_fill,
           color: SpotColors.warning,
         ),
       if (post.sourceType == PostSourceType.secondhand)
-        const _PostStatusIndicator(
+        _PostStatusIndicator(
           iconKey: postThreadRowSecondhandStatusIconKey,
-          tooltip: 'Secondhand',
+          tooltip: l10n.secondhandTooltip,
           icon: CupertinoIcons.arrow_2_squarepath,
           color: SpotColors.accent,
         ),

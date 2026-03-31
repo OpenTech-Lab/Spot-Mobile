@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/p2p/p2p_service.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/models/asset_transport_policy.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
@@ -75,11 +76,12 @@ class _AssetTransportSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
         backgroundColor: SpotColors.bg,
-        title: const Text('Asset Transport', style: SpotType.subheading),
+        title: Text(l10n.assetTransportScreenTitle, style: SpotType.subheading),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(
@@ -89,12 +91,12 @@ class _AssetTransportSettingsScreenState
         children: [
           // ── P2P transport policy ──────────────────────────────────────
           Text(
-            'Peer Transport',
+            l10n.peerTransportSection,
             style: SpotType.subheading.copyWith(fontSize: 14),
           ),
           const SizedBox(height: SpotSpacing.sm),
           Text(
-            'Control when Spot can share and fetch full images and videos over peer transport to avoid unexpected mobile-data use.',
+            l10n.peerTransportDescription,
             style: SpotType.bodySecondary.copyWith(
               color: SpotColors.textSecondary,
             ),
@@ -106,6 +108,7 @@ class _AssetTransportSettingsScreenState
               selected: _selectedPolicy == policy,
               enabled: !_isSaving,
               onTap: () => _selectPolicy(policy),
+              l10n: l10n,
             ),
             if (policy != AssetTransportPolicy.values.last)
               const SizedBox(height: SpotSpacing.sm),
@@ -114,33 +117,28 @@ class _AssetTransportSettingsScreenState
           // ── CDN acceleration ──────────────────────────────────────────
           const SizedBox(height: SpotSpacing.xl),
           Text(
-            'CDN Acceleration',
+            l10n.cdnAccelerationSection,
             style: SpotType.subheading.copyWith(fontSize: 14),
           ),
           const SizedBox(height: SpotSpacing.sm),
           Text(
-            'Use a content delivery network for faster media loading. '
-            'Media is cached on CDN servers by content hash. '
-            'CDN fetch and upload are enabled by default; disable them here to '
-            'use only peer-to-peer transport.',
+            l10n.cdnAccelerationDescription,
             style: SpotType.bodySecondary.copyWith(
               color: SpotColors.textSecondary,
             ),
           ),
           const SizedBox(height: SpotSpacing.md),
           _ToggleRow(
-            label: 'CDN fetch & cache',
-            description: 'Download media from CDN when available (faster).',
+            label: l10n.cdnFetchLabel,
+            description: l10n.cdnFetchDescription,
             value: _cdnEnabled,
             enabled: !_isSaving,
             onChanged: _onCdnEnabledChanged,
           ),
           const SizedBox(height: SpotSpacing.sm),
           _ToggleRow(
-            label: 'CDN upload',
-            description:
-                'Upload your media to CDN so others can fetch it faster. '
-                'Danger Mode posts are never uploaded.',
+            label: l10n.cdnUploadLabel,
+            description: l10n.cdnUploadDescription,
             value: _cdnUploadEnabled,
             enabled: !_isSaving && _cdnEnabled,
             onChanged: _onCdnUploadChanged,
@@ -210,12 +208,20 @@ class _PolicyOptionCard extends StatelessWidget {
     required this.selected,
     required this.enabled,
     required this.onTap,
+    required this.l10n,
   });
 
   final AssetTransportPolicy policy;
   final bool selected;
   final bool enabled;
   final VoidCallback onTap;
+  final AppLocalizations l10n;
+
+  String get _localizedLabel => switch (policy) {
+    AssetTransportPolicy.always => l10n.alwaysOption,
+    AssetTransportPolicy.wifiOnly => l10n.wifiOnlyOption,
+    AssetTransportPolicy.off => l10n.offOption,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -235,7 +241,7 @@ class _PolicyOptionCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(policy.label, style: SpotType.body),
+                  Text(_localizedLabel, style: SpotType.body),
                   const SizedBox(height: 4),
                   Text(
                     policy.description,

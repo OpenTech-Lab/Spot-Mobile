@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import 'package:mobile/l10n/app_localizations.dart';
+
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/models/asset_transport_policy.dart';
 import 'package:mobile/models/profile_model.dart';
@@ -121,7 +123,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (!mounted) return;
       setState(() => _isLoadingVisibility = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load privacy settings: $error')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.failedLoadPrivacy(error.toString()))),
       );
     }
   }
@@ -171,7 +173,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _isSavingVisibility = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update privacy settings: $error')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.failedUpdatePrivacy(error.toString()))),
       );
     }
   }
@@ -208,7 +210,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _isSavingSafeMode = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update safe mode: $error')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.failedUpdateSafeMode(error.toString()))),
       );
     }
   }
@@ -241,6 +243,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _clearCache() async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -248,21 +251,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(SpotRadius.md),
         ),
-        title: const Text('Clear Cache', style: SpotType.subheading),
-        content: const Text(
-          'This will delete all cached media files. '
-          'Your posts and settings will not be affected.',
+        title: Text(l10n.clearCacheLabel, style: SpotType.subheading),
+        content: Text(
+          l10n.clearCacheDialogContent,
           style: SpotType.bodySecondary,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel', style: SpotType.bodySecondary),
+            child: Text(l10n.cancelAction, style: SpotType.bodySecondary),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
-              'Clear',
+              l10n.clearButton,
               style: SpotType.body.copyWith(color: SpotColors.danger),
             ),
           ),
@@ -275,12 +277,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Cache cleared')));
+        ).showSnackBar(SnackBar(content: Text(l10n.cacheClearedSnackbar)));
       }
     }
   }
 
   Future<void> _clearAllData() async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -288,26 +291,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(SpotRadius.md),
         ),
-        title: const Text('Clear Local Data', style: SpotType.subheading),
-        content: const Text(
-          'This will delete ALL local data including:\n'
-          '• Cached media\n'
-          '• Saved posts\n'
-          '• Favorite tags and preferences\n'
-          '• Blocklist\n\n'
-          'Your account will NOT be deleted. '
-          'Remote data will re-sync from Supabase.',
+        title: Text(l10n.clearLocalDataLabel, style: SpotType.subheading),
+        content: Text(
+          l10n.clearLocalDataDialogContent,
           style: SpotType.bodySecondary,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel', style: SpotType.bodySecondary),
+            child: Text(l10n.cancelAction, style: SpotType.bodySecondary),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
-              'Clear All',
+              l10n.clearAllButton,
               style: SpotType.body.copyWith(color: SpotColors.danger),
             ),
           ),
@@ -328,8 +325,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Local data cleared. Restart app to re-sync.'),
+          SnackBar(
+            content: Text(l10n.localDataClearedSnackbar),
           ),
         );
       }
@@ -339,6 +336,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _confirmLogout() async {
     if (_isLoggingOut) return;
 
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -346,23 +344,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(SpotRadius.md),
         ),
-        title: const Text('Log out?', style: SpotType.subheading),
-        content: const Text(
-          'Before logging out, make sure you have saved your 12-word recovery '
-          'phrase. You will need it to restore this same identity later. '
-          'Logging out will sign you out on this device and erase local app '
-          'data. Your Supabase account and remote posts will remain intact.',
+        title: Text(l10n.logOutDialogTitle, style: SpotType.subheading),
+        content: Text(
+          l10n.logOutDialogContent,
           style: SpotType.bodySecondary,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel', style: SpotType.bodySecondary),
+            child: Text(l10n.cancelAction, style: SpotType.bodySecondary),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
-              'Log Out',
+              l10n.logOutConfirmButton,
               style: SpotType.body.copyWith(color: SpotColors.danger),
             ),
           ),
@@ -391,30 +386,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to log out: $error')));
+      ).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.failedLogOut(error.toString()))));
       setState(() => _isLoggingOut = false);
     }
   }
 
   Future<void> _openPublicActivityMenu() async {
+    final l10n = AppLocalizations.of(context)!;
     final selection = await showCupertinoModalPopup<MyPostsScreenMode>(
       context: context,
       builder: (ctx) => CupertinoActionSheet(
-        title: const Text('Public Activity'),
-        message: const Text('Choose which of your public posts to open.'),
+        title: Text(l10n.publicActivityTitle),
+        message: Text(l10n.publicActivityMessage),
         actions: [
           CupertinoActionSheetAction(
             onPressed: () => Navigator.of(ctx).pop(MyPostsScreenMode.threads),
-            child: const Text('Posted Threads'),
+            child: Text(l10n.postedThreadsOption),
           ),
           CupertinoActionSheetAction(
             onPressed: () => Navigator.of(ctx).pop(MyPostsScreenMode.replies),
-            child: const Text('Replied Threads'),
+            child: Text(l10n.repliedThreadsOption),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancelAction),
         ),
       ),
     );
@@ -429,11 +425,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
         backgroundColor: SpotColors.bg,
-        title: const Text('Settings', style: SpotType.subheading),
+        title: Text(l10n.settingsTitle, style: SpotType.subheading),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(
@@ -443,21 +440,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           _SettingsRow(
             icon: CupertinoIcons.star,
-            label: 'Favorite Topics',
+            label: l10n.favoriteTopicsLabel,
             value: _favoriteTopicsValue,
             onTap: _openFavoriteTopics,
           ),
           const SizedBox(height: SpotSpacing.sm),
           _SettingsRow(
             icon: CupertinoIcons.wifi,
-            label: 'Asset Transport',
+            label: l10n.assetTransportLabel,
             value: _assetTransportPolicy.label,
             onTap: _openAssetTransportSettings,
           ),
           const SizedBox(height: SpotSpacing.sm),
           _SettingsRow(
             icon: CupertinoIcons.person_crop_circle,
-            label: 'Account',
+            label: l10n.accountLabel,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => WalletScreen(wallet: widget.wallet),
@@ -467,17 +464,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: SpotSpacing.sm),
           _SettingsRow(
             icon: CupertinoIcons.list_bullet,
-            label: 'View My Activity',
+            label: l10n.viewMyActivityLabel,
             onTap: _openPublicActivityMenu,
           ),
           const SizedBox(height: SpotSpacing.xl),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: SpotSpacing.sm),
-            child: Text('PRIVACY', style: SpotType.label),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: SpotSpacing.sm),
+            child: Text(l10n.privacySectionLabel, style: SpotType.label),
           ),
           _SettingsSwitchRow(
             icon: CupertinoIcons.map,
-            label: 'Footprint Map',
+            label: l10n.footprintMapLabel,
             value: _footprintMapPublic,
             onChanged: _isLoadingVisibility || _isSavingVisibility
                 ? null
@@ -486,7 +483,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: SpotSpacing.sm),
           _SettingsSwitchRow(
             icon: CupertinoIcons.text_bubble,
-            label: 'Public Threads',
+            label: l10n.publicThreadsLabel,
             value: _threadsPublic,
             onChanged: _isLoadingVisibility || _isSavingVisibility
                 ? null
@@ -495,44 +492,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: SpotSpacing.sm),
           _SettingsSwitchRow(
             icon: CupertinoIcons.reply,
-            label: 'Public Replies',
+            label: l10n.publicRepliesLabel,
             value: _repliesPublic,
             onChanged: _isLoadingVisibility || _isSavingVisibility
                 ? null
                 : _setRepliesPublic,
           ),
           const SizedBox(height: SpotSpacing.xl),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: SpotSpacing.sm),
-            child: Text('Storage', style: SpotType.label),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: SpotSpacing.sm),
+            child: Text(l10n.storageSectionLabel, style: SpotType.label),
           ),
           _SettingsRow(
             icon: CupertinoIcons.trash,
-            label: 'Clear Cache',
+            label: l10n.clearCacheLabel,
             onTap: _clearCache,
           ),
           const SizedBox(height: SpotSpacing.sm),
           _SettingsRow(
             icon: CupertinoIcons.delete,
-            label: 'Clear Local Data',
+            label: l10n.clearLocalDataLabel,
             onTap: _clearAllData,
           ),
           const SizedBox(height: SpotSpacing.xl),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: SpotSpacing.sm),
-            child: Text('SESSION', style: SpotType.label),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: SpotSpacing.sm),
+            child: Text(l10n.sessionSectionLabel, style: SpotType.label),
           ),
           _SettingsSwitchRow(
             icon: CupertinoIcons.lock,
-            label: 'Safe Mode',
+            label: l10n.safeModeLabel,
             value: _safeModeEnabled,
             onChanged: _isSavingSafeMode ? null : _setSafeModeEnabled,
           ),
           const SizedBox(height: SpotSpacing.sm),
           _SettingsRow(
             icon: CupertinoIcons.square_arrow_right,
-            label: 'Log Out',
-            value: _isLoggingOut ? 'Signing out…' : null,
+            label: l10n.logOutLabel,
+            value: _isLoggingOut ? l10n.signingOutLabel : null,
             onTap: _confirmLogout,
           ),
           const SizedBox(height: SpotSpacing.xxl),

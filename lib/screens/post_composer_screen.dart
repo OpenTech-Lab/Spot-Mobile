@@ -18,6 +18,7 @@ import 'package:mobile/services/cdn_media_service.dart';
 import 'package:mobile/services/media_processing_service.dart';
 import 'package:mobile/services/post_media_preparation_service.dart';
 import 'package:mobile/services/post_publish_service.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
@@ -151,9 +152,10 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
   Future<void> _pickGallery() async {
     _dismissKeyboard();
+    final l10n = AppLocalizations.of(context)!;
     final remaining = 4 - _mediaFiles.length;
     if (remaining <= 0) {
-      _showSnack('Maximum 4 media items per post');
+      _showSnack(l10n.maxMediaItemsWarning);
       return;
     }
     final picked = await _picker.pickMultipleMedia(limit: remaining);
@@ -164,29 +166,33 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
   Future<void> _takeMediaWithCamera() async {
     _dismissKeyboard();
+    final l10n = AppLocalizations.of(context)!;
     final choice = await showCupertinoModalPopup<String>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(ctx, 'photo'),
-            child: const Text('Take Photo'),
+      builder: (ctx) {
+        final innerL10n = AppLocalizations.of(ctx)!;
+        return CupertinoActionSheet(
+          actions: [
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.pop(ctx, 'photo'),
+              child: Text(innerL10n.takePhotoOption),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.pop(ctx, 'video'),
+              child: Text(innerL10n.recordVideoOption),
+            ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(innerL10n.cancelAction),
           ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(ctx, 'video'),
-            child: const Text('Record Video'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDestructiveAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('Cancel'),
-        ),
-      ),
+        );
+      },
     );
     if (choice == null || !mounted) return;
     if (4 - _mediaFiles.length <= 0) {
-      _showSnack('Maximum 4 media items per post');
+      _showSnack(l10n.maxMediaItemsWarning);
       return;
     }
     XFile? result;
@@ -249,6 +255,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
   }
 
   Future<void> _publish() async {
+    final l10n = AppLocalizations.of(context)!;
     setState(() => _isPublishing = true);
     MediaPost? post;
 
@@ -404,13 +411,13 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
         await PostPublishService.instance.saveFailedPublish(post, e);
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Publish failed. Saved in Profile so you can retry.'),
+          SnackBar(
+            content: Text(l10n.publishFailedSaved),
           ),
         );
         Navigator.of(context).pop(); // composer
       } else {
-        _showSnack('Publish failed: $e');
+        _showSnack(l10n.publishFailedError(e.toString()));
       }
     } finally {
       if (mounted) setState(() => _isPublishing = false);
@@ -425,6 +432,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
   // ── Tag section ──────────────────────────────────────────────────────────
 
   Widget _buildTagSection() {
+    final l10n = AppLocalizations.of(context)!;
     final hasCategory = _tags.isNotEmpty;
     final categoryTag = hasCategory ? _tags[0] : null;
     final extraTags = hasCategory ? _tags.sublist(1) : <String>[];
@@ -476,7 +484,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                             color: SpotColors.textPrimary,
                           ),
                           decoration: InputDecoration(
-                            hintText: 'Category tag (e.g. AWSSummitTokyo2026)',
+                            hintText: l10n.categoryTagHint,
                             hintStyle: SpotType.body.copyWith(
                               color: SpotColors.textTertiary,
                             ),
@@ -499,7 +507,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                   const SizedBox(width: SpotSpacing.xs),
                   IconButton(
                     onPressed: _canCreatePendingTag ? _createPendingTag : null,
-                    tooltip: 'Create category tag',
+                    tooltip: l10n.createCategoryTagTooltip,
                     splashRadius: 18,
                     visualDensity: VisualDensity.compact,
                     icon: Icon(
@@ -565,7 +573,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                             color: SpotColors.textSecondary,
                           ),
                           decoration: InputDecoration(
-                            hintText: 'Add more tags…',
+                            hintText: l10n.addMoreTagsHint,
                             hintStyle: SpotType.bodySecondary.copyWith(
                               color: SpotColors.textTertiary,
                             ),
@@ -589,7 +597,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                         onPressed: _canCreatePendingTag
                             ? _createPendingTag
                             : null,
-                        tooltip: 'Create tag',
+                        tooltip: l10n.createTagTooltip,
                         splashRadius: 18,
                         visualDensity: VisualDensity.compact,
                         icon: Icon(
@@ -614,6 +622,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final mq = MediaQuery.of(context);
     final sheetHeight = mq.size.height * 0.92;
     final bottomInset = mq.viewInsets.bottom;
@@ -657,7 +666,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        'Reply to ${_shortKey(widget.replyToPost!.nostrEventId)}',
+                                        l10n.replyToShortKey(_shortKey(widget.replyToPost!.nostrEventId)),
                                         style: SpotType.caption.copyWith(
                                           color: SpotColors.textTertiary,
                                         ),
@@ -691,8 +700,8 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                                     filled: false,
                                     fillColor: Colors.transparent,
                                     hintText: widget.replyToPost != null
-                                        ? 'Write a reply…'
-                                        : 'What\'s happening?',
+                                        ? l10n.writeReplyHint
+                                        : l10n.whatsHappeningHint,
                                     hintStyle: SpotType.body.copyWith(
                                       color: SpotColors.textTertiary,
                                     ),
@@ -734,7 +743,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                       0,
                     ),
                     child: Text(
-                      'First tag is the event category · press Space or , to add more',
+                      l10n.tagFieldHint,
                       style: SpotType.caption.copyWith(
                         color: SpotColors.textTertiary,
                       ),
@@ -864,7 +873,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                               ),
                             )
                           : Text(
-                              'Post',
+                              l10n.postButton,
                               style: SpotType.label.copyWith(
                                 color: _canPost
                                     ? SpotColors.onAccent
@@ -915,6 +924,7 @@ class _ComposerOptions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final hasSpot = spotName?.isNotEmpty == true;
 
     return Padding(
@@ -923,13 +933,13 @@ class _ComposerOptions extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Post mode pills ────────────────────────────────────────────────
-          Text('Post mode', style: SpotType.caption),
+          Text(l10n.postModeLabel, style: SpotType.caption),
           const SizedBox(height: SpotSpacing.sm),
           Row(
             children: [
               _ModePill(
                 icon: CupertinoIcons.location,
-                label: 'Standard',
+                label: l10n.standardModeLabel,
                 active: !isVirtual,
                 activeColor: SpotColors.success,
                 onTap: () => onVirtualChanged(false),
@@ -937,7 +947,7 @@ class _ComposerOptions extends StatelessWidget {
               const SizedBox(width: SpotSpacing.sm),
               _ModePill(
                 icon: CupertinoIcons.gamecontroller,
-                label: 'Virtual',
+                label: l10n.virtualModeLabel,
                 active: isVirtual,
                 activeColor: SpotColors.accent,
                 onTap: () => onVirtualChanged(!isVirtual),
@@ -950,8 +960,8 @@ class _ComposerOptions extends StatelessWidget {
           if (!isVirtual) ...[
             _OptionRow(
               icon: CupertinoIcons.map_pin_ellipse,
-              label: 'Check in at a spot',
-              subtitle: 'Publish exact location with a place name',
+              label: l10n.checkInLabel,
+              subtitle: l10n.checkInSubtitle,
               value: hasSpot,
               onChanged: (v) {
                 if (v) {
@@ -974,7 +984,7 @@ class _ComposerOptions extends StatelessWidget {
                 style: SpotType.body,
                 maxLength: 100,
                 decoration: InputDecoration(
-                  hintText: 'e.g. Eiffel Tower, Central Park…',
+                  hintText: l10n.checkInSpotHint,
                   hintStyle: SpotType.body.copyWith(
                     color: SpotColors.textTertiary,
                   ),
@@ -1009,8 +1019,8 @@ class _ComposerOptions extends StatelessWidget {
           // ── Blur faces toggle (danger mode) ────────────────────────────────
           _OptionRow(
             icon: CupertinoIcons.shield_lefthalf_fill,
-            label: 'Blur faces',
-            subtitle: 'Automatically blur detected faces in photos',
+            label: l10n.blurFacesLabel,
+            subtitle: l10n.blurFacesSubtitle,
             value: isDangerMode,
             onChanged: onDangerChanged,
             activeColor: SpotColors.danger,
@@ -1020,8 +1030,8 @@ class _ComposerOptions extends StatelessWidget {
           // ── AI-generated toggle ────────────────────────────────────────────
           _OptionRow(
             icon: CupertinoIcons.sparkles,
-            label: 'AI-generated content',
-            subtitle: 'Content was created or assisted by AI',
+            label: l10n.aiGeneratedLabel,
+            subtitle: l10n.aiGeneratedSubtitle,
             value: isAiGenerated,
             onChanged: onAiChanged,
             activeColor: SpotColors.warning,
@@ -1031,8 +1041,8 @@ class _ComposerOptions extends StatelessWidget {
           // ── Source type toggle ─────────────────────────────────────────────
           _OptionRow(
             icon: CupertinoIcons.person_2,
-            label: 'Someone else\'s story',
-            subtitle: 'You are sharing a secondhand account',
+            label: l10n.secondhandLabel,
+            subtitle: l10n.secondhandSubtitle,
             value: sourceType == PostSourceType.secondhand,
             onChanged: (v) => onSourceChanged(
               v ? PostSourceType.secondhand : PostSourceType.firsthand,
@@ -1322,6 +1332,7 @@ class _LegalCheckSheetState extends State<_LegalCheckSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(SpotSpacing.lg),
@@ -1331,33 +1342,31 @@ class _LegalCheckSheetState extends State<_LegalCheckSheet> {
           children: [
             const _SheetHandle(),
             const SizedBox(height: SpotSpacing.lg),
-            Text('Before you post', style: SpotType.subheading),
+            Text(l10n.beforePostTitle, style: SpotType.subheading),
             const SizedBox(height: SpotSpacing.xs),
             Text(
-              'Please confirm all of the following before sharing.',
+              l10n.beforePostSubtitle,
               style: SpotType.caption,
             ),
             const SizedBox(height: SpotSpacing.xl),
             _LegalCheckbox(
               value: _accuracy,
-              label:
-                  'The information I\'m sharing is accurate to the best of my knowledge',
+              label: l10n.accuracyConfirmation,
               onChanged: (v) => setState(() => _accuracy = v),
             ),
             _LegalCheckbox(
               value: _rights,
-              label: 'I have the rights to share this content',
+              label: l10n.rightsConfirmation,
               onChanged: (v) => setState(() => _rights = v),
             ),
             _LegalCheckbox(
               value: _noDefamation,
-              label: 'This content does not defame any individuals or groups',
+              label: l10n.defamationConfirmation,
               onChanged: (v) => setState(() => _noDefamation = v),
             ),
             _LegalCheckbox(
               value: _legalCompliance,
-              label:
-                  'I confirm this complies with applicable laws in my jurisdiction',
+              label: l10n.lawsConfirmation,
               onChanged: (v) => setState(() => _legalCompliance = v),
             ),
             const SizedBox(height: SpotSpacing.xl),
@@ -1378,7 +1387,7 @@ class _LegalCheckSheetState extends State<_LegalCheckSheet> {
                   ),
                   child: Center(
                     child: Text(
-                      'Confirm & Post',
+                      l10n.confirmAndPostButton,
                       style: SpotType.body.copyWith(
                         color: _allChecked
                             ? SpotColors.onAccent
@@ -1401,7 +1410,7 @@ class _LegalCheckSheetState extends State<_LegalCheckSheet> {
                       vertical: SpotSpacing.sm,
                     ),
                     child: Text(
-                      'Cancel',
+                      l10n.cancelAction,
                       style: SpotType.body.copyWith(
                         color: SpotColors.textSecondary,
                       ),
@@ -1553,6 +1562,7 @@ class _LocationRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (isVirtual) {
       return Row(
         children: [
@@ -1587,7 +1597,7 @@ class _LocationRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 5),
-          Text('Locating…', style: SpotType.caption),
+          Text(l10n.locatingLabel, style: SpotType.caption),
         ],
       );
     }

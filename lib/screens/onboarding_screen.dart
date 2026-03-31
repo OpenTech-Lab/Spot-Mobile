@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import 'package:mobile/core/wallet.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/home_screen.dart';
 import 'package:mobile/services/storage_service.dart';
@@ -42,14 +43,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       await StorageService.instance.saveWallet(wallet);
       if (mounted) setState(() { _wallet = wallet; _step = 2; _isLoading = false; });
     } catch (e) {
-      if (mounted) setState(() { _importError = 'Failed: $e'; _isLoading = false; });
+      if (mounted) setState(() { _importError = AppLocalizations.of(context)!.failedError(e.toString()); _isLoading = false; });
     }
   }
 
   Future<void> _importWallet() async {
     final words = _importController.text.trim().split(RegExp(r'\s+'));
     if (words.length != 12) {
-      setState(() => _importError = 'Enter exactly 12 recovery words.');
+      setState(() => _importError = AppLocalizations.of(context)!.importExactWordsError);
       return;
     }
     setState(() { _isLoading = true; _importError = ''; });
@@ -58,7 +59,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       await StorageService.instance.saveWallet(wallet);
       if (mounted) setState(() { _wallet = wallet; _step = 2; _isLoading = false; });
     } catch (e) {
-      if (mounted) setState(() { _importError = 'Invalid phrase: $e'; _isLoading = false; });
+      if (mounted) setState(() { _importError = AppLocalizations.of(context)!.invalidPhraseError(e.toString()); _isLoading = false; });
     }
   }
 
@@ -110,6 +111,7 @@ class _WelcomeStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.xxl),
       child: Column(
@@ -117,12 +119,12 @@ class _WelcomeStep extends StatelessWidget {
         children: [
           const Spacer(flex: 3),
 
-          const Text('Spot', style: SpotType.wordmark),
+          Text(l10n.appTitle, style: SpotType.wordmark),
           const SizedBox(height: SpotSpacing.sm),
           Container(width: 28, height: 0.5, color: SpotColors.accent),
           const SizedBox(height: SpotSpacing.lg),
           Text(
-            'Decentralised media.\nVerified at capture.',
+            l10n.welcomeTagline,
             style: SpotType.bodySecondary.copyWith(
               fontSize: 15,
               fontWeight: FontWeight.w300,
@@ -131,14 +133,14 @@ class _WelcomeStep extends StatelessWidget {
 
           const Spacer(flex: 2),
 
-          const _Bullet('Device-bound cryptographic identity'),
-          const _Bullet('GPS-locked at the moment of capture'),
-          const _Bullet('Danger mode — blur faces in photos, hide location'),
-          const _Bullet('Peer-to-peer, no central servers'),
+          _Bullet(l10n.welcomeBullet1),
+          _Bullet(l10n.welcomeBullet2),
+          _Bullet(l10n.welcomeBullet3),
+          _Bullet(l10n.welcomeBullet4),
 
           const Spacer(flex: 3),
 
-          _PrimaryBtn(label: 'Get started', onPressed: onNext),
+          _PrimaryBtn(label: l10n.getStartedButton, onPressed: onNext),
           const SizedBox(height: SpotSpacing.xxl),
         ],
       ),
@@ -196,6 +198,7 @@ class _IdentityStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: SpotSpacing.xxl),
       child: Column(
@@ -204,14 +207,14 @@ class _IdentityStep extends StatelessWidget {
           const Spacer(flex: 2),
 
           Text(
-            isImporting ? 'Import identity' : 'Create identity',
+            isImporting ? l10n.importIdentityTitle : l10n.createIdentityTitle,
             style: SpotType.heading,
           ),
           const SizedBox(height: SpotSpacing.sm),
           Text(
             isImporting
-                ? 'Enter your 12-word recovery phrase.'
-                : 'A keypair will be generated and stored securely on this device.',
+                ? l10n.importIdentitySubtitle
+                : l10n.createIdentitySubtitle,
             style: SpotType.bodySecondary,
           ),
 
@@ -219,12 +222,12 @@ class _IdentityStep extends StatelessWidget {
 
           if (!isImporting) ...[
             _PrimaryBtn(
-              label: 'Generate new identity',
+              label: l10n.generateIdentityButton,
               onPressed: isLoading ? null : onCreateTap,
               loading: isLoading,
             ),
             const SizedBox(height: SpotSpacing.md),
-            _OutlineBtn(label: 'Import existing', onPressed: onImportToggle),
+            _OutlineBtn(label: l10n.importExistingButton, onPressed: onImportToggle),
           ] else ...[
             TextField(
               controller: importController,
@@ -250,14 +253,14 @@ class _IdentityStep extends StatelessWidget {
             ],
             const SizedBox(height: SpotSpacing.lg),
             _PrimaryBtn(
-              label: 'Import identity',
+              label: l10n.importIdentityButton,
               onPressed: isLoading ? null : onImportSubmit,
               loading: isLoading,
             ),
             const SizedBox(height: SpotSpacing.sm),
             TextButton(
               onPressed: onImportToggle,
-              child: Text('Back', style: SpotType.bodySecondary),
+              child: Text(l10n.backButton, style: SpotType.bodySecondary),
             ),
           ],
 
@@ -290,6 +293,7 @@ class _SuccessStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
         SpotSpacing.xxl, SpotSpacing.xxxl,
@@ -298,9 +302,9 @@ class _SuccessStep extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Identity ready', style: SpotType.heading),
+          Text(l10n.identityReadyTitle, style: SpotType.heading),
           const SizedBox(height: SpotSpacing.xs),
-          const Text('Your public key', style: SpotType.bodySecondary),
+          Text(l10n.yourPublicKeyLabel, style: SpotType.bodySecondary),
           const SizedBox(height: SpotSpacing.md),
 
           // npub row
@@ -308,7 +312,7 @@ class _SuccessStep extends StatelessWidget {
             onTap: () {
               Clipboard.setData(ClipboardData(text: wallet.npub));
               ScaffoldMessenger.of(context)
-                  .showSnackBar(const SnackBar(content: Text('Copied')));
+                  .showSnackBar(SnackBar(content: Text(l10n.copiedSnackbar)));
             },
             child: Container(
               padding: const EdgeInsets.all(SpotSpacing.md),
@@ -347,11 +351,10 @@ class _SuccessStep extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Recovery phrase', style: SpotType.body),
+                Text(l10n.recoveryPhraseLabel, style: SpotType.body),
                 const SizedBox(height: SpotSpacing.xs),
-                const Text(
-                  'The only way to restore your identity if you lose this device. '
-                  'Write these down and keep them safe.',
+                Text(
+                  l10n.recoveryPhraseOnboardingDescription,
                   style: SpotType.bodySecondary,
                 ),
                 const SizedBox(height: SpotSpacing.lg),
@@ -359,7 +362,7 @@ class _SuccessStep extends StatelessWidget {
                   Center(
                     child: TextButton(
                       onPressed: onRevealMnemonic,
-                      child: const Text('Show recovery phrase'),
+                      child: Text(l10n.showRecoveryPhraseButton),
                     ),
                   )
                 else ...[
@@ -386,7 +389,7 @@ class _SuccessStep extends StatelessWidget {
                   if (!mnemonicConfirmed) ...[
                     const SizedBox(height: SpotSpacing.lg),
                     _OutlineBtn(
-                      label: 'I have saved these words',
+                      label: l10n.savedWordsButton,
                       onPressed: onConfirm,
                     ),
                   ],
@@ -398,8 +401,8 @@ class _SuccessStep extends StatelessWidget {
           const SizedBox(height: SpotSpacing.xl),
           _PrimaryBtn(
             label: mnemonicRevealed && !mnemonicConfirmed
-                ? 'Confirm backup first'
-                : 'Continue',
+                ? l10n.confirmBackupFirst
+                : l10n.continueButton,
             onPressed: mnemonicConfirmed || !mnemonicRevealed ? onEnter : null,
           ),
         ],

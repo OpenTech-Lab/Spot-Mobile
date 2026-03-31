@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/core/altcha.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
 /// Full-screen gate shown on every cold start.
@@ -64,6 +65,7 @@ class _AltchaGateScreenState extends State<AltchaGateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: SpotColors.bg,
       body: SafeArea(
@@ -92,9 +94,9 @@ class _AltchaGateScreenState extends State<AltchaGateScreen> {
                   child: Text(
                     key: ValueKey(_state),
                     switch (_state) {
-                      _VerifyState.verifying => 'Verifying…',
-                      _VerifyState.verified  => 'Verified',
-                      _VerifyState.failed    => 'Verification failed',
+                      _VerifyState.verifying => l10n.verifyingStatus,
+                      _VerifyState.verified  => l10n.verifiedStatus,
+                      _VerifyState.failed    => l10n.verificationFailedStatus,
                     },
                     style: switch (_state) {
                       _VerifyState.verified =>
@@ -122,7 +124,7 @@ class _AltchaGateScreenState extends State<AltchaGateScreen> {
                         borderRadius:
                             BorderRadius.circular(SpotRadius.sm),
                       ),
-                      child: Text('Retry', style: SpotType.bodySecondary),
+                      child: Text(l10n.retryButton, style: SpotType.bodySecondary),
                     ),
                   ),
                 ],
@@ -140,7 +142,7 @@ class _AltchaGateScreenState extends State<AltchaGateScreen> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      'Protected by ALTCHA',
+                      l10n.altchaAttribution,
                       style: SpotType.caption,
                     ),
                   ],

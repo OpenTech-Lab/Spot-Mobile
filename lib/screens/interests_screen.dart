@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/core/tag_normalizer.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
@@ -88,6 +89,7 @@ class _InterestsScreenState extends State<InterestsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isValid = _selected.length >= 3;
 
     return Container(
@@ -121,10 +123,10 @@ class _InterestsScreenState extends State<InterestsScreen> {
             ),
             const SizedBox(height: SpotSpacing.xl),
 
-            const Text('Favorite Topics', style: SpotType.subheading),
+            Text(l10n.favoriteTopicsTitle, style: SpotType.subheading),
             const SizedBox(height: SpotSpacing.xs),
-            const Text(
-              'Pick at least 3 topics to personalise your For You feed.',
+            Text(
+              l10n.favoriteTopicsSubtitle,
               style: SpotType.bodySecondary,
             ),
             const SizedBox(height: SpotSpacing.xl),
@@ -178,8 +180,8 @@ class _InterestsScreenState extends State<InterestsScreen> {
                       controller: _customController,
                       inputFormatters: const [CanonicalTagTextInputFormatter()],
                       style: SpotType.body,
-                      decoration: const InputDecoration(
-                        hintText: 'Add custom hashtag',
+                      decoration: InputDecoration(
+                        hintText: l10n.addCustomHashtagHint,
                         prefixText: '#',
                         prefixStyle: TextStyle(color: SpotColors.textTertiary),
                         contentPadding: EdgeInsets.symmetric(
@@ -268,8 +270,8 @@ class _InterestsScreenState extends State<InterestsScreen> {
                       )
                     : Text(
                         _selected.isEmpty
-                            ? 'Select at least 3'
-                            : 'Save ${_selected.length} interest${_selected.length == 1 ? '' : 's'}',
+                            ? l10n.selectAtLeast3
+                            : l10n.saveNInterests(_selected.length),
                       ),
               ),
             ),

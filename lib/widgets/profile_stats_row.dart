@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
 class ProfileStatsRow extends StatelessWidget {
@@ -23,19 +24,20 @@ class ProfileStatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Row(
           children: [
             Expanded(
-              child: _ProfileStat(value: '$postCount', label: 'Posts'),
+              child: _ProfileStat(value: '$postCount', label: l10n.postsLabel),
             ),
             Expanded(
-              child: _ProfileStat(value: '$followingCount', label: 'Following'),
+              child: _ProfileStat(value: '$followingCount', label: l10n.followingLabel),
             ),
             Expanded(
-              child: _ProfileStat(value: '$followerCount', label: 'Followers'),
+              child: _ProfileStat(value: '$followerCount', label: l10n.followersLabel),
             ),
           ],
         ),
@@ -45,21 +47,21 @@ class ProfileStatsRow extends StatelessWidget {
             Expanded(
               child: _ProfileStat(
                 value: _formatDate(joinedAt, empty: '-'),
-                label: 'Joined',
+                label: l10n.joinedLabel,
                 compact: true,
               ),
             ),
             Expanded(
               child: _ProfileStat(
                 value: _formatDate(lastThreadAt, empty: '-'),
-                label: 'Thread',
+                label: l10n.threadStatLabel,
                 compact: true,
               ),
             ),
             Expanded(
               child: _ProfileStat(
                 value: _formatDate(lastReplyAt, empty: '-'),
-                label: 'Reply',
+                label: l10n.replyStatLabel,
                 compact: true,
               ),
             ),

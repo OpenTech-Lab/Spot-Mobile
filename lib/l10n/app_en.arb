@@ -1,0 +1,1082 @@
+{
+  "@@locale": "en",
+
+  "appTitle": "Spot",
+  "@appTitle": {},
+
+  "cancelAction": "Cancel",
+  "@cancelAction": {},
+
+  "retryButton": "Retry",
+  "@retryButton": {},
+
+  "backButton": "Back",
+  "@backButton": {},
+
+  "continueButton": "Continue",
+  "@continueButton": {},
+
+  "copiedSnackbar": "Copied",
+  "@copiedSnackbar": {},
+
+  "loadingLabel": "Loading",
+  "@loadingLabel": {},
+
+  "savingLabel": "Saving…",
+  "@savingLabel": {},
+
+  "updatingLabel": "Updating…",
+  "@updatingLabel": {},
+
+  "locatingLabel": "Locating…",
+  "@locatingLabel": {},
+
+  "verifyingStatus": "Verifying…",
+  "@verifyingStatus": {},
+
+  "verifiedStatus": "Verified",
+  "@verifiedStatus": {},
+
+  "verificationFailedStatus": "Verification failed",
+  "@verificationFailedStatus": {},
+
+  "deleteButton": "Delete",
+  "@deleteButton": {},
+
+  "clearButton": "Clear",
+  "@clearButton": {},
+
+  "clearAllButton": "Clear All",
+  "@clearAllButton": {},
+
+  "hideButton": "Hide",
+  "@hideButton": {},
+
+  "unlockButton": "Unlock",
+  "@unlockButton": {},
+
+  "followButton": "Follow",
+  "@followButton": {},
+
+  "followingLabel": "Following",
+  "@followingLabel": {},
+
+  "followersLabel": "Followers",
+  "@followersLabel": {},
+
+  "postsLabel": "Posts",
+  "@postsLabel": {},
+
+  "joinedLabel": "Joined",
+  "@joinedLabel": {},
+
+  "notSetValue": "Not set",
+  "@notSetValue": {},
+
+  "youLabel": "You",
+  "@youLabel": {},
+
+  "citizenDefaultName": "Citizen",
+  "@citizenDefaultName": {},
+
+  "altchaAttribution": "Protected by ALTCHA",
+  "@altchaAttribution": {},
+
+  "altchaVerificationFailed": "ALTCHA verification failed",
+  "@altchaVerificationFailed": {},
+
+  "reportedContentHidden": "Reported. Content hidden.",
+  "@reportedContentHidden": {},
+
+  "welcomeTagline": "Decentralised media.\nVerified at capture.",
+  "@welcomeTagline": {},
+
+  "welcomeBullet1": "Device-bound cryptographic identity",
+  "@welcomeBullet1": {},
+
+  "welcomeBullet2": "GPS-locked at the moment of capture",
+  "@welcomeBullet2": {},
+
+  "welcomeBullet3": "Danger mode — blur faces in photos, hide location",
+  "@welcomeBullet3": {},
+
+  "welcomeBullet4": "Peer-to-peer, no central servers",
+  "@welcomeBullet4": {},
+
+  "getStartedButton": "Get started",
+  "@getStartedButton": {},
+
+  "createIdentityTitle": "Create identity",
+  "@createIdentityTitle": {},
+
+  "importIdentityTitle": "Import identity",
+  "@importIdentityTitle": {},
+
+  "createIdentitySubtitle": "A keypair will be generated and stored securely on this device.",
+  "@createIdentitySubtitle": {},
+
+  "importIdentitySubtitle": "Enter your 12-word recovery phrase.",
+  "@importIdentitySubtitle": {},
+
+  "generateIdentityButton": "Generate new identity",
+  "@generateIdentityButton": {},
+
+  "importExistingButton": "Import existing",
+  "@importExistingButton": {},
+
+  "importIdentityButton": "Import identity",
+  "@importIdentityButton": {},
+
+  "importExactWordsError": "Enter exactly 12 recovery words.",
+  "@importExactWordsError": {},
+
+  "invalidPhraseError": "Invalid phrase: {error}",
+  "@invalidPhraseError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+
+  "failedError": "Failed: {error}",
+  "@failedError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+
+  "identityReadyTitle": "Identity ready",
+  "@identityReadyTitle": {},
+
+  "yourPublicKeyLabel": "Your public key",
+  "@yourPublicKeyLabel": {},
+
+  "recoveryPhraseLabel": "Recovery phrase",
+  "@recoveryPhraseLabel": {},
+
+  "recoveryPhraseOnboardingDescription": "The only way to restore your identity if you lose this device. Write these down and keep them safe.",
+  "@recoveryPhraseOnboardingDescription": {},
+
+  "showRecoveryPhraseButton": "Show recovery phrase",
+  "@showRecoveryPhraseButton": {},
+
+  "savedWordsButton": "I have saved these words",
+  "@savedWordsButton": {},
+
+  "confirmBackupFirst": "Confirm backup first",
+  "@confirmBackupFirst": {},
+
+  "securingAccountTitle": "Securing account",
+  "@securingAccountTitle": {},
+
+  "checkingOwnerSubtitle": "Checking how this device can verify the saved owner…",
+  "@checkingOwnerSubtitle": {},
+
+  "savedAccountLockedTitle": "Saved account locked",
+  "@savedAccountLockedTitle": {},
+
+  "accountLockedDescription": "Public threads stay public, but private account access on this phone stays locked until the current owner unlocks or resets it.",
+  "@accountLockedDescription": {},
+
+  "accountLabel": "Account",
+  "@accountLabel": {},
+
+  "createdLabel": "Created",
+  "@createdLabel": {},
+
+  "unlockThisAccountButton": "Unlock this account",
+  "@unlockThisAccountButton": {},
+
+  "unlockWithPhraseButton": "Unlock with recovery phrase",
+  "@unlockWithPhraseButton": {},
+
+  "notMyAccountButton": "This is not my account",
+  "@notMyAccountButton": {},
+
+  "unlockCancelledError": "Unlock was cancelled or failed. Spot will stay locked until this device owner confirms access.",
+  "@unlockCancelledError": {},
+
+  "failedResetAccount": "Failed to reset the saved account: {error}",
+  "@failedResetAccount": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+
+  "unlockWithPhraseDialogTitle": "Unlock with recovery phrase",
+  "@unlockWithPhraseDialogTitle": {},
+
+  "unlockPhraseDescription": "Enter the 12-word recovery phrase for this saved account.",
+  "@unlockPhraseDescription": {},
+
+  "enterExactPhraseError": "Enter the exact 12-word recovery phrase.",
+  "@enterExactPhraseError": {},
+
+  "phraseMismatchError": "Recovery phrase does not match this saved account.",
+  "@phraseMismatchError": {},
+
+  "settingsTitle": "Settings",
+  "@settingsTitle": {},
+
+  "settingsTooltip": "Settings",
+  "@settingsTooltip": {},
+
+  "favoriteTopicsLabel": "Favorite Topics",
+  "@favoriteTopicsLabel": {},
+
+  "assetTransportLabel": "Asset Transport",
+  "@assetTransportLabel": {},
+
+  "viewMyActivityLabel": "View My Activity",
+  "@viewMyActivityLabel": {},
+
+  "privacySectionLabel": "PRIVACY",
+  "@privacySectionLabel": {},
+
+  "footprintMapLabel": "Footprint Map",
+  "@footprintMapLabel": {},
+
+  "publicThreadsLabel": "Public Threads",
+  "@publicThreadsLabel": {},
+
+  "publicRepliesLabel": "Public Replies",
+  "@publicRepliesLabel": {},
+
+  "storageSectionLabel": "Storage",
+  "@storageSectionLabel": {},
+
+  "clearCacheLabel": "Clear Cache",
+  "@clearCacheLabel": {},
+
+  "clearLocalDataLabel": "Clear Local Data",
+  "@clearLocalDataLabel": {},
+
+  "sessionSectionLabel": "SESSION",
+  "@sessionSectionLabel": {},
+
+  "safeModeLabel": "Safe Mode",
+  "@safeModeLabel": {},
+
+  "logOutLabel": "Log Out",
+  "@logOutLabel": {},
+
+  "signingOutLabel": "Signing out…",
+  "@signingOutLabel": {},
+
+  "clearCacheDialogContent": "This will delete all cached media files. Your posts and settings will not be affected.",
+  "@clearCacheDialogContent": {},
+
+  "cacheClearedSnackbar": "Cache cleared",
+  "@cacheClearedSnackbar": {},
+
+  "clearLocalDataDialogContent": "This will delete ALL local data including:\n• Cached media\n• Saved posts\n• Favorite tags and preferences\n• Blocklist\n\nYour account will NOT be deleted. Remote data will re-sync from Supabase.",
+  "@clearLocalDataDialogContent": {},
+
+  "localDataClearedSnackbar": "Local data cleared. Restart app to re-sync.",
+  "@localDataClearedSnackbar": {},
+
+  "logOutDialogTitle": "Log out?",
+  "@logOutDialogTitle": {},
+
+  "logOutDialogContent": "Before logging out, make sure you have saved your 12-word recovery phrase. You will need it to restore this same identity later. Logging out will sign you out on this device and erase local app data. Your Supabase account and remote posts will remain intact.",
+  "@logOutDialogContent": {},
+
+  "logOutConfirmButton": "Log Out",
+  "@logOutConfirmButton": {},
+
+  "failedLoadPrivacy": "Failed to load privacy settings: {error}",
+  "@failedLoadPrivacy": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+
+  "failedUpdatePrivacy": "Failed to update privacy settings: {error}",
+  "@failedUpdatePrivacy": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+
+  "failedUpdateSafeMode": "Failed to update safe mode: {error}",
+  "@failedUpdateSafeMode": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+
+  "failedLogOut": "Failed to log out: {error}",
+  "@failedLogOut": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+
+  "publicActivityTitle": "Public Activity",
+  "@publicActivityTitle": {},
+
+  "publicActivityMessage": "Choose which of your public posts to open.",
+  "@publicActivityMessage": {},
+
+  "postedThreadsOption": "Posted Threads",
+  "@postedThreadsOption": {},
+
+  "repliedThreadsOption": "Replied Threads",
+  "@repliedThreadsOption": {},
+
+  "walletAccountTitle": "Account",
+  "@walletAccountTitle": {},
+
+  "thisDeviceSectionTitle": "This device",
+  "@thisDeviceSectionTitle": {},
+
+  "deviceSectionDescription": "Profile name and avatar are edited from the Profile tab. Device signing keys stay internal to the app.",
+  "@deviceSectionDescription": {},
+
+  "deviceLabel": "Device",
+  "@deviceLabel": {},
+
+  "postingLimitsSectionTitle": "Posting limits",
+  "@postingLimitsSectionTitle": {},
+
+  "checkingDailyLimits": "Checking your current daily limits…",
+  "@checkingDailyLimits": {},
+
+  "postingLimitsLoadError": "Could not load your posting limits right now.",
+  "@postingLimitsLoadError": {},
+
+  "recoveryPhraseWalletDescription": "These 12 words are the only way to restore this identity after logging out or moving to a new device.",
+  "@recoveryPhraseWalletDescription": {},
+
+  "copyPhraseButton": "Copy phrase",
+  "@copyPhraseButton": {},
+
+  "recoveryPhraseCopied": "Recovery phrase copied",
+  "@recoveryPhraseCopied": {},
+
+  "dangerZoneSectionTitle": "Danger zone",
+  "@dangerZoneSectionTitle": {},
+
+  "deleteAccountDescription": "Delete this account from Supabase and erase local app data from this device.",
+  "@deleteAccountDescription": {},
+
+  "deleteAccountButton": "Delete this account",
+  "@deleteAccountButton": {},
+
+  "deleteAccountDialogTitle": "Delete this account?",
+  "@deleteAccountDialogTitle": {},
+
+  "deleteAccountDialogContent": "This will permanently remove your Spot profile and posts from Supabase, then erase local app data from this device. This cannot be undone.",
+  "@deleteAccountDialogContent": {},
+
+  "failedDeleteAccount": "Failed to delete account: {error}",
+  "@failedDeleteAccount": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+
+  "postingBlocked": "Posting is currently blocked for this account.",
+  "@postingBlocked": {},
+
+  "postingQuotaDescription": "You can check your remaining thread and reply publishes here before opening the composer.",
+  "@postingQuotaDescription": {},
+
+  "tierLabel": "Tier",
+  "@tierLabel": {},
+
+  "threadsLabel": "Threads",
+  "@threadsLabel": {},
+
+  "repliesLabel": "Replies",
+  "@repliesLabel": {},
+
+  "usedLabel": "Used",
+  "@usedLabel": {},
+
+  "postingQuotaResetsAt": "Resets at {resetTime} (next UTC midnight).",
+  "@postingQuotaResetsAt": {
+    "placeholders": {
+      "resetTime": { "type": "String" }
+    }
+  },
+
+  "postingRemainingOf": "{remaining} left of {total}",
+  "@postingRemainingOf": {
+    "placeholders": {
+      "remaining": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+
+  "postingUsedCount": "{threads} threads, {replies} replies",
+  "@postingUsedCount": {
+    "placeholders": {
+      "threads": { "type": "int" },
+      "replies": { "type": "int" }
+    }
+  },
+
+  "latestTabLabel": "LATEST",
+  "@latestTabLabel": {},
+
+  "followingTabLabel": "FOLLOWING",
+  "@followingTabLabel": {},
+
+  "couldNotLoadPosts": "Could not load posts",
+  "@couldNotLoadPosts": {},
+
+  "noPostsYet": "No posts yet",
+  "@noPostsYet": {},
+
+  "beFirstToRecord": "Be the first to record",
+  "@beFirstToRecord": {},
+
+  "noFollowingPosts": "No posts from people you follow",
+  "@noFollowingPosts": {},
+
+  "tapAvatarToFollow": "Tap an avatar to follow someone",
+  "@tapAvatarToFollow": {},
+
+  "homeNavLabel": "Home",
+  "@homeNavLabel": {},
+
+  "discoverNavLabel": "Discover",
+  "@discoverNavLabel": {},
+
+  "eventsNavLabel": "Events",
+  "@eventsNavLabel": {},
+
+  "profileNavLabel": "Profile",
+  "@profileNavLabel": {},
+
+  "eventsTabTitle": "Events",
+  "@eventsTabTitle": {},
+
+  "allEventsTabLabel": "ALL",
+  "@allEventsTabLabel": {},
+
+  "noEventsYet": "No events yet",
+  "@noEventsYet": {},
+
+  "noFollowedEventsLive": "No followed events live",
+  "@noFollowedEventsLive": {},
+
+  "noFollowedTagsYet": "No followed tags yet",
+  "@noFollowedTagsYet": {},
+
+  "followedTagsDescription": "Followed tags will show up here when matching live events appear.",
+  "@followedTagsDescription": {},
+
+  "followTagPrompt": "Follow a tag from Discover or an event detail screen to see it here.",
+  "@followTagPrompt": {},
+
+  "profileTitle": "Profile",
+  "@profileTitle": {},
+
+  "editProfileTitle": "Edit Profile",
+  "@editProfileTitle": {},
+
+  "usernameFieldLabel": "Username",
+  "@usernameFieldLabel": {},
+
+  "usernameFieldHint": "Citizen name",
+  "@usernameFieldHint": {},
+
+  "descriptionFieldLabel": "Description",
+  "@descriptionFieldLabel": {},
+
+  "descriptionFieldHint": "Simple description about you",
+  "@descriptionFieldHint": {},
+
+  "tapAvatarHint": "Tap avatar to choose a new image",
+  "@tapAvatarHint": {},
+
+  "saveProfileButton": "Save Profile",
+  "@saveProfileButton": {},
+
+  "descriptionTooLongError": "Use 100 words or fewer",
+  "@descriptionTooLongError": {},
+
+  "captureAMomentHint": "Capture a moment to see it here",
+  "@captureAMomentHint": {},
+
+  "repliesPostedHint": "Replies you posted will appear here",
+  "@repliesPostedHint": {},
+
+  "noThreadsYet": "No threads yet",
+  "@noThreadsYet": {},
+
+  "noRepliesYet": "No replies yet",
+  "@noRepliesYet": {},
+
+  "removedLocalPost": "Removed local unsent post",
+  "@removedLocalPost": {},
+
+  "postDeleted": "Post deleted. Swarm participants will be notified to remove local copies.",
+  "@postDeleted": {},
+
+  "failedDeletePost": "Failed to delete post",
+  "@failedDeletePost": {},
+
+  "postSent": "Post sent",
+  "@postSent": {},
+
+  "retryFailed": "Retry failed. The post is still saved locally.",
+  "@retryFailed": {},
+
+  "profileUpdated": "Profile updated",
+  "@profileUpdated": {},
+
+  "profileUpdatedWithWarning": "Profile updated. {warning}",
+  "@profileUpdatedWithWarning": {
+    "placeholders": {
+      "warning": { "type": "String" }
+    }
+  },
+
+  "failedUpdateProfile": "Failed to update profile: {error}",
+  "@failedUpdateProfile": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+
+  "avatarNotUpdated": "Avatar not updated. Please try again.",
+  "@avatarNotUpdated": {},
+
+  "avatarNotUpdatedTimeSync": "Avatar not updated. Turn on automatic date & time and try again.",
+  "@avatarNotUpdatedTimeSync": {},
+
+  "takePhotoOption": "Take Photo",
+  "@takePhotoOption": {},
+
+  "recordVideoOption": "Record Video",
+  "@recordVideoOption": {},
+
+  "maxMediaItemsWarning": "Maximum 4 media items per post",
+  "@maxMediaItemsWarning": {},
+
+  "categoryTagHint": "Category tag (e.g. AWSSummitTokyo2026)",
+  "@categoryTagHint": {},
+
+  "addMoreTagsHint": "Add more tags…",
+  "@addMoreTagsHint": {},
+
+  "createCategoryTagTooltip": "Create category tag",
+  "@createCategoryTagTooltip": {},
+
+  "createTagTooltip": "Create tag",
+  "@createTagTooltip": {},
+
+  "postModeLabel": "Post mode",
+  "@postModeLabel": {},
+
+  "standardModeLabel": "Standard",
+  "@standardModeLabel": {},
+
+  "virtualModeLabel": "Virtual",
+  "@virtualModeLabel": {},
+
+  "checkInLabel": "Check in at a spot",
+  "@checkInLabel": {},
+
+  "checkInSubtitle": "Publish exact location with a place name",
+  "@checkInSubtitle": {},
+
+  "blurFacesLabel": "Blur faces",
+  "@blurFacesLabel": {},
+
+  "blurFacesSubtitle": "Automatically blur detected faces in photos",
+  "@blurFacesSubtitle": {},
+
+  "aiGeneratedLabel": "AI-generated content",
+  "@aiGeneratedLabel": {},
+
+  "aiGeneratedSubtitle": "Content was created or assisted by AI",
+  "@aiGeneratedSubtitle": {},
+
+  "secondhandLabel": "Someone else's story",
+  "@secondhandLabel": {},
+
+  "secondhandSubtitle": "You are sharing a secondhand account",
+  "@secondhandSubtitle": {},
+
+  "publishFailedSaved": "Publish failed. Saved in Profile so you can retry.",
+  "@publishFailedSaved": {},
+
+  "publishFailedError": "Publish failed: {error}",
+  "@publishFailedError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+
+  "publishButton": "Publish",
+  "@publishButton": {},
+
+  "confirmAndPostButton": "Confirm & Post",
+  "@confirmAndPostButton": {},
+
+  "beforePostTitle": "Before you post",
+  "@beforePostTitle": {},
+
+  "rightsConfirmation": "I have the rights to share this content",
+  "@rightsConfirmation": {},
+
+  "defamationConfirmation": "This content does not defame any individuals or groups",
+  "@defamationConfirmation": {},
+
+  "lawsConfirmation": "I confirm this complies with applicable laws in my jurisdiction",
+  "@lawsConfirmation": {},
+
+  "captionHint": "Add a caption… (optional, max {limit} chars)",
+  "@captionHint": {
+    "placeholders": {
+      "limit": { "type": "int" }
+    }
+  },
+
+  "addCategoryTagWarning": "Add a category tag before posting a new thread.",
+  "@addCategoryTagWarning": {},
+
+  "tagFieldHint": "First tag is the event category · press Space or , to add more",
+  "@tagFieldHint": {},
+
+  "checkInSpotHint": "e.g. Eiffel Tower, Central Park…",
+  "@checkInSpotHint": {},
+
+  "checkInSpotPlaceholder": "Check in at a spot…",
+  "@checkInSpotPlaceholder": {},
+
+  "publishNItems": "Publish {count} items",
+  "@publishNItems": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "discoverSearchPlaceholder": "Search threads or #tags",
+  "@discoverSearchPlaceholder": {},
+
+  "discoverTitle": "Discover",
+  "@discoverTitle": {},
+
+  "removeFavoriteLabel": "Remove Favorite",
+  "@removeFavoriteLabel": {},
+
+  "addFavoriteLabel": "Add as Favorite",
+  "@addFavoriteLabel": {},
+
+  "trendingTabLabel": "TRENDING",
+  "@trendingTabLabel": {},
+
+  "forYouTabLabel": "FOR YOU",
+  "@forYouTabLabel": {},
+
+  "nearbyTabLabel": "NEARBY",
+  "@nearbyTabLabel": {},
+
+  "usersTabLabel": "USERS",
+  "@usersTabLabel": {},
+
+  "noThreadsFound": "No threads found for \"{search}\"",
+  "@noThreadsFound": {
+    "placeholders": {
+      "search": { "type": "String" }
+    }
+  },
+
+  "noUsersFound": "No users found for \"{search}\"",
+  "@noUsersFound": {
+    "placeholders": {
+      "search": { "type": "String" }
+    }
+  },
+
+  "nothingTrending": "Nothing trending in the last 48 h",
+  "@nothingTrending": {},
+
+  "noRecommendedPosts": "No recommended posts yet",
+  "@noRecommendedPosts": {},
+
+  "setInterestsPrompt": "Set your interests to see personalised content",
+  "@setInterestsPrompt": {},
+
+  "noEventsNearby": "No events near you",
+  "@noEventsNearby": {},
+
+  "enableLocationPrompt": "Enable location to see nearby events",
+  "@enableLocationPrompt": {},
+
+  "allowLocationButton": "Allow Location",
+  "@allowLocationButton": {},
+
+  "participantsLabel": "Participants",
+  "@participantsLabel": {},
+
+  "splashLoadingTitle": "Loading Spot",
+  "@splashLoadingTitle": {},
+
+  "splashLoadingSubtitle": "Fetching latest data and saving it locally…",
+  "@splashLoadingSubtitle": {},
+
+  "splashRefreshingTitle": "Refreshing data…",
+  "@splashRefreshingTitle": {},
+
+  "splashRefreshingSubtitle": "Checking for new posts and saving updates locally…",
+  "@splashRefreshingSubtitle": {},
+
+  "assetTransportScreenTitle": "Asset Transport",
+  "@assetTransportScreenTitle": {},
+
+  "peerTransportSection": "Peer Transport",
+  "@peerTransportSection": {},
+
+  "peerTransportDescription": "Control when Spot can share and fetch full images and videos over peer transport to avoid unexpected mobile-data use.",
+  "@peerTransportDescription": {},
+
+  "cdnAccelerationSection": "CDN Acceleration",
+  "@cdnAccelerationSection": {},
+
+  "cdnAccelerationDescription": "Use a content delivery network for faster media loading. CDN fetch and upload are enabled by default; disable them here to use only peer-to-peer transport.",
+  "@cdnAccelerationDescription": {},
+
+  "cdnFetchLabel": "CDN fetch & cache",
+  "@cdnFetchLabel": {},
+
+  "cdnFetchDescription": "Download media from CDN when available (faster).",
+  "@cdnFetchDescription": {},
+
+  "cdnUploadLabel": "CDN upload",
+  "@cdnUploadLabel": {},
+
+  "cdnUploadDescription": "Upload your media to CDN so others can fetch it faster.",
+  "@cdnUploadDescription": {},
+
+  "alwaysOption": "Always",
+  "@alwaysOption": {},
+
+  "wifiOnlyOption": "Wi-Fi only",
+  "@wifiOnlyOption": {},
+
+  "offOption": "Off",
+  "@offOption": {},
+
+  "cdnUploadNotConfigured": "CDN upload is not configured for this build",
+  "@cdnUploadNotConfigured": {},
+
+  "threadTitle": "Thread",
+  "@threadTitle": {},
+
+  "threadNotAvailable": "Thread not available",
+  "@threadNotAvailable": {},
+
+  "replyToPostUnavailable": "The post you are replying to is unavailable.",
+  "@replyToPostUnavailable": {},
+
+  "videoLabel": "Video",
+  "@videoLabel": {},
+
+  "imageLabel": "Image",
+  "@imageLabel": {},
+
+  "loadingFullVideo": "Loading full video…",
+  "@loadingFullVideo": {},
+
+  "loadingFullImage": "Loading full image…",
+  "@loadingFullImage": {},
+
+  "loadingFullMedia": "Loading full media…",
+  "@loadingFullMedia": {},
+
+  "mediaUnavailable": "Full media is still unavailable. Preview only for now.",
+  "@mediaUnavailable": {},
+
+  "couldNotLoadMedia": "Could not load the full media right now.",
+  "@couldNotLoadMedia": {},
+
+  "tapToPause": "Tap to pause",
+  "@tapToPause": {},
+
+  "tapToPlay": "Tap to play",
+  "@tapToPlay": {},
+
+  "couldNotRenderImage": "Could not render this image",
+  "@couldNotRenderImage": {},
+
+  "couldNotRenderPreview": "Could not render this preview",
+  "@couldNotRenderPreview": {},
+
+  "tapRetryToLoad": "Tap retry to load full media",
+  "@tapRetryToLoad": {},
+
+  "myPostedThreadsTitle": "Posted Threads",
+  "@myPostedThreadsTitle": {},
+
+  "myRepliedThreadsTitle": "Replied Threads",
+  "@myRepliedThreadsTitle": {},
+
+  "threadsPublicHint": "Threads you post publicly will appear here",
+  "@threadsPublicHint": {},
+
+  "repliesPublicHint": "Replies you post publicly will appear here",
+  "@repliesPublicHint": {},
+
+  "muteUser": "Mute user",
+  "@muteUser": {},
+
+  "unmuteUser": "Unmute user",
+  "@unmuteUser": {},
+
+  "blockUser": "Block user",
+  "@blockUser": {},
+
+  "unblockUser": "Unblock user",
+  "@unblockUser": {},
+
+  "reportUser": "Report user",
+  "@reportUser": {},
+
+  "userOptionsTitle": "User options",
+  "@userOptionsTitle": {},
+
+  "threadsPrivate": "This account is not sharing top-level threads on its public profile.",
+  "@threadsPrivate": {},
+
+  "repliesPrivate": "This account is not sharing replies on its public profile.",
+  "@repliesPrivate": {},
+
+  "footprintMapPrivate": "This account is not sharing its footprint map with other users.",
+  "@footprintMapPrivate": {},
+
+  "userReported": "User reported.",
+  "@userReported": {},
+
+  "followUpdateFailed": "Follow update failed: {error}",
+  "@followUpdateFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+
+  "favoriteTopicsTitle": "Favorite Topics",
+  "@favoriteTopicsTitle": {},
+
+  "favoriteTopicsSubtitle": "Pick at least 3 topics to personalise your For You feed.",
+  "@favoriteTopicsSubtitle": {},
+
+  "addCustomHashtagHint": "Add custom hashtag",
+  "@addCustomHashtagHint": {},
+
+  "selectAtLeast3": "Select at least 3",
+  "@selectAtLeast3": {},
+
+  "deletePost": "Delete post",
+  "@deletePost": {},
+
+  "reportContent": "Report content",
+  "@reportContent": {},
+
+  "savedLocallyOnly": "Saved locally only. Tap refresh to resend.",
+  "@savedLocallyOnly": {},
+
+  "notPostedYet": "Not posted yet. Tap refresh to resend.",
+  "@notPostedYet": {},
+
+  "tapPhotoHoldVideo": "Tap · photo   Hold · video",
+  "@tapPhotoHoldVideo": {},
+
+  "writeReplyHint": "Write a reply…",
+  "@writeReplyHint": {},
+
+  "replyingToUser": "Replying to {pubkey}",
+  "@replyingToUser": {
+    "placeholders": {
+      "pubkey": { "type": "String" }
+    }
+  },
+
+  "replyToEvent": "Reply to {event}",
+  "@replyToEvent": {
+    "placeholders": {
+      "event": { "type": "String" }
+    }
+  },
+
+  "tapToLoadMedia": "Tap to load media",
+  "@tapToLoadMedia": {},
+
+  "tapToLoadFull": "Tap to load full",
+  "@tapToLoadFull": {},
+
+  "downloadingFromCdn": "Downloading from CDN…",
+  "@downloadingFromCdn": {},
+
+  "preparingVideo": "Preparing video…",
+  "@preparingVideo": {},
+
+  "imageUnavailable": "Image unavailable now",
+  "@imageUnavailable": {},
+
+  "noGps": "No GPS",
+  "@noGps": {},
+
+  "locationHidden": "Location hidden",
+  "@locationHidden": {},
+
+  "noLocation": "No location",
+  "@noLocation": {},
+
+  "pinnedPost": "Pinned post",
+  "@pinnedPost": {},
+
+  "videoNOfTotal": "Video {n} of {total}",
+  "@videoNOfTotal": {
+    "placeholders": {
+      "n": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+
+  "openInDiscover": "Open in Discover",
+  "@openInDiscover": {},
+
+  "openFullScreenMap": "Open full screen map",
+  "@openFullScreenMap": {},
+
+  "zoomIn": "Zoom in",
+  "@zoomIn": {},
+
+  "zoomOut": "Zoom out",
+  "@zoomOut": {},
+
+  "mapAttribution": "Map tiles: OpenStreetMap / CARTO",
+  "@mapAttribution": {},
+
+  "locationLabel": "Location",
+  "@locationLabel": {},
+
+  "threadsTabLabel": "THREADS",
+  "@threadsTabLabel": {},
+
+  "repliesTabLabel": "REPLIES",
+  "@repliesTabLabel": {},
+
+  "mapTabLabel": "MAP",
+  "@mapTabLabel": {},
+
+  "footprintMapTitle": "Footprint Map",
+  "@footprintMapTitle": {},
+
+  "noLocations": "No locations",
+  "@noLocations": {},
+
+  "unknownLabel": "Unknown",
+  "@unknownLabel": {},
+
+  "eventPostLabel": "Post",
+  "@eventPostLabel": {},
+
+  "eventReplyLabel": "Reply",
+  "@eventReplyLabel": {},
+
+  "eventPostsContributors": "{count} posts · {contributors} contributors",
+  "@eventPostsContributors": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "contributors": { "type": "int" }
+    }
+  },
+
+  "mediaViewerPageTitle": "{label} {n}/{total}",
+  "@mediaViewerPageTitle": {
+    "placeholders": {
+      "label": { "type": "String" },
+      "n": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+
+  "threadsArePrivateTitle": "Threads are private",
+  "@threadsArePrivateTitle": {},
+
+  "repliesArePrivateTitle": "Replies are private",
+  "@repliesArePrivateTitle": {},
+
+  "footprintMapIsPrivateTitle": "Footprint map is private",
+  "@footprintMapIsPrivateTitle": {},
+
+  "repliesFromAccountHint": "Replies from this account will appear here",
+  "@repliesFromAccountHint": {},
+
+  "noTopLevelThreadsHint": "No top-level threads from this account yet",
+  "@noTopLevelThreadsHint": {},
+
+  "saveNInterests": "{count, plural, one{Save {count} interest} other{Save {count} interests}}",
+  "@saveNInterests": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "threadStatLabel": "Thread",
+  "@threadStatLabel": {},
+
+  "replyStatLabel": "Reply",
+  "@replyStatLabel": {},
+
+  "footprintCountriesVisited": "{count, plural, one{{count} country visited} other{{count} countries visited}}",
+  "@footprintCountriesVisited": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "previewLabel": "Preview",
+  "@previewLabel": {},
+
+  "mediaCheckBackLater": "Check back later",
+  "@mediaCheckBackLater": {},
+
+  "mediaDownloadViaCdnOrP2p": "Downloads via CDN or P2P",
+  "@mediaDownloadViaCdnOrP2p": {},
+
+  "protectedTooltip": "Protected",
+  "@protectedTooltip": {},
+
+  "aiGeneratedTooltip": "AI-generated",
+  "@aiGeneratedTooltip": {},
+
+  "notSentTooltip": "Not sent",
+  "@notSentTooltip": {},
+
+  "secondhandTooltip": "Secondhand",
+  "@secondhandTooltip": {},
+
+  "descriptionWordCountHelper": "{count}/{max} words",
+  "@descriptionWordCountHelper": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "max": { "type": "int" }
+    }
+  },
+
+  "replyToShortKey": "Reply to {key}",
+  "@replyToShortKey": {
+    "placeholders": {
+      "key": { "type": "String" }
+    }
+  },
+
+  "whatsHappeningHint": "What's happening?",
+  "@whatsHappeningHint": {},
+
+  "postButton": "Post",
+  "@postButton": {},
+
+  "beforePostSubtitle": "Please confirm all of the following before sharing.",
+  "@beforePostSubtitle": {},
+
+  "accuracyConfirmation": "The information I'm sharing is accurate to the best of my knowledge",
+  "@accuracyConfirmation": {}
+}

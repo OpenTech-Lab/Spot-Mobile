@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
 class ProfileThreadTabBar extends StatelessWidget {
@@ -9,6 +10,7 @@ class ProfileThreadTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         SpotSpacing.lg,
@@ -24,10 +26,10 @@ class ProfileThreadTabBar extends StatelessWidget {
         indicatorWeight: 1.5,
         dividerColor: Colors.transparent,
         labelStyle: SpotType.caption.copyWith(letterSpacing: 0.8, fontSize: 11),
-        tabs: const [
-          Tab(text: 'THREADS'),
-          Tab(text: 'REPLIES'),
-          Tab(text: 'MAP'),
+        tabs: [
+          Tab(text: l10n.threadsTabLabel),
+          Tab(text: l10n.repliesTabLabel),
+          Tab(text: l10n.mapTabLabel),
         ],
       ),
     );

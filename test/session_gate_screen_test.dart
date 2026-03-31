@@ -1,10 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mobile/core/wallet.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/session_gate_screen.dart';
 import 'package:mobile/services/app_lock_service.dart';
+
+Widget _localizedApp({required Widget home}) => MaterialApp(
+  localizationsDelegates: const [
+    AppLocalizations.delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ],
+  supportedLocales: AppLocalizations.supportedLocales,
+  home: home,
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -31,7 +43,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: SessionGateScreen(
           initialWallet: _wallet(),
           appLockService: service,
@@ -67,7 +79,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: SessionGateScreen(
           initialWallet: _wallet(),
           appLockService: service,
@@ -101,7 +113,7 @@ void main() {
     final wallet = _wallet();
 
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: SessionGateScreen(
           initialWallet: wallet,
           appLockService: service,
@@ -142,7 +154,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: SessionGateScreen(
           initialWallet: _wallet(),
           appLockService: service,
@@ -175,7 +187,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: SessionGateScreen(
           initialWallet: _wallet(),
           appLockService: service,
@@ -200,7 +212,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: SessionGateScreen(
           initialWallet: _wallet(),
           appLockService: service,

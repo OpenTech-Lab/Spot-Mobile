@@ -1,12 +1,26 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/models/event_model.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/models/profile_model.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/discover_screen.dart';
+
+Widget _localizedApp({required Widget home, List<NavigatorObserver>? navigatorObservers}) =>
+    MaterialApp(
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
+      navigatorObservers: navigatorObservers ?? const [],
+      home: home,
+    );
 
 void main() {
   test('discoverFollowableTagForQuery normalizes hash-prefixed tags', () {
@@ -124,7 +138,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: Scaffold(
           body: DiscoverSearchResultsScreen(
             wallet: _wallet(),
@@ -160,7 +174,7 @@ void main() {
     var profileSearchCalls = 0;
 
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: Scaffold(
           body: DiscoverSearchResultsScreen(
             wallet: _wallet(),
@@ -199,7 +213,7 @@ void main() {
       final profileSearchQueries = <String>[];
 
       await tester.pumpWidget(
-        MaterialApp(
+        _localizedApp(
           navigatorObservers: [observer],
           home: Scaffold(
             body: DiscoverSearchResultsScreen(
@@ -243,7 +257,7 @@ void main() {
       final observer = _TestNavigatorObserver();
 
       await tester.pumpWidget(
-        MaterialApp(
+        _localizedApp(
           navigatorObservers: [observer],
           home: Scaffold(
             body: DiscoverSearchResultsScreen(

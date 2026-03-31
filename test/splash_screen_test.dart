@@ -1,12 +1,24 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/models/profile_model.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/splash_screen.dart';
 import 'package:mobile/services/app_refresh_service.dart';
+
+Widget _localizedApp({required Widget home}) => MaterialApp(
+  localizationsDelegates: const [
+    AppLocalizations.delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ],
+  supportedLocales: AppLocalizations.supportedLocales,
+  home: home,
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -28,7 +40,7 @@ void main() {
     final service = _refreshServiceWithBlockers(blockers);
 
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: SplashScreen(
           wallet: _wallet(),
           refreshService: service,
@@ -60,7 +72,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: SplashScreen(
           wallet: _wallet(),
           refreshService: service,
@@ -104,7 +116,7 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(
+        _localizedApp(
           home: SplashScreen(
             wallet: _wallet(),
             refreshService: service,

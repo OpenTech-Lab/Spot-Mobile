@@ -17,6 +17,7 @@ import 'package:mobile/services/media_sync_service.dart';
 import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
 import 'package:mobile/theme/spot_theme.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
 const ValueKey<String> threadScreenEdgeSwipeBackRegionKey = ValueKey<String>(
@@ -234,12 +235,13 @@ class _ThreadScreenState extends State<ThreadScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final entries = _entries;
     final rootPost = _rootPost;
     final categoryTag = rootPost?.eventTags.isNotEmpty == true
         ? rootPost!.eventTags.first
         : null;
-    final title = categoryTag != null ? '#$categoryTag' : 'Thread';
+    final title = categoryTag != null ? '#$categoryTag' : l10n.threadTitle;
     final scaffold = Scaffold(
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
@@ -247,9 +249,9 @@ class _ThreadScreenState extends State<ThreadScreen> {
         title: Text(title, style: SpotType.subheading),
       ),
       body: entries.isEmpty
-          ? const Center(
+          ? Center(
               child: Text(
-                'Thread not available',
+                l10n.threadNotAvailable,
                 style: SpotType.bodySecondary,
               ),
             )

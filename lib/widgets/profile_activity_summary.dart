@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/models/media_post.dart';
 import 'package:mobile/services/geo_lookup.dart';
 import 'package:mobile/theme/spot_theme.dart';
@@ -79,12 +80,13 @@ class ProfileLocationChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Wrap(
       spacing: SpotSpacing.xs,
       runSpacing: SpotSpacing.xs,
       children: [
         if (summary.topLocations.isEmpty)
-          const _ProfileSummaryChip(value: 'No locations', isLocation: true)
+          _ProfileSummaryChip(value: l10n.noLocations, isLocation: true)
         else
           for (final location in summary.topLocations)
             _ProfileSummaryChip(

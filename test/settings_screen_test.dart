@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/models/profile_model.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/settings_screen.dart';
+
+Widget _localizedApp({required Widget home}) => MaterialApp(
+  localizationsDelegates: const [
+    AppLocalizations.delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ],
+  supportedLocales: AppLocalizations.supportedLocales,
+  home: home,
+);
 
 void main() {
   test('favoriteTopicsSummary formats empty, short, and long selections', () {
@@ -20,7 +32,7 @@ void main() {
 
   testWidgets('settings can open the favorite topics editor', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: SettingsScreen(
           wallet: _wallet(),
           loadProfileSettings: (_) async => _profile(),
@@ -44,7 +56,7 @@ void main() {
 
   testWidgets('settings exposes a logout action', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: SettingsScreen(
           wallet: _wallet(),
           loadProfileSettings: (_) async => _profile(),
@@ -78,7 +90,7 @@ void main() {
 
   testWidgets('settings exposes profile visibility switches', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: SettingsScreen(
           wallet: _wallet(),
           loadProfileSettings: (_) async => _profile(
@@ -111,7 +123,7 @@ void main() {
     bool? savedThreadsPublic;
 
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: SettingsScreen(
           wallet: _wallet(),
           loadProfileSettings: (_) async => _profile(areThreadsPublic: true),
@@ -139,7 +151,7 @@ void main() {
 
   testWidgets('settings exposes the my activity menu', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: SettingsScreen(
           wallet: _wallet(),
           loadProfileSettings: (_) async => _profile(),
@@ -164,7 +176,7 @@ void main() {
     bool? savedSafeModeEnabled;
 
     await tester.pumpWidget(
-      MaterialApp(
+      _localizedApp(
         home: SettingsScreen(
           wallet: _wallet(),
           loadProfileSettings: (_) async => _profile(),

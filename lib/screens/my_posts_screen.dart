@@ -15,6 +15,7 @@ import 'package:mobile/services/media_resolver.dart';
 import 'package:mobile/services/media_sync_service.dart';
 import 'package:mobile/services/post_merge.dart';
 import 'package:mobile/services/post_thread_ordering.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/post_thread_row.dart';
 
@@ -30,21 +31,6 @@ class MyPostsScreen extends StatefulWidget {
 
   final WalletModel wallet;
   final MyPostsScreenMode mode;
-
-  String get title => switch (mode) {
-    MyPostsScreenMode.threads => 'Posted Threads',
-    MyPostsScreenMode.replies => 'Replied Threads',
-  };
-
-  String get emptyTitle => switch (mode) {
-    MyPostsScreenMode.threads => 'No threads yet',
-    MyPostsScreenMode.replies => 'No replies yet',
-  };
-
-  String get emptySubtitle => switch (mode) {
-    MyPostsScreenMode.threads => 'Threads you post publicly will appear here',
-    MyPostsScreenMode.replies => 'Replies you post publicly will appear here',
-  };
 
   @override
   State<MyPostsScreen> createState() => _MyPostsScreenState();
@@ -212,6 +198,19 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final screenTitle = switch (widget.mode) {
+      MyPostsScreenMode.threads => l10n.myPostedThreadsTitle,
+      MyPostsScreenMode.replies => l10n.myRepliedThreadsTitle,
+    };
+    final emptyTitle = switch (widget.mode) {
+      MyPostsScreenMode.threads => l10n.noThreadsYet,
+      MyPostsScreenMode.replies => l10n.noRepliesYet,
+    };
+    final emptySubtitle = switch (widget.mode) {
+      MyPostsScreenMode.threads => l10n.threadsPublicHint,
+      MyPostsScreenMode.replies => l10n.repliesPublicHint,
+    };
     return Scaffold(
       backgroundColor: SpotColors.bg,
       appBar: AppBar(
@@ -221,24 +220,28 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
           color: SpotColors.textSecondary,
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text(widget.title, style: SpotType.subheading),
+        title: Text(screenTitle, style: SpotType.subheading),
       ),
-      body: _buildBody(),
+      body: _buildBody(l10n: l10n, emptyTitle: emptyTitle, emptySubtitle: emptySubtitle),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody({
+    required AppLocalizations l10n,
+    required String emptyTitle,
+    required String emptySubtitle,
+  }) {
     final visiblePosts = switch (widget.mode) {
       MyPostsScreenMode.threads => topLevelThreadPosts(_posts),
       MyPostsScreenMode.replies => replyPosts(_posts),
     };
 
     if (_isLoading && _posts.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
+            const SizedBox(
               width: 18,
               height: 18,
               child: CircularProgressIndicator(
@@ -246,8 +249,8 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
                 strokeWidth: 1,
               ),
             ),
-            SizedBox(height: SpotSpacing.xl),
-            Text('Loading', style: SpotType.label),
+            const SizedBox(height: SpotSpacing.xl),
+            Text(l10n.loadingLabel, style: SpotType.label),
           ],
         ),
       );
@@ -266,7 +269,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
                 size: 32,
               ),
               const SizedBox(height: SpotSpacing.xl),
-              const Text('Could not load posts', style: SpotType.bodySecondary),
+              Text(l10n.couldNotLoadPosts, style: SpotType.bodySecondary),
               const SizedBox(height: SpotSpacing.xl),
               GestureDetector(
                 onTap: _refresh,
@@ -279,7 +282,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
                     border: Border.all(color: SpotColors.border, width: 0.5),
                     borderRadius: BorderRadius.circular(SpotRadius.sm),
                   ),
-                  child: const Text('Retry', style: SpotType.bodySecondary),
+                  child: Text(l10n.retryButton, style: SpotType.bodySecondary),
                 ),
               ),
             ],
@@ -300,14 +303,14 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
             ),
             const SizedBox(height: SpotSpacing.lg),
             Text(
-              widget.emptyTitle,
+              emptyTitle,
               style: SpotType.bodySecondary.copyWith(
                 fontWeight: FontWeight.w300,
               ),
             ),
             const SizedBox(height: SpotSpacing.xs),
             Text(
-              widget.emptySubtitle,
+              emptySubtitle,
               style: SpotType.caption,
             ),
           ],

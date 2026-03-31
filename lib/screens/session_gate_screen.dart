@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/core/wallet.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/altcha_gate_screen.dart';
 import 'package:mobile/screens/onboarding_screen.dart';
@@ -163,8 +164,7 @@ class _SessionGateScreenState extends State<SessionGateScreen>
         _isLocked = false;
         _backgroundedAt = null;
       } else if (showErrorOnFailure) {
-        _unlockError =
-            'Unlock was cancelled or failed. Spot will stay locked until this device owner confirms access.';
+        _unlockError = AppLocalizations.of(context)!.unlockCancelledError;
       }
     });
   }
@@ -189,7 +189,7 @@ class _SessionGateScreenState extends State<SessionGateScreen>
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _unlockError = 'Failed to reset the saved account: $error';
+        _unlockError = AppLocalizations.of(context)!.failedResetAccount(error.toString());
       });
     }
 
@@ -209,16 +209,16 @@ class _SessionGateScreenState extends State<SessionGateScreen>
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(SpotRadius.md),
           ),
-          title: const Text(
-            'Unlock with recovery phrase',
+          title: Text(
+            AppLocalizations.of(context)!.unlockWithPhraseDialogTitle,
             style: SpotType.subheading,
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Enter the 12-word recovery phrase for this saved account.',
+              Text(
+                AppLocalizations.of(context)!.unlockPhraseDescription,
                 style: SpotType.bodySecondary,
               ),
               const SizedBox(height: SpotSpacing.md),
@@ -241,11 +241,11 @@ class _SessionGateScreenState extends State<SessionGateScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel', style: SpotType.bodySecondary),
+              child: Text(AppLocalizations.of(context)!.cancelAction, style: SpotType.bodySecondary),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(controller.text),
-              child: const Text('Unlock'),
+              child: Text(AppLocalizations.of(context)!.unlockButton),
             ),
           ],
         );
@@ -293,10 +293,10 @@ class _SessionGateScreenState extends State<SessionGateScreen>
     }
 
     if (_isCheckingLock || _lockStatus == null) {
-      return const Scaffold(
+      return Scaffold(
         body: AppLoadingView(
-          title: 'Securing account',
-          subtitle: 'Checking how this device can verify the saved owner…',
+          title: AppLocalizations.of(context)!.securingAccountTitle,
+          subtitle: AppLocalizations.of(context)!.checkingOwnerSubtitle,
         ),
       );
     }
@@ -352,6 +352,7 @@ class _LockedAccountScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: SpotColors.bg,
       body: SafeArea(
@@ -393,16 +394,16 @@ class _LockedAccountScreen extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: SpotSpacing.xl),
-                            const Text(
-                              'Saved account locked',
+                            Text(
+                              l10n.savedAccountLockedTitle,
                               style: SpotType.heading,
                             ),
                             const SizedBox(height: SpotSpacing.sm),
                             Text(status.message, style: SpotType.bodySecondary),
                             const SizedBox(height: SpotSpacing.xl),
-                            _MetaRow(label: 'Account', value: wallet.npubShort),
+                            _MetaRow(label: l10n.accountLabel, value: wallet.npubShort),
                             _MetaRow(
-                              label: 'Created',
+                              label: l10n.createdLabel,
                               value: wallet.createdAt
                                   .toLocal()
                                   .toString()
@@ -412,8 +413,8 @@ class _LockedAccountScreen extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.all(SpotSpacing.lg),
                               decoration: SpotDecoration.danger(),
-                              child: const Text(
-                                'Public threads stay public, but private account access on this phone stays locked until the current owner unlocks or resets it.',
+                              child: Text(
+                                l10n.accountLockedDescription,
                                 style: SpotType.bodySecondary,
                               ),
                             ),
@@ -441,7 +442,7 @@ class _LockedAccountScreen extends StatelessWidget {
                                             color: SpotColors.onAccent,
                                           ),
                                         )
-                                      : const Text('Unlock this account'),
+                                      : Text(l10n.unlockThisAccountButton),
                                 ),
                               ),
                             if (status.canAuthenticate)
@@ -452,9 +453,7 @@ class _LockedAccountScreen extends StatelessWidget {
                                 onPressed: isUnlocking
                                     ? null
                                     : onUnlockWithRecoveryPhrase,
-                                child: const Text(
-                                  'Unlock with recovery phrase',
-                                ),
+                                child: Text(l10n.unlockWithPhraseButton),
                               ),
                             ),
                             const SizedBox(height: SpotSpacing.md),
@@ -462,7 +461,7 @@ class _LockedAccountScreen extends StatelessWidget {
                               width: double.infinity,
                               child: OutlinedButton(
                                 onPressed: isUnlocking ? null : onResetAccount,
-                                child: const Text('This is not my account'),
+                                child: Text(l10n.notMyAccountButton),
                               ),
                             ),
                           ],

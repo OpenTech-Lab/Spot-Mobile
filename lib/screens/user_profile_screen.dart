@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/event/event_repository.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/features/metadata/metadata_service.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/models/follow_stats.dart';
@@ -243,6 +244,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   Future<void> _toggleFollow() async {
     if (_isTogglingFollow) return;
+    final l10n = AppLocalizations.of(context)!;
     setState(() => _isTogglingFollow = true);
     final shouldFollow = !_isFollowing;
     try {
@@ -265,7 +267,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Follow update failed: $e')));
+      ).showSnackBar(SnackBar(content: Text(l10n.followUpdateFailed(e.toString()))));
     } finally {
       if (mounted) {
         setState(() => _isTogglingFollow = false);
@@ -276,6 +278,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   // ── Post action ───────────────────────────────────────────────────────────
 
   Future<void> _reportPost(MediaPost post) async {
+    final l10n = AppLocalizations.of(context)!;
     try {
       await MetadataService.instance.reportContent(
         postId: post.nostrEventId,
@@ -286,7 +289,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reported. Content hidden.')),
+          SnackBar(content: Text(l10n.reportedContentHidden)),
         );
       }
     } catch (_) {}
@@ -304,6 +307,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   // ── User settings menu ────────────────────────────────────────────────────
 
   void _showUserMenu() {
+    final l10n = AppLocalizations.of(context)!;
     final isMuted = FollowService.instance.isMuted(widget.pubkey);
     final isBlocked = FollowService.instance.isBlocked(widget.pubkey);
 
@@ -344,7 +348,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   size: 20,
                 ),
                 title: Text(
-                  isMuted ? 'Unmute user' : 'Mute user',
+                  isMuted ? l10n.unmuteUser : l10n.muteUser,
                   style: const TextStyle(color: SpotColors.textSecondary),
                 ),
                 contentPadding: EdgeInsets.zero,
@@ -371,7 +375,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   size: 20,
                 ),
                 title: Text(
-                  isBlocked ? 'Unblock user' : 'Block user',
+                  isBlocked ? l10n.unblockUser : l10n.blockUser,
                   style: const TextStyle(color: SpotColors.danger),
                 ),
                 contentPadding: EdgeInsets.zero,
@@ -393,15 +397,15 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   color: SpotColors.warning,
                   size: 20,
                 ),
-                title: const Text(
-                  'Report user',
-                  style: TextStyle(color: SpotColors.warning),
+                title: Text(
+                  l10n.reportUser,
+                  style: const TextStyle(color: SpotColors.warning),
                 ),
                 contentPadding: EdgeInsets.zero,
                 onTap: () {
                   Navigator.of(ctx).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('User reported.')),
+                    SnackBar(content: Text(l10n.userReported)),
                   );
                 },
               ),
@@ -412,9 +416,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   color: SpotColors.textTertiary,
                   size: 20,
                 ),
-                title: const Text(
-                  'Cancel',
-                  style: TextStyle(color: SpotColors.textTertiary),
+                title: Text(
+                  l10n.cancelAction,
+                  style: const TextStyle(color: SpotColors.textTertiary),
                 ),
                 contentPadding: EdgeInsets.zero,
                 onTap: () => Navigator.of(ctx).pop(),
@@ -430,6 +434,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final threads = topLevelThreadPosts(_posts);
     final replies = replyPosts(_posts);
     final hasVisibilitySettings = _profile != null;
@@ -451,7 +456,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     final visiblePosts = showReplies
         ? (repliesHidden ? const <MediaPost>[] : replies)
         : (threadsHidden ? const <MediaPost>[] : threads);
-    final emptyTitle = showReplies ? 'No replies yet' : 'No threads yet';
+    final emptyTitle = showReplies ? l10n.noRepliesYet : l10n.noThreadsYet;
     final activitySummary = buildProfileActivitySummary(
       posts: publicProfilePosts,
       accountCreatedAt: _profile?.createdAt,
@@ -463,14 +468,14 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         title: Text(
           _profile?.displayName?.trim().isNotEmpty == true
               ? _profile!.displayName!.trim()
-              : 'Citizen',
+              : l10n.citizenDefaultName,
           style: SpotType.subheading,
         ),
         actions: [
           IconButton(
             icon: const Icon(CupertinoIcons.ellipsis, size: 20),
             color: SpotColors.textSecondary,
-            tooltip: 'User options',
+            tooltip: l10n.userOptionsTitle,
             onPressed: _showUserMenu,
           ),
         ],
@@ -499,27 +504,24 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               child: ProfileThreadTabBar(controller: _contentTabController),
             ),
             if (threadsHidden)
-              const SliverFillRemaining(
+              SliverFillRemaining(
                 child: _PrivateProfileSection(
-                  title: 'Threads are private',
-                  subtitle:
-                      'This account is not sharing top-level threads on its public profile.',
+                  title: l10n.threadsArePrivateTitle,
+                  subtitle: l10n.threadsPrivate,
                 ),
               )
             else if (repliesHidden)
-              const SliverFillRemaining(
+              SliverFillRemaining(
                 child: _PrivateProfileSection(
-                  title: 'Replies are private',
-                  subtitle:
-                      'This account is not sharing replies on its public profile.',
+                  title: l10n.repliesArePrivateTitle,
+                  subtitle: l10n.repliesPrivate,
                 ),
               )
             else if (mapHidden)
-              const SliverFillRemaining(
+              SliverFillRemaining(
                 child: _PrivateProfileSection(
-                  title: 'Footprint map is private',
-                  subtitle:
-                      'This account is not sharing its footprint map with other users.',
+                  title: l10n.footprintMapIsPrivateTitle,
+                  subtitle: l10n.footprintMapPrivate,
                 ),
               )
             else if (showMap)
@@ -560,8 +562,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                       const SizedBox(height: SpotSpacing.xs),
                       Text(
                         showReplies
-                            ? 'Replies from this account will appear here'
-                            : 'No top-level threads from this account yet',
+                            ? l10n.repliesFromAccountHint
+                            : l10n.noTopLevelThreadsHint,
                         style: SpotType.caption,
                       ),
                     ],
@@ -665,6 +667,7 @@ class _UserProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         SpotSpacing.lg,
@@ -700,7 +703,7 @@ class _UserProfileHeader extends StatelessWidget {
           Text(
             profile?.displayName?.trim().isNotEmpty == true
                 ? profile!.displayName!.trim()
-                : 'Citizen',
+                : l10n.citizenDefaultName,
             style: SpotType.subheading,
           ),
           if (profile?.description?.trim().isNotEmpty == true) ...[
@@ -715,11 +718,11 @@ class _UserProfileHeader extends StatelessWidget {
             child: isFollowing
                 ? OutlinedButton(
                     onPressed: isTogglingFollow ? null : onFollowTap,
-                    child: Text(isTogglingFollow ? 'Updating…' : 'Following'),
+                    child: Text(isTogglingFollow ? l10n.updatingLabel : l10n.followingLabel),
                   )
                 : FilledButton(
                     onPressed: isTogglingFollow ? null : onFollowTap,
-                    child: Text(isTogglingFollow ? 'Updating…' : 'Follow'),
+                    child: Text(isTogglingFollow ? l10n.updatingLabel : l10n.followButton),
                   ),
           ),
         ],

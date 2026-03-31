@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:mobile/core/app_config.dart';
@@ -61,6 +63,17 @@ class SpotApp extends StatelessWidget {
       title: 'Spot',
       debugShowCheckedModeBanner: false,
       theme: SpotTheme.build(),
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en'),
+        Locale('ja'),
+        Locale('zh', 'TW'),
+      ],
       builder: (context, child) =>
           DismissKeyboardOnTap(child: child ?? const SizedBox.shrink()),
       home: SessionGateScreen(
