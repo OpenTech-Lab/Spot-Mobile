@@ -578,12 +578,7 @@ class MetadataService {
       if (authorIds.isEmpty) return const [];
     }
 
-    dynamic query = client
-        .from('posts')
-        .select()
-        .isFilter('deleted_at', null)
-        .order('created_at', ascending: false)
-        .limit(limit);
+    var query = client.from('posts').select().isFilter('deleted_at', null);
 
     if (before != null) {
       query = query.lt('created_at', before.toUtc().toIso8601String());
@@ -595,7 +590,9 @@ class MetadataService {
       query = query.inFilter('user_id', authorIds);
     }
 
-    final rows = List<Map<String, dynamic>>.from(await query);
+    final rows = List<Map<String, dynamic>>.from(
+      await query.order('created_at', ascending: false).limit(limit),
+    );
     return mapPostRows(rows);
   }
 
