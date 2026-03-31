@@ -527,6 +527,24 @@ abstract class AppLocalizations {
   /// **'Asset Transport'**
   String get assetTransportLabel;
 
+  /// No description provided for @languageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get languageLabel;
+
+  /// No description provided for @languageMenuMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the language used throughout the app.'**
+  String get languageMenuMessage;
+
+  /// No description provided for @systemDefaultLanguageOption.
+  ///
+  /// In en, this message translates to:
+  /// **'System Default'**
+  String get systemDefaultLanguageOption;
+
   /// No description provided for @viewMyActivityLabel.
   ///
   /// In en, this message translates to:
@@ -658,6 +676,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to update safe mode: {error}'**
   String failedUpdateSafeMode(String error);
+
+  /// No description provided for @failedUpdateLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to update language: {error}'**
+  String failedUpdateLanguage(String error);
 
   /// No description provided for @failedLogOut.
   ///
@@ -1222,6 +1246,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Before you post'**
   String get beforePostTitle;
+
+  /// No description provided for @yesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get yesLabel;
+
+  /// No description provided for @noLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get noLabel;
 
   /// No description provided for @rightsConfirmation.
   ///

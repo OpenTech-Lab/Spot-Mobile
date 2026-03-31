@@ -11,6 +11,7 @@ Widget _localizedApp({required Widget home}) => MaterialApp(
   localizationsDelegates: const [
     AppLocalizations.delegate,
     GlobalMaterialLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
     GlobalWidgetsLocalizations.delegate,
   ],
   supportedLocales: AppLocalizations.supportedLocales,
@@ -168,6 +169,41 @@ void main() {
 
     expect(find.text('Posted Threads'), findsOneWidget);
     expect(find.text('Replied Threads'), findsOneWidget);
+  });
+
+  testWidgets('settings exposes and saves the language menu', (tester) async {
+    Locale? savedLocale;
+
+    await tester.pumpWidget(
+      _localizedApp(
+        home: SettingsScreen(
+          wallet: _wallet(),
+          loadProfileSettings: (_) async => _profile(),
+          readSafeModeEnabled: () => true,
+          readPreferredLocale: () => const Locale('en'),
+          savePreferredLocale: (locale) async {
+            savedLocale = locale;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Language'), findsOneWidget);
+    expect(find.text('English'), findsOneWidget);
+
+    await tester.tap(find.text('Language'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('System Default'), findsOneWidget);
+    expect(find.text('日本語'), findsOneWidget);
+    expect(find.text('中文'), findsOneWidget);
+
+    await tester.tap(find.text('日本語'));
+    await tester.pumpAndSettle();
+
+    expect(savedLocale, const Locale('ja'));
+    expect(find.text('日本語'), findsOneWidget);
   });
 
   testWidgets('settings exposes and saves the safe mode switch', (

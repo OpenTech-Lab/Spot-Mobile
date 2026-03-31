@@ -230,6 +230,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assetTransportLabel => '資源傳輸';
 
   @override
+  String get languageLabel => '語言';
+
+  @override
+  String get languageMenuMessage => '選擇整個應用程式要使用的語言。';
+
+  @override
+  String get systemDefaultLanguageOption => '跟隨系統';
+
+  @override
   String get viewMyActivityLabel => '查看我的活動';
 
   @override
@@ -301,6 +310,11 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String failedUpdateSafeMode(String error) {
     return '更新安全模式失敗：$error';
+  }
+
+  @override
+  String failedUpdateLanguage(String error) {
+    return '更新語言失敗：$error';
   }
 
   @override
@@ -602,6 +616,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get beforePostTitle => '發文前';
+
+  @override
+  String get yesLabel => '是';
+
+  @override
+  String get noLabel => '否';
 
   @override
   String get rightsConfirmation => '我擁有分享此內容的權利';
@@ -1269,6 +1289,15 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get assetTransportLabel => '資源傳輸';
 
   @override
+  String get languageLabel => '語言';
+
+  @override
+  String get languageMenuMessage => '選擇整個應用程式要使用的語言。';
+
+  @override
+  String get systemDefaultLanguageOption => '跟隨系統';
+
+  @override
   String get viewMyActivityLabel => '查看我的活動';
 
   @override
@@ -1340,6 +1369,11 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String failedUpdateSafeMode(String error) {
     return '更新安全模式失敗：$error';
+  }
+
+  @override
+  String failedUpdateLanguage(String error) {
+    return '更新語言失敗：$error';
   }
 
   @override
@@ -1641,6 +1675,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get beforePostTitle => '發文前';
+
+  @override
+  String get yesLabel => '是';
+
+  @override
+  String get noLabel => '否';
 
   @override
   String get rightsConfirmation => '我擁有分享此內容的權利';

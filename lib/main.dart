@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:mobile/l10n/app_localizations.dart';
@@ -52,33 +53,40 @@ Future<void> main() async {
 }
 
 class SpotApp extends StatelessWidget {
-  const SpotApp({super.key, this.initialWallet, this.appLockService});
+  const SpotApp({
+    super.key,
+    this.initialWallet,
+    this.appLockService,
+    this.localeListenable,
+  });
 
   final WalletModel? initialWallet;
   final AppLockService? appLockService;
+  final ValueListenable<Locale?>? localeListenable;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Spot',
-      debugShowCheckedModeBanner: false,
-      theme: SpotTheme.build(),
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('en'),
-        Locale('ja'),
-        Locale('zh', 'TW'),
-      ],
-      builder: (context, child) =>
-          DismissKeyboardOnTap(child: child ?? const SizedBox.shrink()),
-      home: SessionGateScreen(
-        initialWallet: initialWallet,
-        appLockService: appLockService,
+    return ValueListenableBuilder<Locale?>(
+      valueListenable:
+          localeListenable ?? UserPrefsService.instance.uiLocaleListenable,
+      builder: (context, locale, _) => MaterialApp(
+        title: 'Spot',
+        debugShowCheckedModeBanner: false,
+        theme: SpotTheme.build(),
+        locale: locale,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) =>
+            DismissKeyboardOnTap(child: child ?? const SizedBox.shrink()),
+        home: SessionGateScreen(
+          initialWallet: initialWallet,
+          appLockService: appLockService,
+        ),
       ),
     );
   }

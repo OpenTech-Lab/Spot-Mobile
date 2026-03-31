@@ -226,6 +226,15 @@
   "assetTransportLabel": "Asset Transport",
   "@assetTransportLabel": {},
 
+  "languageLabel": "Language",
+  "@languageLabel": {},
+
+  "languageMenuMessage": "Choose the language used throughout the app.",
+  "@languageMenuMessage": {},
+
+  "systemDefaultLanguageOption": "System Default",
+  "@systemDefaultLanguageOption": {},
+
   "viewMyActivityLabel": "View My Activity",
   "@viewMyActivityLabel": {},
 
@@ -299,6 +308,13 @@
 
   "failedUpdateSafeMode": "Failed to update safe mode: {error}",
   "@failedUpdateSafeMode": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+
+  "failedUpdateLanguage": "Failed to update language: {error}",
+  "@failedUpdateLanguage": {
     "placeholders": {
       "error": { "type": "String" }
     }
@@ -619,6 +635,12 @@
 
   "beforePostTitle": "Before you post",
   "@beforePostTitle": {},
+
+  "yesLabel": "Yes",
+  "@yesLabel": {},
+
+  "noLabel": "No",
+  "@noLabel": {},
 
   "rightsConfirmation": "I have the rights to share this content",
   "@rightsConfirmation": {},

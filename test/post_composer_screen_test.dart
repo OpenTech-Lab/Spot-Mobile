@@ -302,6 +302,68 @@ void main() {
     expect(find.text('Confirm & Post'), findsNothing);
   });
 
+  testWidgets(
+    'composer options no longer show AI and secondhand declarations',
+    (tester) async {
+      final wallet = _wallet();
+
+      await tester.pumpWidget(_ComposerHarness(wallet: wallet));
+
+      await tester.tap(find.text('Compose'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      await tester.tap(find.byIcon(CupertinoIcons.slider_horizontal_3));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(find.text('AI-generated content'), findsNothing);
+      expect(find.text("Someone else's story"), findsNothing);
+    },
+  );
+
+  testWidgets('post opens declaration sheet with yes/no choices', (
+    tester,
+  ) async {
+    final wallet = _wallet();
+
+    await tester.pumpWidget(_ComposerHarness(wallet: wallet));
+
+    await tester.tap(find.text('Compose'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final captionField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.hintText == "What's happening?",
+    );
+    final categoryField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.hintText ==
+              'Category tag (e.g. AWSSummitTokyo2026)',
+    );
+
+    await tester.enterText(captionField, 'Smoke near the station');
+    await tester.pump();
+    await tester.enterText(categoryField, 'tokyo');
+    await tester.pump();
+    await tester.tap(find.byTooltip('Create category tag'));
+    await tester.pump();
+
+    await tester.tap(find.text('Post'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.text('Before you post'), findsOneWidget);
+    expect(find.text('AI-generated content'), findsOneWidget);
+    expect(find.text("Someone else's story"), findsOneWidget);
+    expect(find.text('Yes'), findsNWidgets(2));
+    expect(find.text('No'), findsNWidgets(2));
+    expect(find.byType(Switch), findsNothing);
+  });
+
   testWidgets('virtual mode stays active when blur faces is toggled', (
     tester,
   ) async {

@@ -24,11 +24,18 @@ import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
 String favoriteTopicsSummary(Iterable<String> topics) {
+  return favoriteTopicsSummaryWithFallback(topics, notSetLabel: 'Not set');
+}
+
+String favoriteTopicsSummaryWithFallback(
+  Iterable<String> topics, {
+  required String notSetLabel,
+}) {
   final unique = topics
       .map((topic) => topic.trim())
       .where((topic) => topic.isNotEmpty)
       .toList(growable: false);
-  if (unique.isEmpty) return 'Not set';
+  if (unique.isEmpty) return notSetLabel;
   if (unique.length <= 2) return unique.map((topic) => '#$topic').join(', ');
   return '#${unique[0]}, #${unique[1]} +${unique.length - 2}';
 }
@@ -43,6 +50,8 @@ typedef SaveProfileVisibility =
     });
 typedef ReadSafeModeEnabled = bool Function();
 typedef SaveSafeModeEnabled = Future<void> Function(bool enabled);
+typedef ReadPreferredLocale = Locale? Function();
+typedef SavePreferredLocale = Future<void> Function(Locale? locale);
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -52,6 +61,8 @@ class SettingsScreen extends StatefulWidget {
     this.saveProfileVisibility,
     this.readSafeModeEnabled,
     this.saveSafeModeEnabled,
+    this.readPreferredLocale,
+    this.savePreferredLocale,
   });
 
   final WalletModel wallet;
@@ -59,6 +70,8 @@ class SettingsScreen extends StatefulWidget {
   final SaveProfileVisibility? saveProfileVisibility;
   final ReadSafeModeEnabled? readSafeModeEnabled;
   final SaveSafeModeEnabled? saveSafeModeEnabled;
+  final ReadPreferredLocale? readPreferredLocale;
+  final SavePreferredLocale? savePreferredLocale;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -69,15 +82,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoadingVisibility = true;
   bool _isSavingVisibility = false;
   bool _isSavingSafeMode = false;
+  bool _isSavingPreferredLocale = false;
   bool _threadsPublic = true;
   bool _repliesPublic = true;
   bool _footprintMapPublic = false;
   late bool _safeModeEnabled;
+  late Locale? _preferredLocale;
 
   AssetTransportPolicy get _assetTransportPolicy =>
       UserPrefsService.instance.assetTransportPolicy;
-  String get _favoriteTopicsValue =>
-      favoriteTopicsSummary(UserPrefsService.instance.interests);
 
   LoadSettingsProfile get _profileLoader =>
       widget.loadProfileSettings ??
@@ -97,11 +110,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   SaveSafeModeEnabled get _safeModeWriter =>
       widget.saveSafeModeEnabled ??
       UserPrefsService.instance.saveSafeModeEnabled;
+  ReadPreferredLocale get _preferredLocaleReader =>
+      widget.readPreferredLocale ?? () => UserPrefsService.instance.uiLocale;
+  SavePreferredLocale get _preferredLocaleWriter =>
+      widget.savePreferredLocale ?? UserPrefsService.instance.saveUiLocale;
 
   @override
   void initState() {
     super.initState();
     _safeModeEnabled = _safeModeReader();
+    _preferredLocale = _preferredLocaleReader();
     unawaited(_loadProfileVisibility());
   }
 
@@ -123,7 +141,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (!mounted) return;
       setState(() => _isLoadingVisibility = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.failedLoadPrivacy(error.toString()))),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)!.failedLoadPrivacy(error.toString()),
+          ),
+        ),
       );
     }
   }
@@ -173,7 +195,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _isSavingVisibility = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.failedUpdatePrivacy(error.toString()))),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)!.failedUpdatePrivacy(error.toString()),
+          ),
+        ),
       );
     }
   }
@@ -210,7 +236,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _isSavingSafeMode = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.failedUpdateSafeMode(error.toString()))),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(
+              context,
+            )!.failedUpdateSafeMode(error.toString()),
+          ),
+        ),
       );
     }
   }
@@ -239,6 +271,105 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (mounted) {
       setState(() {});
+    }
+  }
+
+  String _favoriteTopicsValue(AppLocalizations l10n) =>
+      favoriteTopicsSummaryWithFallback(
+        UserPrefsService.instance.interests,
+        notSetLabel: l10n.notSetValue,
+      );
+
+  static String _preferredLocaleTag(Locale? locale) {
+    if (locale == null) return 'system';
+    if (locale.languageCode == 'zh') return 'zh';
+    return locale.languageCode;
+  }
+
+  static Locale? _localeFromTag(String tag) {
+    return switch (tag) {
+      'system' => null,
+      'en' => const Locale('en'),
+      'ja' => const Locale('ja'),
+      'zh' => const Locale('zh'),
+      _ => null,
+    };
+  }
+
+  String _preferredLocaleLabel(AppLocalizations l10n) {
+    return switch (_preferredLocaleTag(_preferredLocale)) {
+      'en' => 'English',
+      'ja' => '日本語',
+      'zh' => '中文',
+      _ => l10n.systemDefaultLanguageOption,
+    };
+  }
+
+  Future<void> _openPreferredLocaleMenu() async {
+    if (_isSavingPreferredLocale) return;
+
+    final l10n = AppLocalizations.of(context)!;
+    final selection = await showCupertinoModalPopup<String>(
+      context: context,
+      builder: (ctx) {
+        final selectedTag = _preferredLocaleTag(_preferredLocale);
+        CupertinoActionSheetAction languageAction({
+          required String tag,
+          required String label,
+        }) {
+          return CupertinoActionSheetAction(
+            isDefaultAction: selectedTag == tag,
+            onPressed: () => Navigator.of(ctx).pop(tag),
+            child: Text(label),
+          );
+        }
+
+        return CupertinoActionSheet(
+          title: Text(l10n.languageLabel),
+          message: Text(l10n.languageMenuMessage),
+          actions: [
+            languageAction(
+              tag: 'system',
+              label: l10n.systemDefaultLanguageOption,
+            ),
+            languageAction(tag: 'en', label: 'English'),
+            languageAction(tag: 'ja', label: '日本語'),
+            languageAction(tag: 'zh', label: '中文'),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(l10n.cancelAction),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || selection == null) return;
+    final nextLocale = _localeFromTag(selection);
+    if (_preferredLocaleTag(_preferredLocale) ==
+        _preferredLocaleTag(nextLocale)) {
+      return;
+    }
+
+    final previousLocale = _preferredLocale;
+    setState(() {
+      _preferredLocale = nextLocale;
+      _isSavingPreferredLocale = true;
+    });
+
+    try {
+      await _preferredLocaleWriter(nextLocale);
+      if (!mounted) return;
+      setState(() => _isSavingPreferredLocale = false);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _preferredLocale = previousLocale;
+        _isSavingPreferredLocale = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.failedUpdateLanguage(error.toString()))),
+      );
     }
   }
 
@@ -324,11 +455,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         AppDataResetService.instance.notifyLocalDataCleared();
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.localDataClearedSnackbar),
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.localDataClearedSnackbar)));
       }
     }
   }
@@ -345,10 +474,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           borderRadius: BorderRadius.circular(SpotRadius.md),
         ),
         title: Text(l10n.logOutDialogTitle, style: SpotType.subheading),
-        content: Text(
-          l10n.logOutDialogContent,
-          style: SpotType.bodySecondary,
-        ),
+        content: Text(l10n.logOutDialogContent, style: SpotType.bodySecondary),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -384,9 +510,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.failedLogOut(error.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)!.failedLogOut(error.toString()),
+          ),
+        ),
+      );
       setState(() => _isLoggingOut = false);
     }
   }
@@ -441,7 +571,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _SettingsRow(
             icon: CupertinoIcons.star,
             label: l10n.favoriteTopicsLabel,
-            value: _favoriteTopicsValue,
+            value: _favoriteTopicsValue(l10n),
             onTap: _openFavoriteTopics,
           ),
           const SizedBox(height: SpotSpacing.sm),
@@ -450,6 +580,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             label: l10n.assetTransportLabel,
             value: _assetTransportPolicy.label,
             onTap: _openAssetTransportSettings,
+          ),
+          const SizedBox(height: SpotSpacing.sm),
+          _SettingsRow(
+            icon: CupertinoIcons.globe,
+            label: l10n.languageLabel,
+            value: _isSavingPreferredLocale
+                ? l10n.savingLabel
+                : _preferredLocaleLabel(l10n),
+            onTap: _isSavingPreferredLocale ? null : _openPreferredLocaleMenu,
           ),
           const SizedBox(height: SpotSpacing.sm),
           _SettingsRow(
@@ -586,7 +725,7 @@ class _SettingsRow extends StatelessWidget {
 
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final String? value;
 
   @override

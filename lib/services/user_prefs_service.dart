@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show Locale;
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:mobile/models/asset_transport_policy.dart';
@@ -12,6 +14,7 @@ import 'package:mobile/models/asset_transport_policy.dart';
 /// - `interests_set`: bool, true once the user has completed interest onboarding.
 /// - `viewed_hashtags`: map of hashtag → view count (for Scheme B bonus).
 /// - `asset_transport_policy`: peer media transport policy.
+/// - `ui_locale`: optional app locale override.
 ///
 /// No data ever leaves the device.
 class UserPrefsService {
@@ -23,6 +26,9 @@ class UserPrefsService {
 
   Map<String, dynamic> _data = {};
   bool _loaded = false;
+  final ValueNotifier<Locale?> _uiLocaleNotifier = ValueNotifier<Locale?>(null);
+
+  ValueListenable<Locale?> get uiLocaleListenable => _uiLocaleNotifier;
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -37,6 +43,7 @@ class UserPrefsService {
     } catch (_) {
       _data = {};
     }
+    _uiLocaleNotifier.value = uiLocale;
     _loaded = true;
   }
 
@@ -76,6 +83,23 @@ class UserPrefsService {
 
   Future<void> saveAssetTransportPolicy(AssetTransportPolicy policy) async {
     _data = {..._data, 'asset_transport_policy': policy.storageValue};
+    await _save();
+  }
+
+  // ── UI language ───────────────────────────────────────────────────────────
+
+  Locale? get uiLocale => _decodeLocale(_data['ui_locale'] as String?);
+
+  Future<void> saveUiLocale(Locale? locale) async {
+    final localeTag = _encodeLocale(locale);
+    final nextData = {..._data};
+    if (localeTag == null) {
+      nextData.remove('ui_locale');
+    } else {
+      nextData['ui_locale'] = localeTag;
+    }
+    _data = nextData;
+    _uiLocaleNotifier.value = locale;
     await _save();
   }
 
@@ -128,6 +152,7 @@ class UserPrefsService {
   Future<void> clearAll() async {
     _data = {};
     _loaded = true;
+    _uiLocaleNotifier.value = null;
     try {
       final file = await _file();
       if (await file.exists()) {
@@ -148,5 +173,22 @@ class UserPrefsService {
   Future<File> _file() async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/$_fileName');
+  }
+
+  static String? _encodeLocale(Locale? locale) {
+    if (locale == null) return null;
+    if ((locale.countryCode ?? '').isEmpty) return locale.languageCode;
+    return '${locale.languageCode}_${locale.countryCode}';
+  }
+
+  static Locale? _decodeLocale(String? value) {
+    return switch (value) {
+      null || '' => null,
+      'en' => const Locale('en'),
+      'ja' => const Locale('ja'),
+      'zh' => const Locale('zh'),
+      'zh_TW' || 'zh-TW' => const Locale('zh', 'TW'),
+      _ => null,
+    };
   }
 }

@@ -237,6 +237,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assetTransportLabel => 'Asset Transport';
 
   @override
+  String get languageLabel => 'Language';
+
+  @override
+  String get languageMenuMessage =>
+      'Choose the language used throughout the app.';
+
+  @override
+  String get systemDefaultLanguageOption => 'System Default';
+
+  @override
   String get viewMyActivityLabel => 'View My Activity';
 
   @override
@@ -310,6 +320,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String failedUpdateSafeMode(String error) {
     return 'Failed to update safe mode: $error';
+  }
+
+  @override
+  String failedUpdateLanguage(String error) {
+    return 'Failed to update language: $error';
   }
 
   @override
@@ -621,6 +636,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get beforePostTitle => 'Before you post';
+
+  @override
+  String get yesLabel => 'Yes';
+
+  @override
+  String get noLabel => 'No';
 
   @override
   String get rightsConfirmation => 'I have the rights to share this content';

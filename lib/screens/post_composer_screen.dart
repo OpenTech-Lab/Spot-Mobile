@@ -234,27 +234,37 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
       _tagFocus.requestFocus();
       return;
     }
-    final confirmed = await _showLegalCheck();
-    if (!confirmed) return;
-    await _publish();
+    final declaration = await _showPostDeclaration();
+    if (declaration == null) return;
+    _isAiGenerated = declaration.isAiGenerated;
+    _sourceType = declaration.sourceType;
+    await _publish(
+      isAiGenerated: declaration.isAiGenerated,
+      sourceType: declaration.sourceType,
+    );
   }
 
-  Future<bool> _showLegalCheck() async {
-    return await showModalBottomSheet<bool>(
-          context: context,
-          backgroundColor: SpotColors.surface,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(
-              top: Radius.circular(SpotRadius.xl),
-            ),
-          ),
-          isScrollControlled: true,
-          builder: (_) => const _LegalCheckSheet(),
-        ) ??
-        false;
+  Future<_PostDeclarationResult?> _showPostDeclaration() async {
+    return showModalBottomSheet<_PostDeclarationResult>(
+      context: context,
+      backgroundColor: SpotColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(SpotRadius.xl),
+        ),
+      ),
+      isScrollControlled: true,
+      builder: (_) => _PostDeclarationSheet(
+        initialAiGenerated: _isAiGenerated,
+        initialSourceType: _sourceType,
+      ),
+    );
   }
 
-  Future<void> _publish() async {
+  Future<void> _publish({
+    required bool isAiGenerated,
+    required PostSourceType sourceType,
+  }) async {
     final l10n = AppLocalizations.of(context)!;
     setState(() => _isPublishing = true);
     MediaPost? post;
@@ -347,11 +357,11 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
         eventTags: effectiveTags,
         isDangerMode: _isDangerMode,
         isVirtual: _isVirtual,
-        isAiGenerated: _isAiGenerated,
+        isAiGenerated: isAiGenerated,
         isTextOnly: isTextOnly,
         previewBase64: preparedMedia.previewBase64,
         previewMimeType: preparedMedia.previewMimeType,
-        sourceType: _sourceType,
+        sourceType: sourceType,
         caption: caption.isEmpty ? null : caption,
         replyToId: widget.replyToPost?.nostrEventId,
         nostrEventId: hashes.first,
@@ -410,11 +420,9 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
       } else if (post != null) {
         await PostPublishService.instance.saveFailedPublish(post, e);
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.publishFailedSaved),
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.publishFailedSaved)));
         Navigator.of(context).pop(); // composer
       } else {
         _showSnack(l10n.publishFailedError(e.toString()));
@@ -666,7 +674,11 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        l10n.replyToShortKey(_shortKey(widget.replyToPost!.nostrEventId)),
+                                        l10n.replyToShortKey(
+                                          _shortKey(
+                                            widget.replyToPost!.nostrEventId,
+                                          ),
+                                        ),
                                         style: SpotType.caption.copyWith(
                                           color: SpotColors.textTertiary,
                                         ),
@@ -776,8 +788,6 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                     _ComposerOptions(
                       isDangerMode: _isDangerMode,
                       isVirtual: _isVirtual,
-                      isAiGenerated: _isAiGenerated,
-                      sourceType: _sourceType,
                       spotName: _spotName,
                       spotNameCtrl: _spotNameCtrl,
                       onDangerChanged: (v) => setState(() => _isDangerMode = v),
@@ -788,8 +798,6 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                           _spotNameCtrl.clear();
                         }
                       }),
-                      onAiChanged: (v) => setState(() => _isAiGenerated = v),
-                      onSourceChanged: (v) => setState(() => _sourceType = v),
                       onSpotNameChanged: (v) => setState(() => _spotName = v),
                     ),
                     const SizedBox(height: SpotSpacing.sm),
@@ -843,9 +851,7 @@ class _PostComposerSheetState extends State<PostComposerSheet> {
                         _showOptions ||
                         _isDangerMode ||
                         _isVirtual ||
-                        _isAiGenerated ||
-                        _spotName?.isNotEmpty == true ||
-                        _sourceType == PostSourceType.secondhand,
+                        _spotName?.isNotEmpty == true,
                   ),
                   const Spacer(),
                   // Post button
@@ -899,27 +905,19 @@ class _ComposerOptions extends StatelessWidget {
   const _ComposerOptions({
     required this.isDangerMode,
     required this.isVirtual,
-    required this.isAiGenerated,
-    required this.sourceType,
     required this.spotName,
     required this.spotNameCtrl,
     required this.onDangerChanged,
     required this.onVirtualChanged,
-    required this.onAiChanged,
-    required this.onSourceChanged,
     required this.onSpotNameChanged,
   });
 
   final bool isDangerMode;
   final bool isVirtual;
-  final bool isAiGenerated;
-  final PostSourceType sourceType;
   final String? spotName;
   final TextEditingController spotNameCtrl;
   final ValueChanged<bool> onDangerChanged;
   final ValueChanged<bool> onVirtualChanged;
-  final ValueChanged<bool> onAiChanged;
-  final ValueChanged<PostSourceType> onSourceChanged;
   final ValueChanged<String?> onSpotNameChanged;
 
   @override
@@ -1024,30 +1022,6 @@ class _ComposerOptions extends StatelessWidget {
             value: isDangerMode,
             onChanged: onDangerChanged,
             activeColor: SpotColors.danger,
-          ),
-          const SizedBox(height: SpotSpacing.sm),
-
-          // ── AI-generated toggle ────────────────────────────────────────────
-          _OptionRow(
-            icon: CupertinoIcons.sparkles,
-            label: l10n.aiGeneratedLabel,
-            subtitle: l10n.aiGeneratedSubtitle,
-            value: isAiGenerated,
-            onChanged: onAiChanged,
-            activeColor: SpotColors.warning,
-          ),
-          const SizedBox(height: SpotSpacing.sm),
-
-          // ── Source type toggle ─────────────────────────────────────────────
-          _OptionRow(
-            icon: CupertinoIcons.person_2,
-            label: l10n.secondhandLabel,
-            subtitle: l10n.secondhandSubtitle,
-            value: sourceType == PostSourceType.secondhand,
-            onChanged: (v) => onSourceChanged(
-              v ? PostSourceType.secondhand : PostSourceType.firsthand,
-            ),
-            activeColor: SpotColors.accent,
           ),
         ],
       ),
@@ -1312,16 +1286,34 @@ class _SheetHandle extends StatelessWidget {
   }
 }
 
-// ── Legal compliance check sheet ─────────────────────────────────────────────
+class _PostDeclarationResult {
+  const _PostDeclarationResult({
+    required this.isAiGenerated,
+    required this.sourceType,
+  });
 
-class _LegalCheckSheet extends StatefulWidget {
-  const _LegalCheckSheet();
-
-  @override
-  State<_LegalCheckSheet> createState() => _LegalCheckSheetState();
+  final bool isAiGenerated;
+  final PostSourceType sourceType;
 }
 
-class _LegalCheckSheetState extends State<_LegalCheckSheet> {
+// ── Post declaration sheet ───────────────────────────────────────────────────
+
+class _PostDeclarationSheet extends StatefulWidget {
+  const _PostDeclarationSheet({
+    required this.initialAiGenerated,
+    required this.initialSourceType,
+  });
+
+  final bool initialAiGenerated;
+  final PostSourceType initialSourceType;
+
+  @override
+  State<_PostDeclarationSheet> createState() => _PostDeclarationSheetState();
+}
+
+class _PostDeclarationSheetState extends State<_PostDeclarationSheet> {
+  late bool _isAiGenerated = widget.initialAiGenerated;
+  late PostSourceType _sourceType = widget.initialSourceType;
   bool _accuracy = false;
   bool _rights = false;
   bool _noDefamation = false;
@@ -1344,9 +1336,28 @@ class _LegalCheckSheetState extends State<_LegalCheckSheet> {
             const SizedBox(height: SpotSpacing.lg),
             Text(l10n.beforePostTitle, style: SpotType.subheading),
             const SizedBox(height: SpotSpacing.xs),
-            Text(
-              l10n.beforePostSubtitle,
-              style: SpotType.caption,
+            Text(l10n.beforePostSubtitle, style: SpotType.caption),
+            const SizedBox(height: SpotSpacing.lg),
+            _DeclarationQuestionRow(
+              icon: CupertinoIcons.sparkles,
+              label: l10n.aiGeneratedLabel,
+              subtitle: l10n.aiGeneratedSubtitle,
+              value: _isAiGenerated,
+              onChanged: (value) => setState(() => _isAiGenerated = value),
+              activeColor: SpotColors.warning,
+            ),
+            const SizedBox(height: SpotSpacing.sm),
+            _DeclarationQuestionRow(
+              icon: CupertinoIcons.person_2,
+              label: l10n.secondhandLabel,
+              subtitle: l10n.secondhandSubtitle,
+              value: _sourceType == PostSourceType.secondhand,
+              onChanged: (value) => setState(
+                () => _sourceType = value
+                    ? PostSourceType.secondhand
+                    : PostSourceType.firsthand,
+              ),
+              activeColor: SpotColors.accent,
             ),
             const SizedBox(height: SpotSpacing.xl),
             _LegalCheckbox(
@@ -1374,7 +1385,12 @@ class _LegalCheckSheetState extends State<_LegalCheckSheet> {
               width: double.infinity,
               child: GestureDetector(
                 onTap: _allChecked
-                    ? () => Navigator.of(context).pop(true)
+                    ? () => Navigator.of(context).pop(
+                        _PostDeclarationResult(
+                          isAiGenerated: _isAiGenerated,
+                          sourceType: _sourceType,
+                        ),
+                      )
                     : null,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
@@ -1403,7 +1419,7 @@ class _LegalCheckSheetState extends State<_LegalCheckSheet> {
             SizedBox(
               width: double.infinity,
               child: GestureDetector(
-                onTap: () => Navigator.of(context).pop(false),
+                onTap: () => Navigator.of(context).pop(),
                 child: Center(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -1420,6 +1436,145 @@ class _LegalCheckSheetState extends State<_LegalCheckSheet> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DeclarationQuestionRow extends StatelessWidget {
+  const _DeclarationQuestionRow({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+    required this.activeColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final Color activeColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final iconColor = value ? activeColor : SpotColors.textTertiary;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Icon(icon, size: 16, color: iconColor),
+        ),
+        const SizedBox(width: SpotSpacing.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: SpotType.bodySecondary.copyWith(
+                  color: value
+                      ? SpotColors.textPrimary
+                      : SpotColors.textSecondary,
+                ),
+              ),
+              Text(subtitle, style: SpotType.caption),
+            ],
+          ),
+        ),
+        const SizedBox(width: SpotSpacing.md),
+        _YesNoChoice(
+          value: value,
+          onChanged: onChanged,
+          activeColor: activeColor,
+        ),
+      ],
+    );
+  }
+}
+
+class _YesNoChoice extends StatelessWidget {
+  const _YesNoChoice({
+    required this.value,
+    required this.onChanged,
+    required this.activeColor,
+  });
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final Color activeColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _ChoicePill(
+          label: l10n.noLabel,
+          active: !value,
+          activeColor: SpotColors.textSecondary,
+          onTap: () => onChanged(false),
+        ),
+        const SizedBox(width: SpotSpacing.xs),
+        _ChoicePill(
+          label: l10n.yesLabel,
+          active: value,
+          activeColor: activeColor,
+          onTap: () => onChanged(true),
+        ),
+      ],
+    );
+  }
+}
+
+class _ChoicePill extends StatelessWidget {
+  const _ChoicePill({
+    required this.label,
+    required this.active,
+    required this.activeColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool active;
+  final Color activeColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final background = active
+        ? activeColor.withValues(alpha: 0.14)
+        : SpotColors.surfaceHigh;
+    final border = active
+        ? activeColor.withValues(alpha: 0.55)
+        : SpotColors.border;
+    final foreground = active ? activeColor : SpotColors.textSecondary;
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(
+          horizontal: SpotSpacing.md,
+          vertical: SpotSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(SpotRadius.full),
+          border: Border.all(color: border, width: 0.5),
+        ),
+        child: Text(
+          label,
+          style: SpotType.label.copyWith(
+            color: foreground,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );

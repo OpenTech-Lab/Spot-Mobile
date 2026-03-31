@@ -231,6 +231,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get assetTransportLabel => 'アセット転送';
 
   @override
+  String get languageLabel => '言語';
+
+  @override
+  String get languageMenuMessage => 'アプリ全体で使用する言語を選択してください。';
+
+  @override
+  String get systemDefaultLanguageOption => 'システム設定に従う';
+
+  @override
   String get viewMyActivityLabel => 'マイアクティビティを表示';
 
   @override
@@ -304,6 +313,11 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String failedUpdateSafeMode(String error) {
     return 'セーフモードの更新に失敗しました: $error';
+  }
+
+  @override
+  String failedUpdateLanguage(String error) {
+    return '言語の更新に失敗しました: $error';
   }
 
   @override
@@ -608,6 +622,12 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get beforePostTitle => '投稿前に';
+
+  @override
+  String get yesLabel => 'はい';
+
+  @override
+  String get noLabel => 'いいえ';
 
   @override
   String get rightsConfirmation => 'このコンテンツを共有する権利があります';
