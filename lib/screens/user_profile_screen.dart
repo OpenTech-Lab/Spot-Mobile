@@ -63,6 +63,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   bool _isTogglingFollow = false;
   ProfileModel? _profile;
   FollowStats _followStats = const FollowStats.empty();
+  bool _blockPromptVisible = false;
+  Timer? _blockPromptTimer;
 
   @override
   void initState() {
@@ -83,6 +85,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   void dispose() {
     _repoSub?.cancel();
     _resetSub?.cancel();
+    _blockPromptTimer?.cancel();
     _contentTabController.dispose();
     _repo.dispose();
     super.dispose();
@@ -325,26 +328,23 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
     if (didSubmit != true || !mounted) return;
 
-    final messenger = ScaffoldMessenger.of(context);
     if (wasBlocked || FollowService.instance.isBlocked(widget.pubkey)) {
-      messenger.showSnackBar(SnackBar(content: Text(l10n.userReported)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.userReported)),
+      );
       return;
     }
 
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(l10n.userReported),
-        action: SnackBarAction(
-          label: l10n.blockUser,
-          onPressed: () {
-            unawaited(_blockUserFromReportAction());
-          },
-        ),
-      ),
-    );
+    _blockPromptTimer?.cancel();
+    setState(() => _blockPromptVisible = true);
+    _blockPromptTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _blockPromptVisible = false);
+    });
   }
 
   Future<void> _blockUserFromReportAction() async {
+    _blockPromptTimer?.cancel();
+    setState(() => _blockPromptVisible = false);
     await FollowService.instance.block(widget.pubkey);
     if (!mounted) return;
     Navigator.of(context).pop();
@@ -516,6 +516,15 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
     return Scaffold(
       backgroundColor: SpotColors.bg,
+      bottomSheet: _blockPromptVisible
+          ? _BlockPromptBanner(
+              onBlock: () => unawaited(_blockUserFromReportAction()),
+              onDismiss: () {
+                _blockPromptTimer?.cancel();
+                setState(() => _blockPromptVisible = false);
+              },
+            )
+          : null,
       appBar: AppBar(
         backgroundColor: SpotColors.bg,
         title: Text(
@@ -687,6 +696,68 @@ class _PrivateProfileSection extends StatelessWidget {
               subtitle,
               textAlign: TextAlign.center,
               style: SpotType.caption,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Block prompt banner ───────────────────────────────────────────────────────
+
+class _BlockPromptBanner extends StatelessWidget {
+  const _BlockPromptBanner({
+    required this.onBlock,
+    required this.onDismiss,
+  });
+
+  final VoidCallback onBlock;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: SpotSpacing.lg,
+          vertical: SpotSpacing.md,
+        ),
+        decoration: const BoxDecoration(
+          color: SpotColors.surface,
+          border: Border(
+            top: BorderSide(color: SpotColors.border, width: 0.5),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(l10n.userReported, style: SpotType.bodySecondary),
+            ),
+            const SizedBox(width: SpotSpacing.md),
+            GestureDetector(
+              onTap: onBlock,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SpotSpacing.md,
+                  vertical: SpotSpacing.xs,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: SpotColors.warning,
+                    width: 0.5,
+                  ),
+                  borderRadius: BorderRadius.circular(SpotRadius.xs),
+                ),
+                child: Text(
+                  l10n.blockUser,
+                  style: SpotType.caption.copyWith(
+                    color: SpotColors.warning,
+                  ),
+                ),
+              ),
             ),
           ],
         ),
