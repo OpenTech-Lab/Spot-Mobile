@@ -1061,6 +1061,73 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get accuracyConfirmation => '我所分享的資訊在我所知範圍內是準確的';
+
+  @override
+  String get ugcTermsTitle => '同意社群使用條款';
+
+  @override
+  String get ugcTermsSubtitle => 'Spot 含有使用者產生的貼文與個人檔案。您必須先同意這些條款，才能存取社群內容。';
+
+  @override
+  String get ugcTermsSafetyHeading => '對不當內容與濫用行為零容忍';
+
+  @override
+  String get ugcTermsBulletRespect => '請勿張貼令人反感的內容、騷擾、仇恨、威脅、性剝削或血腥暴力虐待內容。';
+
+  @override
+  String get ugcTermsBulletModeration => '被檢舉的貼文與帳號可能會被隱藏、審查、禁止發文或移除。';
+
+  @override
+  String get ugcTermsBulletReporting => '當您遇到不安全內容或濫用使用者時，請使用檢舉與封鎖工具。';
+
+  @override
+  String get ugcTermsBulletEnforcement => '繼續使用即表示您同意 Spot 不允許濫用使用者與令人反感的內容。';
+
+  @override
+  String get ugcTermsAgreement =>
+      '我同意 Spot 使用條款，並了解 Spot 對令人反感的內容或濫用使用者採取零容忍政策。';
+
+  @override
+  String get ugcTermsAgreeButton => '同意並繼續';
+
+  @override
+  String get reportUserTitle => '檢舉此使用者';
+
+  @override
+  String get reportUserSubtitle => '請告訴管理員此帳號的問題，以便他們進行審查。';
+
+  @override
+  String get reportReasonLabel => '原因';
+
+  @override
+  String get reportDetailsLabel => '詳細資訊';
+
+  @override
+  String get reportUserDetailsHint => '提供給管理員的選填說明';
+
+  @override
+  String get submitUserReportButton => '送出檢舉';
+
+  @override
+  String get reportReasonHarassment => '騷擾';
+
+  @override
+  String get reportReasonHate => '仇恨或極端主義';
+
+  @override
+  String get reportReasonSexualContent => '色情內容';
+
+  @override
+  String get reportReasonViolence => '暴力';
+
+  @override
+  String get reportReasonSpam => '垃圾訊息或詐騙';
+
+  @override
+  String get reportReasonImpersonation => '冒充他人';
+
+  @override
+  String get reportReasonOther => '其他';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -2120,4 +2187,71 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get accuracyConfirmation => '我所分享的資訊在我所知範圍內是準確的';
+
+  @override
+  String get ugcTermsTitle => '同意社群使用條款';
+
+  @override
+  String get ugcTermsSubtitle => 'Spot 含有使用者產生的貼文與個人檔案。您必須先同意這些條款，才能存取社群內容。';
+
+  @override
+  String get ugcTermsSafetyHeading => '對不當內容與濫用行為零容忍';
+
+  @override
+  String get ugcTermsBulletRespect => '請勿張貼令人反感的內容、騷擾、仇恨、威脅、性剝削或血腥暴力虐待內容。';
+
+  @override
+  String get ugcTermsBulletModeration => '被檢舉的貼文與帳號可能會被隱藏、審查、禁止發文或移除。';
+
+  @override
+  String get ugcTermsBulletReporting => '當您遇到不安全內容或濫用使用者時，請使用檢舉與封鎖工具。';
+
+  @override
+  String get ugcTermsBulletEnforcement => '繼續使用即表示您同意 Spot 不允許濫用使用者與令人反感的內容。';
+
+  @override
+  String get ugcTermsAgreement =>
+      '我同意 Spot 使用條款，並了解 Spot 對令人反感的內容或濫用使用者採取零容忍政策。';
+
+  @override
+  String get ugcTermsAgreeButton => '同意並繼續';
+
+  @override
+  String get reportUserTitle => '檢舉此使用者';
+
+  @override
+  String get reportUserSubtitle => '請告訴管理員此帳號的問題，以便他們進行審查。';
+
+  @override
+  String get reportReasonLabel => '原因';
+
+  @override
+  String get reportDetailsLabel => '詳細資訊';
+
+  @override
+  String get reportUserDetailsHint => '提供給管理員的選填說明';
+
+  @override
+  String get submitUserReportButton => '送出檢舉';
+
+  @override
+  String get reportReasonHarassment => '騷擾';
+
+  @override
+  String get reportReasonHate => '仇恨或極端主義';
+
+  @override
+  String get reportReasonSexualContent => '色情內容';
+
+  @override
+  String get reportReasonViolence => '暴力';
+
+  @override
+  String get reportReasonSpam => '垃圾訊息或詐騙';
+
+  @override
+  String get reportReasonImpersonation => '冒充他人';
+
+  @override
+  String get reportReasonOther => '其他';
 }

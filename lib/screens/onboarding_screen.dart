@@ -3,16 +3,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'package:mobile/core/community_safety.dart';
 import 'package:mobile/core/wallet.dart';
 import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/home_screen.dart';
 import 'package:mobile/services/storage_service.dart';
+import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
+import 'package:mobile/widgets/ugc_terms_gate.dart';
 
 /// Three-step onboarding:  Welcome → Identity → Success
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key});
+  const OnboardingScreen({super.key, this.hasAcceptedTerms, this.acceptTerms});
+
+  final bool Function(String version)? hasAcceptedTerms;
+  final Future<void> Function(String version)? acceptTerms;
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -22,13 +28,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _step = 0;
 
   bool _isImporting = false;
-  bool _isLoading   = false;
+  bool _isLoading = false;
   String _importError = '';
   final _importController = TextEditingController();
 
   WalletModel? _wallet;
-  bool _mnemonicRevealed  = false;
+  bool _mnemonicRevealed = false;
   bool _mnemonicConfirmed = false;
+
+  bool _hasAcceptedTerms(String version) {
+    return widget.hasAcceptedTerms?.call(version) ??
+        UserPrefsService.instance.hasAcceptedUgcTerms(version);
+  }
+
+  Future<void> _acceptTerms(String version) async {
+    final acceptTerms = widget.acceptTerms;
+    if (acceptTerms != null) {
+      await acceptTerms(version);
+      return;
+    }
+    await UserPrefsService.instance.acceptUgcTerms(version);
+  }
 
   @override
   void dispose() {
@@ -37,35 +57,82 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _createWallet() async {
-    setState(() { _isLoading = true; _importError = ''; });
+    setState(() {
+      _isLoading = true;
+      _importError = '';
+    });
     try {
       final wallet = await WalletService.createNewWallet();
       await StorageService.instance.saveWallet(wallet);
-      if (mounted) setState(() { _wallet = wallet; _step = 2; _isLoading = false; });
+      if (mounted) {
+        setState(() {
+          _wallet = wallet;
+          _step = 3;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() { _importError = AppLocalizations.of(context)!.failedError(e.toString()); _isLoading = false; });
+      if (mounted) {
+        setState(() {
+          _importError = AppLocalizations.of(
+            context,
+          )!.failedError(e.toString());
+          _isLoading = false;
+        });
+      }
     }
   }
 
   Future<void> _importWallet() async {
     final words = _importController.text.trim().split(RegExp(r'\s+'));
     if (words.length != 12) {
-      setState(() => _importError = AppLocalizations.of(context)!.importExactWordsError);
+      setState(
+        () =>
+            _importError = AppLocalizations.of(context)!.importExactWordsError,
+      );
       return;
     }
-    setState(() { _isLoading = true; _importError = ''; });
+    setState(() {
+      _isLoading = true;
+      _importError = '';
+    });
     try {
       final wallet = await WalletService.importFromMnemonic(words);
       await StorageService.instance.saveWallet(wallet);
-      if (mounted) setState(() { _wallet = wallet; _step = 2; _isLoading = false; });
+      if (mounted) {
+        setState(() {
+          _wallet = wallet;
+          _step = 3;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() { _importError = AppLocalizations.of(context)!.invalidPhraseError(e.toString()); _isLoading = false; });
+      if (mounted) {
+        setState(() {
+          _importError = AppLocalizations.of(
+            context,
+          )!.invalidPhraseError(e.toString());
+          _isLoading = false;
+        });
+      }
     }
   }
 
+  void _advanceFromWelcome() {
+    setState(() {
+      _step = _hasAcceptedTerms(currentUgcTermsVersion) ? 2 : 1;
+    });
+  }
+
+  Future<void> _handleTermsAccepted() async {
+    await _acceptTerms(currentUgcTermsVersion);
+    if (!mounted) return;
+    setState(() => _step = 2);
+  }
+
   void _goToHome() => Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => HomeScreen(wallet: _wallet!)),
-      );
+    MaterialPageRoute(builder: (_) => HomeScreen(wallet: _wallet!)),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -74,28 +141,39 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: SafeArea(
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 260),
-          transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+          transitionBuilder: (child, anim) =>
+              FadeTransition(opacity: anim, child: child),
           child: switch (_step) {
-            0 => _WelcomeStep(key: const ValueKey(0), onNext: () => setState(() => _step = 1)),
-            1 => _IdentityStep(
-                key: const ValueKey(1),
-                isImporting:      _isImporting,
-                isLoading:        _isLoading,
-                importError:      _importError,
-                importController: _importController,
-                onCreateTap:      _createWallet,
-                onImportToggle:   () => setState(() => _isImporting = !_isImporting),
-                onImportSubmit:   _importWallet,
-              ),
+            0 => _WelcomeStep(
+              key: const ValueKey(0),
+              onNext: _advanceFromWelcome,
+            ),
+            1 => UgcTermsGate(
+              key: const ValueKey(1),
+              onAccept: _handleTermsAccepted,
+              secondaryActionLabel: AppLocalizations.of(context)!.backButton,
+              onSecondaryAction: () => setState(() => _step = 0),
+            ),
+            2 => _IdentityStep(
+              key: const ValueKey(2),
+              isImporting: _isImporting,
+              isLoading: _isLoading,
+              importError: _importError,
+              importController: _importController,
+              onCreateTap: _createWallet,
+              onImportToggle: () =>
+                  setState(() => _isImporting = !_isImporting),
+              onImportSubmit: _importWallet,
+            ),
             _ => _SuccessStep(
-                key: const ValueKey(2),
-                wallet:            _wallet!,
-                mnemonicRevealed:  _mnemonicRevealed,
-                mnemonicConfirmed: _mnemonicConfirmed,
-                onRevealMnemonic:  () => setState(() => _mnemonicRevealed = true),
-                onConfirm:         () => setState(() => _mnemonicConfirmed = true),
-                onEnter:           _goToHome,
-              ),
+              key: const ValueKey(3),
+              wallet: _wallet!,
+              mnemonicRevealed: _mnemonicRevealed,
+              mnemonicConfirmed: _mnemonicConfirmed,
+              onRevealMnemonic: () => setState(() => _mnemonicRevealed = true),
+              onConfirm: () => setState(() => _mnemonicConfirmed = true),
+              onEnter: _goToHome,
+            ),
           },
         ),
       ),
@@ -227,7 +305,10 @@ class _IdentityStep extends StatelessWidget {
               loading: isLoading,
             ),
             const SizedBox(height: SpotSpacing.md),
-            _OutlineBtn(label: l10n.importExistingButton, onPressed: onImportToggle),
+            _OutlineBtn(
+              label: l10n.importExistingButton,
+              onPressed: onImportToggle,
+            ),
           ] else ...[
             TextField(
               controller: importController,
@@ -235,7 +316,9 @@ class _IdentityStep extends StatelessWidget {
               style: SpotType.body,
               decoration: InputDecoration(
                 hintText: 'word1 word2 word3 …',
-                hintStyle: SpotType.bodySecondary.copyWith(color: SpotColors.textTertiary),
+                hintStyle: SpotType.bodySecondary.copyWith(
+                  color: SpotColors.textTertiary,
+                ),
                 filled: true,
                 fillColor: SpotColors.surface,
                 border: OutlineInputBorder(
@@ -296,8 +379,10 @@ class _SuccessStep extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
-        SpotSpacing.xxl, SpotSpacing.xxxl,
-        SpotSpacing.xxl, SpotSpacing.xxl,
+        SpotSpacing.xxl,
+        SpotSpacing.xxxl,
+        SpotSpacing.xxl,
+        SpotSpacing.xxl,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -311,8 +396,9 @@ class _SuccessStep extends StatelessWidget {
           GestureDetector(
             onTap: () {
               Clipboard.setData(ClipboardData(text: wallet.npub));
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(SnackBar(content: Text(l10n.copiedSnackbar)));
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(l10n.copiedSnackbar)));
             },
             child: Container(
               padding: const EdgeInsets.all(SpotSpacing.md),
@@ -320,10 +406,18 @@ class _SuccessStep extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(wallet.npub, style: SpotType.mono, overflow: TextOverflow.fade),
+                    child: Text(
+                      wallet.npub,
+                      style: SpotType.mono,
+                      overflow: TextOverflow.fade,
+                    ),
                   ),
                   const SizedBox(width: SpotSpacing.sm),
-                  const Icon(CupertinoIcons.doc_on_doc, color: SpotColors.textTertiary, size: 13),
+                  const Icon(
+                    CupertinoIcons.doc_on_doc,
+                    color: SpotColors.textTertiary,
+                    size: 13,
+                  ),
                 ],
               ),
             ),
@@ -381,7 +475,9 @@ class _SuccessStep extends StatelessWidget {
                         ),
                         child: Text(
                           '${e.key + 1}. ${e.value}',
-                          style: SpotType.mono.copyWith(color: SpotColors.textPrimary),
+                          style: SpotType.mono.copyWith(
+                            color: SpotColors.textPrimary,
+                          ),
                         ),
                       );
                     }).toList(),
@@ -414,7 +510,11 @@ class _SuccessStep extends StatelessWidget {
 // ── Shared button components ───────────────────────────────────────────────────
 
 class _PrimaryBtn extends StatelessWidget {
-  const _PrimaryBtn({required this.label, required this.onPressed, this.loading = false});
+  const _PrimaryBtn({
+    required this.label,
+    required this.onPressed,
+    this.loading = false,
+  });
   final String label;
   final VoidCallback? onPressed;
   final bool loading;

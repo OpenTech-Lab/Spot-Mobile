@@ -28,6 +28,7 @@ import 'package:mobile/widgets/profile_post_thread_row.dart';
 import 'package:mobile/widgets/profile_stats_row.dart';
 import 'package:mobile/widgets/footprint_map_tab.dart';
 import 'package:mobile/widgets/profile_thread_tab_bar.dart';
+import 'package:mobile/widgets/user_report_sheet.dart';
 
 /// Profile screen for any user other than the local account.
 ///
@@ -265,9 +266,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.followUpdateFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.followUpdateFailed(e.toString()))),
+      );
     } finally {
       if (mounted) {
         setState(() => _isTogglingFollow = false);
@@ -288,11 +289,65 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       );
       setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.reportedContentHidden)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.reportedContentHidden)));
       }
     } catch (_) {}
+  }
+
+  Future<void> _reportUser() async {
+    final l10n = AppLocalizations.of(context)!;
+    final wasBlocked = FollowService.instance.isBlocked(widget.pubkey);
+    final didSubmit = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: SpotColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(SpotRadius.lg),
+        ),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: UserReportSheet(
+          onSubmit: (reason, details) {
+            return MetadataService.instance.reportUser(
+              reportedPubkey: widget.pubkey,
+              reason: reason.storageValue,
+              wallet: widget.wallet,
+              details: details,
+            );
+          },
+        ),
+      ),
+    );
+
+    if (didSubmit != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    if (wasBlocked || FollowService.instance.isBlocked(widget.pubkey)) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.userReported)));
+      return;
+    }
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(l10n.userReported),
+        action: SnackBarAction(
+          label: l10n.blockUser,
+          onPressed: () {
+            unawaited(_blockUserFromReportAction());
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _blockUserFromReportAction() async {
+    await FollowService.instance.block(widget.pubkey);
+    if (!mounted) return;
+    Navigator.of(context).pop();
   }
 
   void _openDiscoverTag(BuildContext ctx, String tag) {
@@ -404,9 +459,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 contentPadding: EdgeInsets.zero,
                 onTap: () {
                   Navigator.of(ctx).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.userReported)),
-                  );
+                  unawaited(_reportUser());
                 },
               ),
               // Cancel
@@ -718,11 +771,17 @@ class _UserProfileHeader extends StatelessWidget {
             child: isFollowing
                 ? OutlinedButton(
                     onPressed: isTogglingFollow ? null : onFollowTap,
-                    child: Text(isTogglingFollow ? l10n.updatingLabel : l10n.followingLabel),
+                    child: Text(
+                      isTogglingFollow
+                          ? l10n.updatingLabel
+                          : l10n.followingLabel,
+                    ),
                   )
                 : FilledButton(
                     onPressed: isTogglingFollow ? null : onFollowTap,
-                    child: Text(isTogglingFollow ? l10n.updatingLabel : l10n.followButton),
+                    child: Text(
+                      isTogglingFollow ? l10n.updatingLabel : l10n.followButton,
+                    ),
                   ),
           ),
         ],

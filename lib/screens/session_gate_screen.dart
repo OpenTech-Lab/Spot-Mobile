@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'package:mobile/core/community_safety.dart';
 import 'package:mobile/core/wallet.dart';
 import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/models/wallet_model.dart';
@@ -13,6 +14,7 @@ import 'package:mobile/services/session_logout_service.dart';
 import 'package:mobile/services/user_prefs_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 import 'package:mobile/widgets/app_loading_view.dart';
+import 'package:mobile/widgets/ugc_terms_gate.dart';
 
 typedef SessionUnlockedBuilder = Widget Function(WalletModel wallet);
 typedef SessionOnboardingBuilder = Widget Function();
@@ -51,6 +53,8 @@ class SessionGateScreen extends StatefulWidget {
     this.onboardingBuilder,
     this.safeModeEnabled,
     this.relockAfter = const Duration(minutes: 2),
+    this.hasAcceptedTerms,
+    this.acceptTerms,
   });
 
   final WalletModel? initialWallet;
@@ -60,6 +64,8 @@ class SessionGateScreen extends StatefulWidget {
   final SessionOnboardingBuilder? onboardingBuilder;
   final bool? safeModeEnabled;
   final Duration relockAfter;
+  final bool Function(String version)? hasAcceptedTerms;
+  final Future<void> Function(String version)? acceptTerms;
 
   @override
   State<SessionGateScreen> createState() => _SessionGateScreenState();
@@ -81,6 +87,20 @@ class _SessionGateScreenState extends State<SessionGateScreen>
       widget.logoutRunner ?? SessionLogoutService.instance.logout;
   bool get _safeModeEnabled =>
       widget.safeModeEnabled ?? UserPrefsService.instance.safeModeEnabled;
+
+  bool _hasAcceptedTerms(String version) {
+    return widget.hasAcceptedTerms?.call(version) ??
+        UserPrefsService.instance.hasAcceptedUgcTerms(version);
+  }
+
+  Future<void> _acceptTerms(String version) async {
+    final acceptTerms = widget.acceptTerms;
+    if (acceptTerms != null) {
+      await acceptTerms(version);
+      return;
+    }
+    await UserPrefsService.instance.acceptUgcTerms(version);
+  }
 
   @override
   void initState() {
@@ -189,7 +209,9 @@ class _SessionGateScreenState extends State<SessionGateScreen>
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _unlockError = AppLocalizations.of(context)!.failedResetAccount(error.toString());
+        _unlockError = AppLocalizations.of(
+          context,
+        )!.failedResetAccount(error.toString());
       });
     }
 
@@ -241,7 +263,10 @@ class _SessionGateScreenState extends State<SessionGateScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(AppLocalizations.of(context)!.cancelAction, style: SpotType.bodySecondary),
+              child: Text(
+                AppLocalizations.of(context)!.cancelAction,
+                style: SpotType.bodySecondary,
+              ),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(controller.text),
@@ -279,6 +304,12 @@ class _SessionGateScreenState extends State<SessionGateScreen>
     });
   }
 
+  Future<void> _acceptCurrentTerms() async {
+    await _acceptTerms(currentUgcTermsVersion);
+    if (!mounted) return;
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final wallet = _wallet;
@@ -287,7 +318,15 @@ class _SessionGateScreenState extends State<SessionGateScreen>
           const AltchaGateScreen(next: OnboardingScreen());
     }
 
+    final requiresTerms = !_hasAcceptedTerms(currentUgcTermsVersion);
+
     if (!_safeModeEnabled) {
+      if (requiresTerms) {
+        return Scaffold(
+          backgroundColor: SpotColors.bg,
+          body: SafeArea(child: UgcTermsGate(onAccept: _acceptCurrentTerms)),
+        );
+      }
       return widget.unlockedBuilder?.call(wallet) ??
           SplashScreen(wallet: wallet);
     }
@@ -303,6 +342,12 @@ class _SessionGateScreenState extends State<SessionGateScreen>
 
     final lockStatus = _lockStatus!;
     if (_shouldShowUnlockedContent()) {
+      if (requiresTerms) {
+        return Scaffold(
+          backgroundColor: SpotColors.bg,
+          body: SafeArea(child: UgcTermsGate(onAccept: _acceptCurrentTerms)),
+        );
+      }
       return widget.unlockedBuilder?.call(wallet) ??
           SplashScreen(wallet: wallet);
     }
@@ -401,7 +446,10 @@ class _LockedAccountScreen extends StatelessWidget {
                             const SizedBox(height: SpotSpacing.sm),
                             Text(status.message, style: SpotType.bodySecondary),
                             const SizedBox(height: SpotSpacing.xl),
-                            _MetaRow(label: l10n.accountLabel, value: wallet.npubShort),
+                            _MetaRow(
+                              label: l10n.accountLabel,
+                              value: wallet.npubShort,
+                            ),
                             _MetaRow(
                               label: l10n.createdLabel,
                               value: wallet.createdAt

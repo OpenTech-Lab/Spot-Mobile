@@ -1103,4 +1103,77 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get accuracyConfirmation =>
       'The information I\'m sharing is accurate to the best of my knowledge';
+
+  @override
+  String get ugcTermsTitle => 'Agree to the community terms';
+
+  @override
+  String get ugcTermsSubtitle =>
+      'Spot includes user-generated posts and profiles. You must agree to these terms before you can access community content.';
+
+  @override
+  String get ugcTermsSafetyHeading => 'No tolerance for abusive behavior';
+
+  @override
+  String get ugcTermsBulletRespect =>
+      'Do not post objectionable content, harassment, hate, threats, sexual exploitation, or graphic abuse.';
+
+  @override
+  String get ugcTermsBulletModeration =>
+      'Reported posts and accounts may be hidden, reviewed, blocked from posting, or removed.';
+
+  @override
+  String get ugcTermsBulletReporting =>
+      'Use the report and block tools whenever you encounter unsafe content or abusive users.';
+
+  @override
+  String get ugcTermsBulletEnforcement =>
+      'By continuing, you agree that abusive users and objectionable content are not allowed on Spot.';
+
+  @override
+  String get ugcTermsAgreement =>
+      'I agree to the Spot Terms of Use and understand there is no tolerance for objectionable content or abusive users.';
+
+  @override
+  String get ugcTermsAgreeButton => 'Agree and continue';
+
+  @override
+  String get reportUserTitle => 'Report this user';
+
+  @override
+  String get reportUserSubtitle =>
+      'Tell moderators what this account is doing so they can review it.';
+
+  @override
+  String get reportReasonLabel => 'Reason';
+
+  @override
+  String get reportDetailsLabel => 'Details';
+
+  @override
+  String get reportUserDetailsHint => 'Optional details for moderators';
+
+  @override
+  String get submitUserReportButton => 'Submit report';
+
+  @override
+  String get reportReasonHarassment => 'Harassment';
+
+  @override
+  String get reportReasonHate => 'Hate or extremism';
+
+  @override
+  String get reportReasonSexualContent => 'Sexual content';
+
+  @override
+  String get reportReasonViolence => 'Violence';
+
+  @override
+  String get reportReasonSpam => 'Spam or scams';
+
+  @override
+  String get reportReasonImpersonation => 'Impersonation';
+
+  @override
+  String get reportReasonOther => 'Other';
 }

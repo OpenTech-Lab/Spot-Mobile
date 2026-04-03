@@ -1068,4 +1068,76 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get accuracyConfirmation => '私が共有する情報は私の知る限り正確です';
+
+  @override
+  String get ugcTermsTitle => 'コミュニティ利用規約への同意';
+
+  @override
+  String get ugcTermsSubtitle =>
+      'Spot にはユーザー生成の投稿とプロフィールが含まれます。コミュニティコンテンツにアクセスする前に、これらの規約へ同意する必要があります。';
+
+  @override
+  String get ugcTermsSafetyHeading => '不適切なコンテンツや濫用行為は許容しません';
+
+  @override
+  String get ugcTermsBulletRespect =>
+      '不適切なコンテンツ、嫌がらせ、ヘイト、脅迫、性的搾取、または暴力的な虐待表現を投稿しないでください。';
+
+  @override
+  String get ugcTermsBulletModeration =>
+      '報告された投稿やアカウントは、非表示、審査、投稿停止、または削除の対象となる場合があります。';
+
+  @override
+  String get ugcTermsBulletReporting =>
+      '危険なコンテンツや濫用するユーザーを見つけた場合は、報告機能とブロック機能を使用してください。';
+
+  @override
+  String get ugcTermsBulletEnforcement =>
+      '続行することで、濫用するユーザーと不適切なコンテンツは Spot で許可されないことに同意したものとみなされます。';
+
+  @override
+  String get ugcTermsAgreement =>
+      '私は Spot の利用規約に同意し、不適切なコンテンツや濫用するユーザーに対して一切の許容がないことを理解しています。';
+
+  @override
+  String get ugcTermsAgreeButton => '同意して続行';
+
+  @override
+  String get reportUserTitle => 'このユーザーを報告';
+
+  @override
+  String get reportUserSubtitle => 'モデレーターが審査できるよう、このアカウントの問題を知らせてください。';
+
+  @override
+  String get reportReasonLabel => '理由';
+
+  @override
+  String get reportDetailsLabel => '詳細';
+
+  @override
+  String get reportUserDetailsHint => 'モデレーター向けの任意の詳細';
+
+  @override
+  String get submitUserReportButton => '報告を送信';
+
+  @override
+  String get reportReasonHarassment => '嫌がらせ';
+
+  @override
+  String get reportReasonHate => 'ヘイト・過激主義';
+
+  @override
+  String get reportReasonSexualContent => '性的コンテンツ';
+
+  @override
+  String get reportReasonViolence => '暴力';
+
+  @override
+  String get reportReasonSpam => 'スパム・詐欺';
+
+  @override
+  String get reportReasonImpersonation => 'なりすまし';
+
+  @override
+  String get reportReasonOther => 'その他';
 }

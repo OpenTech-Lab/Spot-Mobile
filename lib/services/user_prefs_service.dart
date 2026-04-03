@@ -53,6 +53,29 @@ class UserPrefsService {
   List<String> get interests =>
       List<String>.from(_data['interests'] as List? ?? []);
 
+  /// Version string for the currently accepted community terms gate.
+  String? get ugcTermsVersion => _data['ugc_terms_version'] as String?;
+
+  /// Timestamp when the current device accepted the community terms.
+  DateTime? get ugcTermsAcceptedAt {
+    final raw = _data['ugc_terms_accepted_at'] as String?;
+    if (raw == null || raw.isEmpty) return null;
+    return DateTime.tryParse(raw)?.toUtc();
+  }
+
+  bool hasAcceptedUgcTerms(String version) {
+    return ugcTermsVersion == version && ugcTermsAcceptedAt != null;
+  }
+
+  Future<void> acceptUgcTerms(String version) async {
+    _data = {
+      ..._data,
+      'ugc_terms_version': version,
+      'ugc_terms_accepted_at': DateTime.now().toUtc().toIso8601String(),
+    };
+    await _save();
+  }
+
   /// Whether the user has completed the interest-selection step.
   bool get hasSetInterests => _data['interests_set'] == true;
 

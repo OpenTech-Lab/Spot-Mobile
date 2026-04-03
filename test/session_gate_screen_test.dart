@@ -48,6 +48,7 @@ void main() {
           initialWallet: _wallet(),
           appLockService: service,
           safeModeEnabled: true,
+          hasAcceptedTerms: (_) => true,
           unlockedBuilder: (_) => const Text('Unlocked home'),
         ),
       ),
@@ -85,6 +86,7 @@ void main() {
           appLockService: service,
           safeModeEnabled: true,
           logoutRunner: () async => logoutCalls++,
+          hasAcceptedTerms: (_) => true,
           onboardingBuilder: () => const Text('Onboarding flow'),
         ),
       ),
@@ -118,6 +120,7 @@ void main() {
           initialWallet: wallet,
           appLockService: service,
           safeModeEnabled: true,
+          hasAcceptedTerms: (_) => true,
           unlockedBuilder: (_) => const Text('Unlocked home'),
         ),
       ),
@@ -160,6 +163,7 @@ void main() {
           appLockService: service,
           safeModeEnabled: true,
           relockAfter: Duration.zero,
+          hasAcceptedTerms: (_) => true,
           unlockedBuilder: (_) => const Text('Unlocked home'),
         ),
       ),
@@ -192,6 +196,7 @@ void main() {
           initialWallet: _wallet(),
           appLockService: service,
           safeModeEnabled: false,
+          hasAcceptedTerms: (_) => true,
           unlockedBuilder: (_) => const Text('Unlocked home'),
         ),
       ),
@@ -216,6 +221,7 @@ void main() {
         home: SessionGateScreen(
           initialWallet: _wallet(),
           appLockService: service,
+          hasAcceptedTerms: (_) => true,
           unlockedBuilder: (_) => const Text('Unlocked home'),
         ),
       ),
@@ -225,6 +231,37 @@ void main() {
 
     expect(find.text('Unlocked home'), findsOneWidget);
     expect(find.text('Saved account locked'), findsNothing);
+  });
+
+  testWidgets('saved wallet must accept terms before unlocked content loads', (
+    tester,
+  ) async {
+    var acceptedTerms = false;
+
+    await tester.pumpWidget(
+      _localizedApp(
+        home: SessionGateScreen(
+          initialWallet: _wallet(),
+          safeModeEnabled: false,
+          hasAcceptedTerms: (_) => acceptedTerms,
+          acceptTerms: (_) async => acceptedTerms = true,
+          unlockedBuilder: (_) => const Text('Unlocked home'),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Agree to the community terms'), findsOneWidget);
+    expect(find.text('Unlocked home'), findsNothing);
+
+    await tester.tap(find.byType(Checkbox));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Agree and continue'));
+    await tester.tap(find.text('Agree and continue'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unlocked home'), findsOneWidget);
   });
 }
 

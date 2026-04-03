@@ -448,6 +448,7 @@ class MetadataService {
     required String contentHash,
     required String reason,
     required WalletModel wallet,
+    String? details,
   }) async {
     await syncLegacyProfile(wallet);
     final user = client.auth.currentUser;
@@ -455,12 +456,43 @@ class MetadataService {
       throw StateError('Missing Supabase user after profile sync');
     }
 
-    await client.from('content_reports').upsert({
-      'post_id': postId,
-      'content_hash': contentHash,
-      'reporter_id': user.id,
-      'reason': reason,
-    }, onConflict: 'post_id,reporter_id');
+    await client.rpc(
+      'submit_content_report',
+      params: {
+        'p_post_id': postId,
+        'p_content_hash': contentHash,
+        'p_reason': reason,
+        'p_details': details,
+      },
+    );
+  }
+
+  Future<void> reportUser({
+    required String reportedPubkey,
+    required String reason,
+    required WalletModel wallet,
+    String? details,
+  }) async {
+    final normalizedPubkey = reportedPubkey.trim();
+    if (normalizedPubkey.isEmpty) {
+      throw StateError('Reported user pubkey is required');
+    }
+
+    await syncLegacyProfile(wallet);
+    if (client.auth.currentUser == null) {
+      throw StateError('Missing Supabase user after profile sync');
+    }
+
+    final authorIds = await resolveAuthorIds(normalizedPubkey);
+    await client.rpc(
+      'submit_user_report',
+      params: {
+        'p_reported_user_id': authorIds.isEmpty ? null : authorIds.first,
+        'p_reported_legacy_pubkey': normalizedPubkey,
+        'p_reason': reason,
+        'p_details': details,
+      },
+    );
   }
 
   Future<void> publishWitness({

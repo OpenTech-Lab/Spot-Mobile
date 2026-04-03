@@ -1100,5 +1100,71 @@
   "@beforePostSubtitle": {},
 
   "accuracyConfirmation": "The information I'm sharing is accurate to the best of my knowledge",
-  "@accuracyConfirmation": {}
+  "@accuracyConfirmation": {},
+
+  "ugcTermsTitle": "Agree to the community terms",
+  "@ugcTermsTitle": {},
+
+  "ugcTermsSubtitle": "Spot includes user-generated posts and profiles. You must agree to these terms before you can access community content.",
+  "@ugcTermsSubtitle": {},
+
+  "ugcTermsSafetyHeading": "No tolerance for abusive behavior",
+  "@ugcTermsSafetyHeading": {},
+
+  "ugcTermsBulletRespect": "Do not post objectionable content, harassment, hate, threats, sexual exploitation, or graphic abuse.",
+  "@ugcTermsBulletRespect": {},
+
+  "ugcTermsBulletModeration": "Reported posts and accounts may be hidden, reviewed, blocked from posting, or removed.",
+  "@ugcTermsBulletModeration": {},
+
+  "ugcTermsBulletReporting": "Use the report and block tools whenever you encounter unsafe content or abusive users.",
+  "@ugcTermsBulletReporting": {},
+
+  "ugcTermsBulletEnforcement": "By continuing, you agree that abusive users and objectionable content are not allowed on Spot.",
+  "@ugcTermsBulletEnforcement": {},
+
+  "ugcTermsAgreement": "I agree to the Spot Terms of Use and understand there is no tolerance for objectionable content or abusive users.",
+  "@ugcTermsAgreement": {},
+
+  "ugcTermsAgreeButton": "Agree and continue",
+  "@ugcTermsAgreeButton": {},
+
+  "reportUserTitle": "Report this user",
+  "@reportUserTitle": {},
+
+  "reportUserSubtitle": "Tell moderators what this account is doing so they can review it.",
+  "@reportUserSubtitle": {},
+
+  "reportReasonLabel": "Reason",
+  "@reportReasonLabel": {},
+
+  "reportDetailsLabel": "Details",
+  "@reportDetailsLabel": {},
+
+  "reportUserDetailsHint": "Optional details for moderators",
+  "@reportUserDetailsHint": {},
+
+  "submitUserReportButton": "Submit report",
+  "@submitUserReportButton": {},
+
+  "reportReasonHarassment": "Harassment",
+  "@reportReasonHarassment": {},
+
+  "reportReasonHate": "Hate or extremism",
+  "@reportReasonHate": {},
+
+  "reportReasonSexualContent": "Sexual content",
+  "@reportReasonSexualContent": {},
+
+  "reportReasonViolence": "Violence",
+  "@reportReasonViolence": {},
+
+  "reportReasonSpam": "Spam or scams",
+  "@reportReasonSpam": {},
+
+  "reportReasonImpersonation": "Impersonation",
+  "@reportReasonImpersonation": {},
+
+  "reportReasonOther": "Other",
+  "@reportReasonOther": {}
 }

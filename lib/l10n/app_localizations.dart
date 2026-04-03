@@ -2056,6 +2056,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The information I\'m sharing is accurate to the best of my knowledge'**
   String get accuracyConfirmation;
+
+  /// No description provided for @ugcTermsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Agree to the community terms'**
+  String get ugcTermsTitle;
+
+  /// No description provided for @ugcTermsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Spot includes user-generated posts and profiles. You must agree to these terms before you can access community content.'**
+  String get ugcTermsSubtitle;
+
+  /// No description provided for @ugcTermsSafetyHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'No tolerance for abusive behavior'**
+  String get ugcTermsSafetyHeading;
+
+  /// No description provided for @ugcTermsBulletRespect.
+  ///
+  /// In en, this message translates to:
+  /// **'Do not post objectionable content, harassment, hate, threats, sexual exploitation, or graphic abuse.'**
+  String get ugcTermsBulletRespect;
+
+  /// No description provided for @ugcTermsBulletModeration.
+  ///
+  /// In en, this message translates to:
+  /// **'Reported posts and accounts may be hidden, reviewed, blocked from posting, or removed.'**
+  String get ugcTermsBulletModeration;
+
+  /// No description provided for @ugcTermsBulletReporting.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the report and block tools whenever you encounter unsafe content or abusive users.'**
+  String get ugcTermsBulletReporting;
+
+  /// No description provided for @ugcTermsBulletEnforcement.
+  ///
+  /// In en, this message translates to:
+  /// **'By continuing, you agree that abusive users and objectionable content are not allowed on Spot.'**
+  String get ugcTermsBulletEnforcement;
+
+  /// No description provided for @ugcTermsAgreement.
+  ///
+  /// In en, this message translates to:
+  /// **'I agree to the Spot Terms of Use and understand there is no tolerance for objectionable content or abusive users.'**
+  String get ugcTermsAgreement;
+
+  /// No description provided for @ugcTermsAgreeButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Agree and continue'**
+  String get ugcTermsAgreeButton;
+
+  /// No description provided for @reportUserTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Report this user'**
+  String get reportUserTitle;
+
+  /// No description provided for @reportUserSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell moderators what this account is doing so they can review it.'**
+  String get reportUserSubtitle;
+
+  /// No description provided for @reportReasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get reportReasonLabel;
+
+  /// No description provided for @reportDetailsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get reportDetailsLabel;
+
+  /// No description provided for @reportUserDetailsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional details for moderators'**
+  String get reportUserDetailsHint;
+
+  /// No description provided for @submitUserReportButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit report'**
+  String get submitUserReportButton;
+
+  /// No description provided for @reportReasonHarassment.
+  ///
+  /// In en, this message translates to:
+  /// **'Harassment'**
+  String get reportReasonHarassment;
+
+  /// No description provided for @reportReasonHate.
+  ///
+  /// In en, this message translates to:
+  /// **'Hate or extremism'**
+  String get reportReasonHate;
+
+  /// No description provided for @reportReasonSexualContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sexual content'**
+  String get reportReasonSexualContent;
+
+  /// No description provided for @reportReasonViolence.
+  ///
+  /// In en, this message translates to:
+  /// **'Violence'**
+  String get reportReasonViolence;
+
+  /// No description provided for @reportReasonSpam.
+  ///
+  /// In en, this message translates to:
+  /// **'Spam or scams'**
+  String get reportReasonSpam;
+
+  /// No description provided for @reportReasonImpersonation.
+  ///
+  /// In en, this message translates to:
+  /// **'Impersonation'**
+  String get reportReasonImpersonation;
+
+  /// No description provided for @reportReasonOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get reportReasonOther;
 }
 
 class _AppLocalizationsDelegate
