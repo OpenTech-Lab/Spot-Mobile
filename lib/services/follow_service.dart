@@ -51,6 +51,7 @@ class FollowService {
   bool isFollowingTag(String tag) => _followedTags.contains(normalizeTag(tag));
 
   List<String> get following => _following.toList();
+  List<String> get blocked => _blocked.toList();
   List<String> get followedTags => _followedTags.toList()..sort();
 
   // ── Follow tag ────────────────────────────────────────────────────────────

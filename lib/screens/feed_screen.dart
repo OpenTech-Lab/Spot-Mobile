@@ -17,6 +17,7 @@ import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/cache_manager.dart';
 import 'package:mobile/features/p2p/p2p_service.dart';
 import 'package:mobile/services/app_data_reset_service.dart';
+import 'package:mobile/services/blocked_user_visibility.dart';
 import 'package:mobile/services/media_resolver.dart';
 import 'package:mobile/services/media_sync_service.dart';
 import 'package:mobile/services/follow_service.dart';
@@ -34,6 +35,7 @@ List<MediaPost> visibleFollowingPosts(
   required String selfPubkey,
   required Set<String> followedPubkeys,
   required Set<String> followedTags,
+  Set<String> blockedPubkeys = const {},
 }) {
   final normalizedFollowedTags = followedTags
       .map(normalizeTag)
@@ -43,6 +45,7 @@ List<MediaPost> visibleFollowingPosts(
       .where(
         (post) =>
             post.pubkey != selfPubkey &&
+            !blockedPubkeys.contains(post.pubkey) &&
             (followedPubkeys.contains(post.pubkey) ||
                 post.eventTags
                     .map(normalizeTag)
@@ -68,6 +71,7 @@ class FeedScreenState extends State<FeedScreen>
   StreamSubscription<void>? _repoSub;
   StreamSubscription<List<MediaPost>>? _localSub;
   StreamSubscription<void>? _resetSub;
+  StreamSubscription<void>? _followSub;
 
   List<MediaPost> _posts = [];
   List<MediaPost> _remotePosts = [];
@@ -86,7 +90,7 @@ class FeedScreenState extends State<FeedScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    FollowService.instance.init();
+    unawaited(_initFollowState());
     _localSub ??= LocalPostStore.instance.changes.listen(_onLocalPostsChanged);
     _resetSub ??= AppDataResetService.instance.localDataCleared.listen((_) {
       unawaited(_handleLocalDataCleared());
@@ -101,6 +105,7 @@ class FeedScreenState extends State<FeedScreen>
     _repoSub?.cancel();
     _localSub?.cancel();
     _resetSub?.cancel();
+    _followSub?.cancel();
     super.dispose();
   }
 
@@ -126,6 +131,17 @@ class FeedScreenState extends State<FeedScreen>
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
+
+  Future<void> _initFollowState() async {
+    await FollowService.instance.init();
+    if (!mounted) return;
+    _followSub ??= FollowService.instance.changes.listen((_) {
+      if (!mounted) return;
+      final rebuilt = _rebuildPosts();
+      setState(() => _posts = rebuilt);
+    });
+    setState(() => _posts = _rebuildPosts());
+  }
 
   Future<void> _initFeed() async {
     setState(() {
@@ -200,11 +216,15 @@ class FeedScreenState extends State<FeedScreen>
   }
 
   List<MediaPost> _rebuildPosts() {
-    return reconcilePostsPreservingLocalState(_posts, [
+    final merged = reconcilePostsPreservingLocalState(_posts, [
       _remotePosts,
       _pagedPosts,
       _persistedPosts,
     ]);
+    return filterPostsByBlockedAuthors(
+      merged,
+      blockedPubkeys: FollowService.instance.blocked.toSet(),
+    );
   }
 
   void _syncVisiblePosts() {
@@ -266,8 +286,12 @@ class FeedScreenState extends State<FeedScreen>
         (post) => !CacheManager.instance.isBlocked(post.contentHash),
       ),
     );
-    debugPrint('[FeedScreen] _mergePosts result: ${result.length} posts');
-    return result;
+    final visible = filterPostsByBlockedAuthors(
+      result,
+      blockedPubkeys: FollowService.instance.blocked.toSet(),
+    );
+    debugPrint('[FeedScreen] _mergePosts result: ${visible.length} posts');
+    return visible;
   }
 
   void _onLocalPostsChanged(List<MediaPost> persisted) {
@@ -332,9 +356,9 @@ class FeedScreenState extends State<FeedScreen>
       );
       setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.reportedContentHidden)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.reportedContentHidden)));
       }
     } catch (_) {}
   }
@@ -380,6 +404,7 @@ class FeedScreenState extends State<FeedScreen>
       selfPubkey: widget.wallet.publicKeyHex,
       followedPubkeys: FollowService.instance.following.toSet(),
       followedTags: FollowService.instance.followedTags.toSet(),
+      blockedPubkeys: FollowService.instance.blocked.toSet(),
     );
     debugPrint(
       '[FeedScreen] Following filter: ${_posts.length} total → ${filtered.length} visible',
@@ -679,10 +704,7 @@ class _LatestTabState extends State<_LatestTab> {
                       size: 32,
                     ),
                     const SizedBox(height: SpotSpacing.xl),
-                    Text(
-                      l10n.couldNotLoadPosts,
-                      style: SpotType.bodySecondary,
-                    ),
+                    Text(l10n.couldNotLoadPosts, style: SpotType.bodySecondary),
                     const SizedBox(height: SpotSpacing.xl),
                     GestureDetector(
                       onTap: widget.onRefresh,
@@ -698,7 +720,10 @@ class _LatestTabState extends State<_LatestTab> {
                           ),
                           borderRadius: BorderRadius.circular(SpotRadius.sm),
                         ),
-                        child: Text(l10n.retryButton, style: SpotType.bodySecondary),
+                        child: Text(
+                          l10n.retryButton,
+                          style: SpotType.bodySecondary,
+                        ),
                       ),
                     ),
                   ],
@@ -837,10 +862,7 @@ class _FollowingTab extends StatelessWidget {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: SpotSpacing.xs),
-                      Text(
-                        l10n.tapAvatarToFollow,
-                        style: SpotType.caption,
-                      ),
+                      Text(l10n.tapAvatarToFollow, style: SpotType.caption),
                     ],
                   ),
                 ),

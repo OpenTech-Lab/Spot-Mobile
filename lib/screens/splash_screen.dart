@@ -53,7 +53,8 @@ class _SplashScreenState extends State<SplashScreen>
   AppRefreshService get _refreshService =>
       widget.refreshService ?? AppRefreshService.instance;
   SplashLogoutRunner get _logoutRunner =>
-      widget.logoutRunner ?? SessionLogoutService.instance.logout;
+      widget.logoutRunner ??
+      () => SessionLogoutService.instance.logout(preserveAuthSession: false);
 
   @override
   void initState() {

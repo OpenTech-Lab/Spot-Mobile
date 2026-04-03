@@ -18,7 +18,7 @@ import 'package:mobile/services/post_publish_service.dart';
 import 'package:mobile/theme/spot_theme.dart';
 
 /// Full-screen camera UI.
-/// Tap = photo · Hold = video · Shield = Danger Mode
+/// Tap = photo · Hold = video · Shield = Privacy Mode
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key, required this.wallet, this.replyToPost});
 
@@ -358,7 +358,7 @@ class _CameraScreenState extends State<CameraScreen>
             ),
           ),
 
-          // Mode banner (Danger or Virtual)
+          // Mode banner (Privacy or Virtual)
           if (_isDangerMode || _isVirtualMode)
             Positioned(
               top: MediaQuery.of(context).padding.top + SpotSpacing.md,
@@ -379,7 +379,7 @@ class _CameraScreenState extends State<CameraScreen>
                   child: Text(
                     _isVirtualMode
                         ? 'Virtual · no location published'
-                        : 'Danger mode',
+                        : 'Privacy mode',
                     style: SpotType.label.copyWith(
                       color: _isVirtualMode
                           ? SpotColors.onAccent
@@ -1130,9 +1130,9 @@ String _buildGpsLabel(bool isDangerMode, GpsLock? gpsLock, {String? spotName}) {
     return '${spotName!.trim()}  ·  $place';
   }
 
-  // Danger mode: city-level privacy note
+  // Privacy mode: city-level privacy note
   if (isDangerMode) {
-    return '$place  (Danger mode)';
+    return '$place  (Privacy mode)';
   }
 
   // Default: city-level only

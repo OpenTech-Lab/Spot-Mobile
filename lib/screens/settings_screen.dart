@@ -13,7 +13,10 @@ import 'package:mobile/screens/altcha_gate_screen.dart';
 import 'package:mobile/screens/asset_transport_settings_screen.dart';
 import 'package:mobile/screens/interests_screen.dart';
 import 'package:mobile/screens/my_posts_screen.dart';
+import 'package:mobile/screens/blocked_users_screen.dart';
 import 'package:mobile/screens/onboarding_screen.dart';
+import 'package:mobile/screens/privacy_policy_screen.dart';
+import 'package:mobile/screens/terms_of_use_screen.dart';
 import 'package:mobile/screens/wallet_screen.dart';
 import 'package:mobile/services/app_data_reset_service.dart';
 import 'package:mobile/services/cache_manager.dart';
@@ -553,6 +556,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _openTermsOfUse() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TermsOfUseScreen()),
+    );
+  }
+
+  void _openPrivacyPolicy() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+    );
+  }
+
+  void _openBlockedUsers() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BlockedUsersScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -602,6 +626,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: SpotSpacing.sm),
           _SettingsRow(
+            icon: CupertinoIcons.doc_plaintext,
+            label: l10n.termsOfUseTitle,
+            onTap: _openTermsOfUse,
+          ),
+          const SizedBox(height: SpotSpacing.sm),
+          _SettingsRow(
+            icon: CupertinoIcons.lock_shield,
+            label: l10n.privacyPolicyTitle,
+            onTap: _openPrivacyPolicy,
+          ),
+          const SizedBox(height: SpotSpacing.sm),
+          _SettingsRow(
             icon: CupertinoIcons.list_bullet,
             label: l10n.viewMyActivityLabel,
             onTap: _openPublicActivityMenu,
@@ -611,6 +647,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: const EdgeInsets.symmetric(vertical: SpotSpacing.sm),
             child: Text(l10n.privacySectionLabel, style: SpotType.label),
           ),
+          _SettingsRow(
+            icon: CupertinoIcons.person_crop_circle_badge_xmark,
+            label: l10n.blockedUsersTitle,
+            onTap: _openBlockedUsers,
+          ),
+          const SizedBox(height: SpotSpacing.sm),
           _SettingsSwitchRow(
             icon: CupertinoIcons.map,
             label: l10n.footprintMapLabel,

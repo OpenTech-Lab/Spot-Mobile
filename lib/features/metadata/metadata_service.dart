@@ -38,6 +38,34 @@ const _profileSelectColumns =
     'device_id, avatar_seed, avatar_content_hash, threads_public, '
     'replies_public, footprint_map_public';
 
+String? _normalizedIdentityValue(String? value) {
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty) return null;
+  return trimmed;
+}
+
+bool isProfileSessionCompatibleWithWallet(
+  ProfileModel? profile,
+  WalletModel wallet,
+) {
+  if (profile == null) return false;
+
+  final profilePubkey = _normalizedIdentityValue(profile.legacyPubkey);
+  final profileDeviceId = _normalizedIdentityValue(profile.deviceId);
+  if (profilePubkey == null && profileDeviceId == null) {
+    return true;
+  }
+
+  if (profilePubkey != null && profilePubkey != wallet.publicKeyHex) {
+    return false;
+  }
+  if (profileDeviceId != null && profileDeviceId != wallet.deviceId) {
+    return false;
+  }
+
+  return true;
+}
+
 /// Supabase-backed metadata service for posts, events, reports, and witnesses.
 ///
 /// The old Nostr wallet identity is still synced into `profiles.legacy_pubkey`
@@ -77,7 +105,7 @@ class MetadataService {
 
   Future<void> syncLegacyProfile(WalletModel wallet) async {
     return _profileSyncFlight.run(() async {
-      final user = await ensureSignedIn();
+      final user = await _ensureSignedInForWallet(wallet);
       if (user == null) {
         throw StateError('Unable to create a Supabase auth session');
       }
@@ -122,6 +150,37 @@ class MetadataService {
         );
       }
     });
+  }
+
+  Future<User?> _ensureSignedInForWallet(WalletModel wallet) async {
+    final current = client.auth.currentUser;
+    if (current == null) {
+      return ensureSignedIn();
+    }
+
+    final currentProfile = await _fetchProfileById(current.id);
+    if (isProfileSessionCompatibleWithWallet(currentProfile, wallet)) {
+      return current;
+    }
+
+    debugPrint(
+      '[MetadataService] Discarding incompatible saved auth session for '
+      'wallet ${wallet.publicKeyHex.substring(0, 8)}',
+    );
+    try {
+      await client.auth.signOut();
+    } on AuthException catch (error) {
+      debugPrint(
+        '[MetadataService] Failed to clear incompatible auth session: '
+        '${error.message}',
+      );
+      throw StateError(
+        'Failed to clear incompatible Supabase auth session. '
+        '${error.message}',
+      );
+    }
+
+    return ensureSignedIn();
   }
 
   Future<ProfileModel> fetchCurrentProfile(WalletModel wallet) async {

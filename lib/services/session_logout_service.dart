@@ -13,12 +13,14 @@ class SessionLogoutService {
 
   static final SessionLogoutService instance = SessionLogoutService._();
 
-  Future<void> logout() async {
+  Future<void> logout({bool preserveAuthSession = true}) async {
     await LocalPostStore.instance.runWithWritesPaused(() async {
-      try {
-        await Supabase.instance.client.auth.signOut();
-      } catch (error) {
-        debugPrint('[SessionLogoutService] Supabase sign-out failed: $error');
+      if (!preserveAuthSession) {
+        try {
+          await Supabase.instance.client.auth.signOut();
+        } catch (error) {
+          debugPrint('[SessionLogoutService] Supabase sign-out failed: $error');
+        }
       }
 
       await Future.wait([

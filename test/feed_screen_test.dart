@@ -40,6 +40,29 @@ void main() {
 
     expect(visible, [followedAuthorPost, followedTagPost]);
   });
+
+  test('visibleFollowingPosts hides blocked authors', () {
+    final blockedFollowedAuthorPost = _post(
+      id: 'blocked-author',
+      pubkey: 'author-a',
+    );
+    final blockedFollowedTagPost = _post(
+      id: 'blocked-tag',
+      pubkey: 'author-b',
+      eventTags: const ['tokyo'],
+    );
+    final visibleAuthorPost = _post(id: 'visible-author', pubkey: 'author-c');
+
+    final visible = visibleFollowingPosts(
+      [blockedFollowedAuthorPost, blockedFollowedTagPost, visibleAuthorPost],
+      selfPubkey: 'self-pubkey',
+      followedPubkeys: const {'author-a', 'author-c'},
+      followedTags: const {'tokyo'},
+      blockedPubkeys: const {'author-a', 'author-b'},
+    );
+
+    expect(visible, [visibleAuthorPost]);
+  });
 }
 
 MediaPost _post({

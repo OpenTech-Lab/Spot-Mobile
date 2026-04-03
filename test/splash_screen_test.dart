@@ -50,7 +50,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Loading Spot'), findsOneWidget);
+    expect(find.text('Loading #seen'), findsOneWidget);
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
     expect(find.text('Home ready'), findsNothing);
 
@@ -58,7 +58,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Home ready'), findsOneWidget);
-    expect(find.text('Loading Spot'), findsNothing);
+    expect(find.text('Loading #seen'), findsNothing);
   });
 
   testWidgets('SplashScreen shows the loading overlay again on app resume', (

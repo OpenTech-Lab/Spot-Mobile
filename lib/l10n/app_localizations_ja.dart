@@ -9,7 +9,7 @@ class AppLocalizationsJa extends AppLocalizations {
   AppLocalizationsJa([String locale = 'ja']) : super(locale);
 
   @override
-  String get appTitle => 'Spot';
+  String get appTitle => '#seen';
 
   @override
   String get cancelAction => 'キャンセル';
@@ -105,7 +105,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get welcomeBullet2 => '撮影時にGPSロック';
 
   @override
-  String get welcomeBullet3 => 'デンジャーモード — 顔をぼかし、位置情報を非表示';
+  String get welcomeBullet3 => 'プライバシーモード — 顔をぼかし、位置情報を非表示';
 
   @override
   String get welcomeBullet4 => 'ピアツーピア、中央サーバーなし';
@@ -223,6 +223,12 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsTooltip => '設定';
+
+  @override
+  String get termsOfUseTitle => '利用規約';
+
+  @override
+  String get privacyPolicyTitle => 'プライバシーポリシー';
 
   @override
   String get favoriteTopicsLabel => 'お気に入りトピック';
@@ -838,6 +844,22 @@ class AppLocalizationsJa extends AppLocalizations {
   String get unblockUser => 'ブロックを解除';
 
   @override
+  String get blockedUsersTitle => 'ブロックしたユーザー';
+
+  @override
+  String get blockedUsersEmpty => 'ブロックしているユーザーはいません。';
+
+  @override
+  String get blockedUsersUnblockButton => '解除';
+
+  @override
+  String get blockedUsersUnblockConfirmTitle => 'ブロックを解除しますか？';
+
+  @override
+  String get blockedUsersUnblockConfirmBody =>
+      'このユーザーはあなたのコンテンツを閲覧し、再びやり取りできるようになります。';
+
+  @override
   String get reportUser => 'ユーザーを報告';
 
   @override
@@ -1074,7 +1096,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get ugcTermsSubtitle =>
-      'Spot にはユーザー生成の投稿とプロフィールが含まれます。コミュニティコンテンツにアクセスする前に、これらの規約へ同意する必要があります。';
+      '#seen にはユーザー生成の投稿とプロフィールが含まれます。コミュニティコンテンツにアクセスする前に、これらの規約へ同意する必要があります。';
 
   @override
   String get ugcTermsSafetyHeading => '不適切なコンテンツや濫用行為は許容しません';
@@ -1093,14 +1115,20 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get ugcTermsBulletEnforcement =>
-      '続行することで、濫用するユーザーと不適切なコンテンツは Spot で許可されないことに同意したものとみなされます。';
+      '違反行為はコンテンツの削除、投稿制限、またはアカウント停止につながる場合があります。';
 
   @override
   String get ugcTermsAgreement =>
-      '私は Spot の利用規約に同意し、不適切なコンテンツや濫用するユーザーに対して一切の許容がないことを理解しています。';
+      '私は #seen の利用規約とプライバシーポリシーに同意し、不適切なコンテンツや濫用するユーザーに対して一切の許容がないことを理解しています。';
 
   @override
   String get ugcTermsAgreeButton => '同意して続行';
+
+  @override
+  String get ugcTermsViewTerms => '利用規約';
+
+  @override
+  String get ugcTermsViewPrivacy => 'プライバシーポリシー';
 
   @override
   String get reportUserTitle => 'このユーザーを報告';

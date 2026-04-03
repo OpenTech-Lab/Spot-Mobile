@@ -1,7 +1,48 @@
 import 'package:flutter/material.dart';
 
 import 'package:mobile/l10n/app_localizations.dart';
+import 'package:mobile/screens/privacy_policy_screen.dart';
+import 'package:mobile/screens/terms_of_use_screen.dart';
 import 'package:mobile/theme/spot_theme.dart';
+
+class UgcTermsSummary extends StatelessWidget {
+  const UgcTermsSummary({super.key, this.showWordmark = true});
+
+  final bool showWordmark;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showWordmark) ...[
+          Text(l10n.appTitle, style: SpotType.wordmark),
+          const SizedBox(height: SpotSpacing.md),
+        ],
+        Text(l10n.ugcTermsTitle, style: SpotType.heading),
+        const SizedBox(height: SpotSpacing.sm),
+        Text(l10n.ugcTermsSubtitle, style: SpotType.bodySecondary),
+        const SizedBox(height: SpotSpacing.xl),
+        Container(
+          padding: const EdgeInsets.all(SpotSpacing.lg),
+          decoration: SpotDecoration.cardBordered(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.ugcTermsSafetyHeading, style: SpotType.subheading),
+              const SizedBox(height: SpotSpacing.md),
+              _TermsBullet(text: l10n.ugcTermsBulletRespect),
+              _TermsBullet(text: l10n.ugcTermsBulletModeration),
+              _TermsBullet(text: l10n.ugcTermsBulletReporting),
+              _TermsBullet(text: l10n.ugcTermsBulletEnforcement),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class UgcTermsGate extends StatefulWidget {
   const UgcTermsGate({
@@ -48,27 +89,7 @@ class _UgcTermsGateState extends State<UgcTermsGate> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(l10n.appTitle, style: SpotType.wordmark),
-          const SizedBox(height: SpotSpacing.md),
-          Text(l10n.ugcTermsTitle, style: SpotType.heading),
-          const SizedBox(height: SpotSpacing.sm),
-          Text(l10n.ugcTermsSubtitle, style: SpotType.bodySecondary),
-          const SizedBox(height: SpotSpacing.xl),
-          Container(
-            padding: const EdgeInsets.all(SpotSpacing.lg),
-            decoration: SpotDecoration.cardBordered(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(l10n.ugcTermsSafetyHeading, style: SpotType.subheading),
-                const SizedBox(height: SpotSpacing.md),
-                _TermsBullet(text: l10n.ugcTermsBulletRespect),
-                _TermsBullet(text: l10n.ugcTermsBulletModeration),
-                _TermsBullet(text: l10n.ugcTermsBulletReporting),
-                _TermsBullet(text: l10n.ugcTermsBulletEnforcement),
-              ],
-            ),
-          ),
+          const UgcTermsSummary(),
           const SizedBox(height: SpotSpacing.lg),
           Container(
             padding: const EdgeInsets.all(SpotSpacing.md),
@@ -115,6 +136,8 @@ class _UgcTermsGateState extends State<UgcTermsGate> {
                   : Text(l10n.ugcTermsAgreeButton),
             ),
           ),
+          const SizedBox(height: SpotSpacing.md),
+          const _LegalLinksRow(),
           if (widget.secondaryActionLabel != null &&
               widget.onSecondaryAction != null) ...[
             const SizedBox(height: SpotSpacing.sm),
@@ -127,6 +150,64 @@ class _UgcTermsGateState extends State<UgcTermsGate> {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _LegalLinksRow extends StatelessWidget {
+  const _LegalLinksRow();
+
+  void _openTerms(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TermsOfUseScreen()),
+    );
+  }
+
+  void _openPrivacy(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: SpotSpacing.sm,
+      children: [
+        _LinkButton(
+          label: l10n.ugcTermsViewTerms,
+          onTap: () => _openTerms(context),
+        ),
+        Text('·', style: SpotType.bodySecondary),
+        _LinkButton(
+          label: l10n.ugcTermsViewPrivacy,
+          onTap: () => _openPrivacy(context),
+        ),
+      ],
+    );
+  }
+}
+
+class _LinkButton extends StatelessWidget {
+  const _LinkButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Text(
+        label,
+        style: SpotType.bodySecondary.copyWith(
+          decoration: TextDecoration.underline,
+        ),
       ),
     );
   }

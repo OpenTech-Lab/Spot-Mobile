@@ -10,17 +10,19 @@ import 'package:mobile/models/profile_model.dart';
 import 'package:mobile/models/wallet_model.dart';
 import 'package:mobile/screens/discover_screen.dart';
 
-Widget _localizedApp({required Widget home, List<NavigatorObserver>? navigatorObservers}) =>
-    MaterialApp(
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ],
-      supportedLocales: AppLocalizations.supportedLocales,
-      navigatorObservers: navigatorObservers ?? const [],
-      home: home,
-    );
+Widget _localizedApp({
+  required Widget home,
+  List<NavigatorObserver>? navigatorObservers,
+}) => MaterialApp(
+  localizationsDelegates: const [
+    AppLocalizations.delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ],
+  supportedLocales: AppLocalizations.supportedLocales,
+  navigatorObservers: navigatorObservers ?? const [],
+  home: home,
+);
 
 void main() {
   test('discoverFollowableTagForQuery normalizes hash-prefixed tags', () {
@@ -98,6 +100,18 @@ void main() {
     expect(visible.map((post) => post.id), ['other']);
   });
 
+  test('discover hides blocked-author root threads', () {
+    final visible = visibleDiscoverThreads(
+      [
+        _post(id: 'blocked', pubkey: 'blocked-user'),
+        _post(id: 'other', pubkey: 'other-user'),
+      ],
+      blockedAuthorPubkeys: const {'blocked-user'},
+    );
+
+    expect(visible.map((post) => post.id), ['other']);
+  });
+
   test(
     'discover keeps other-authored roots even when my reply matches query',
     () {
@@ -122,6 +136,33 @@ void main() {
       );
 
       expect(visible.map((post) => post.id), ['root']);
+    },
+  );
+
+  test(
+    'discover search ignores matches that come only from blocked replies',
+    () {
+      final root = _post(
+        id: 'root',
+        nostrEventId: 'root-event',
+        pubkey: 'other',
+        caption: 'Parent thread',
+      );
+      final blockedReply = _post(
+        id: 'reply',
+        nostrEventId: 'reply-event',
+        pubkey: 'blocked-user',
+        replyToId: 'root-event',
+        caption: 'Smoke nearby',
+      );
+
+      final visible = visibleDiscoverThreads(
+        [root, blockedReply],
+        query: 'smoke',
+        blockedAuthorPubkeys: const {'blocked-user'},
+      );
+
+      expect(visible, isEmpty);
     },
   );
 

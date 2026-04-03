@@ -15,6 +15,7 @@ import 'package:mobile/screens/post_composer_screen.dart';
 import 'package:mobile/screens/thread_screen.dart';
 import 'package:mobile/screens/user_profile_screen.dart';
 import 'package:mobile/services/app_data_reset_service.dart';
+import 'package:mobile/services/blocked_user_visibility.dart';
 import 'package:mobile/services/discover_feed_service.dart';
 import 'package:mobile/services/feed_scoring_service.dart';
 import 'package:mobile/services/follow_service.dart';
@@ -139,8 +140,13 @@ List<MediaPost> visibleDiscoverThreads(
   Iterable<MediaPost> posts, {
   String query = '',
   String? excludedAuthorPubkey,
+  Set<String> blockedAuthorPubkeys = const {},
 }) {
-  final roots = topLevelThreadPosts(posts)
+  final visiblePosts = filterPostsByBlockedAuthors(
+    posts,
+    blockedPubkeys: blockedAuthorPubkeys,
+  );
+  final roots = topLevelThreadPosts(visiblePosts)
       .where(
         (post) =>
             excludedAuthorPubkey == null || post.pubkey != excludedAuthorPubkey,
@@ -150,7 +156,7 @@ List<MediaPost> visibleDiscoverThreads(
   if (normalizedQuery.isEmpty) return roots;
 
   final entriesByRoot = <String, List<ThreadedPostEntry>>{};
-  for (final entry in buildThreadedPostEntries(posts)) {
+  for (final entry in buildThreadedPostEntries(visiblePosts)) {
     entriesByRoot
         .putIfAbsent(entry.rootId, () => <ThreadedPostEntry>[])
         .add(entry);
@@ -298,13 +304,16 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     if (!mounted) return;
     _followChangesSub = FollowService.instance.changes.listen((_) {
       if (!mounted) return;
+      final rebuilt = _rebuildVisiblePosts();
       setState(() {
+        _posts = rebuilt;
         _isFollowingSearchTag =
             _currentSearchTag != null &&
             FollowService.instance.isFollowingTag(_currentSearchTag!);
       });
     });
     setState(() {
+      _posts = _rebuildVisiblePosts();
       _isFollowingSearchTag =
           _currentSearchTag != null &&
           FollowService.instance.isFollowingTag(_currentSearchTag!);
@@ -417,12 +426,20 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     return posts.where((post) => !post.isPendingRetry).toList(growable: false);
   }
 
-  void _syncVisiblePosts() {
-    if (!mounted) return;
+  List<MediaPost> _rebuildVisiblePosts() {
     final rebuilt = reconcilePostsPreservingLocalState(_posts, [
       _remotePosts,
       _persistedPosts,
     ]);
+    return filterPostsByBlockedAuthors(
+      rebuilt,
+      blockedPubkeys: FollowService.instance.blocked.toSet(),
+    );
+  }
+
+  void _syncVisiblePosts() {
+    if (!mounted) return;
+    final rebuilt = _rebuildVisiblePosts();
     if (orderedPostsEqual(rebuilt, _posts)) return;
     setState(() => _posts = rebuilt);
   }
@@ -489,9 +506,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       );
       setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.reportedContentHidden)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.reportedContentHidden)));
       }
     } catch (_) {}
   }
@@ -686,6 +703,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       posts,
       query: _searchQuery,
       excludedAuthorPubkey: widget.wallet.publicKeyHex,
+      blockedAuthorPubkeys: FollowService.instance.blocked.toSet(),
     );
     if (_isLoading && roots.isEmpty) {
       return Center(
@@ -855,6 +873,7 @@ class _DiscoverSearchResultsScreenState
   late final EventRepository _repo;
   late final TabController _tabController;
   StreamSubscription<CivicEvent>? _sub;
+  StreamSubscription<void>? _followChangesSub;
   final TextEditingController _searchController = TextEditingController();
 
   List<MediaPost> _posts = [];
@@ -880,6 +899,7 @@ class _DiscoverSearchResultsScreenState
     _searchController.text = widget.initialQuery;
     _isLoadingProfiles = _usesTabbedLayout;
     _initFeed();
+    unawaited(_initFollowState());
     if (_usesTabbedLayout) {
       unawaited(_loadProfilesForQuery(_searchQuery));
     }
@@ -888,10 +908,49 @@ class _DiscoverSearchResultsScreenState
   @override
   void dispose() {
     _sub?.cancel();
+    _followChangesSub?.cancel();
     _searchController.dispose();
     _tabController.dispose();
     _repo.dispose();
     super.dispose();
+  }
+
+  Set<String> get _blockedPubkeys => FollowService.instance.blocked.toSet();
+
+  Future<void> _initFollowState() async {
+    await FollowService.instance.init();
+    if (!mounted) return;
+    _followChangesSub = FollowService.instance.changes.listen((_) {
+      if (!mounted) return;
+      setState(() {
+        _posts = filterPostsByBlockedAuthors(
+          _posts,
+          blockedPubkeys: _blockedPubkeys,
+        );
+        _profiles = _visibleProfiles(_profiles);
+      });
+    });
+    setState(() {
+      _posts = filterPostsByBlockedAuthors(
+        _posts,
+        blockedPubkeys: _blockedPubkeys,
+      );
+      _profiles = _visibleProfiles(_profiles);
+    });
+  }
+
+  List<ProfileModel> _visibleProfiles(Iterable<ProfileModel> profiles) {
+    return filterProfilesByBlockedPubkeys(
+          profiles,
+          blockedPubkeys: _blockedPubkeys,
+        )
+        .where((profile) {
+          final pubkey = profile.legacyPubkey?.trim();
+          return pubkey != null &&
+              pubkey.isNotEmpty &&
+              pubkey != widget.wallet.publicKeyHex;
+        })
+        .toList(growable: false);
   }
 
   Future<void> _initFeed() async {
@@ -928,16 +987,7 @@ class _DiscoverSearchResultsScreenState
           query != _searchQuery) {
         return;
       }
-      setState(() {
-        _profiles = profiles
-            .where((profile) {
-              final pubkey = profile.legacyPubkey?.trim();
-              return pubkey != null &&
-                  pubkey.isNotEmpty &&
-                  pubkey != widget.wallet.publicKeyHex;
-            })
-            .toList(growable: false);
-      });
+      setState(() => _profiles = _visibleProfiles(profiles));
     } catch (_) {
       if (!mounted ||
           requestId != _profileSearchRequestId ||
@@ -965,7 +1015,10 @@ class _DiscoverSearchResultsScreenState
   List<MediaPost> _mergePosts(
     List<MediaPost> current,
     Iterable<MediaPost> incoming,
-  ) => mergePostsPreservingLocalState(current, incoming);
+  ) => filterPostsByBlockedAuthors(
+    mergePostsPreservingLocalState(current, incoming),
+    blockedPubkeys: _blockedPubkeys,
+  );
 
   Future<void> _refresh() async {
     await _sub?.cancel();
@@ -1049,9 +1102,9 @@ class _DiscoverSearchResultsScreenState
       );
       setState(() => _posts = _posts.where((p) => p.id != post.id).toList());
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.reportedContentHidden)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.reportedContentHidden)));
       }
     } catch (_) {}
   }
@@ -1138,6 +1191,7 @@ class _DiscoverSearchResultsScreenState
       _posts,
       query: _searchQuery,
       excludedAuthorPubkey: widget.wallet.publicKeyHex,
+      blockedAuthorPubkeys: _blockedPubkeys,
     );
 
     if (_isLoadingPosts && roots.isEmpty) {

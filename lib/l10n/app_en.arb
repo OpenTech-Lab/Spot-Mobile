@@ -1,7 +1,7 @@
 {
   "@@locale": "en",
 
-  "appTitle": "Spot",
+  "appTitle": "#seen",
   "@appTitle": {},
 
   "cancelAction": "Cancel",
@@ -97,7 +97,7 @@
   "welcomeBullet2": "GPS-locked at the moment of capture",
   "@welcomeBullet2": {},
 
-  "welcomeBullet3": "Danger mode — blur faces in photos, hide location",
+  "welcomeBullet3": "Privacy mode — blur faces in photos, hide location",
   "@welcomeBullet3": {},
 
   "welcomeBullet4": "Peer-to-peer, no central servers",
@@ -192,7 +192,7 @@
   "notMyAccountButton": "This is not my account",
   "@notMyAccountButton": {},
 
-  "unlockCancelledError": "Unlock was cancelled or failed. Spot will stay locked until this device owner confirms access.",
+  "unlockCancelledError": "Unlock was cancelled or failed. #seen will stay locked until this device owner confirms access.",
   "@unlockCancelledError": {},
 
   "failedResetAccount": "Failed to reset the saved account: {error}",
@@ -219,6 +219,12 @@
 
   "settingsTooltip": "Settings",
   "@settingsTooltip": {},
+
+  "termsOfUseTitle": "Terms of Use",
+  "@termsOfUseTitle": {},
+
+  "privacyPolicyTitle": "Privacy Policy",
+  "@privacyPolicyTitle": {},
 
   "favoriteTopicsLabel": "Favorite Topics",
   "@favoriteTopicsLabel": {},
@@ -381,7 +387,7 @@
   "deleteAccountDialogTitle": "Delete this account?",
   "@deleteAccountDialogTitle": {},
 
-  "deleteAccountDialogContent": "This will permanently remove your Spot profile and posts from Supabase, then erase local app data from this device. This cannot be undone.",
+  "deleteAccountDialogContent": "This will permanently remove your #seen profile and posts from Supabase, then erase local app data from this device. This cannot be undone.",
   "@deleteAccountDialogContent": {},
 
   "failedDeleteAccount": "Failed to delete account: {error}",
@@ -736,7 +742,7 @@
   "participantsLabel": "Participants",
   "@participantsLabel": {},
 
-  "splashLoadingTitle": "Loading Spot",
+  "splashLoadingTitle": "Loading #seen",
   "@splashLoadingTitle": {},
 
   "splashLoadingSubtitle": "Fetching latest data and saving it locally…",
@@ -754,7 +760,7 @@
   "peerTransportSection": "Peer Transport",
   "@peerTransportSection": {},
 
-  "peerTransportDescription": "Control when Spot can share and fetch full images and videos over peer transport to avoid unexpected mobile-data use.",
+  "peerTransportDescription": "Control when #seen can share and fetch full images and videos over peer transport to avoid unexpected mobile-data use.",
   "@peerTransportDescription": {},
 
   "cdnAccelerationSection": "CDN Acceleration",
@@ -855,6 +861,21 @@
 
   "unblockUser": "Unblock user",
   "@unblockUser": {},
+
+  "blockedUsersTitle": "Blocked Users",
+  "@blockedUsersTitle": {},
+
+  "blockedUsersEmpty": "You haven't blocked anyone.",
+  "@blockedUsersEmpty": {},
+
+  "blockedUsersUnblockButton": "Unblock",
+  "@blockedUsersUnblockButton": {},
+
+  "blockedUsersUnblockConfirmTitle": "Unblock this user?",
+  "@blockedUsersUnblockConfirmTitle": {},
+
+  "blockedUsersUnblockConfirmBody": "They will be able to see your content and interact with you again.",
+  "@blockedUsersUnblockConfirmBody": {},
 
   "reportUser": "Report user",
   "@reportUser": {},
@@ -1105,7 +1126,7 @@
   "ugcTermsTitle": "Agree to the community terms",
   "@ugcTermsTitle": {},
 
-  "ugcTermsSubtitle": "Spot includes user-generated posts and profiles. You must agree to these terms before you can access community content.",
+  "ugcTermsSubtitle": "#seen includes user-generated posts and profiles. You must agree to these terms before you can access community content.",
   "@ugcTermsSubtitle": {},
 
   "ugcTermsSafetyHeading": "No tolerance for abusive behavior",
@@ -1120,14 +1141,20 @@
   "ugcTermsBulletReporting": "Use the report and block tools whenever you encounter unsafe content or abusive users.",
   "@ugcTermsBulletReporting": {},
 
-  "ugcTermsBulletEnforcement": "By continuing, you agree that abusive users and objectionable content are not allowed on Spot.",
+  "ugcTermsBulletEnforcement": "Violations may result in content removal, posting restrictions, or account suspension.",
   "@ugcTermsBulletEnforcement": {},
 
-  "ugcTermsAgreement": "I agree to the Spot Terms of Use and understand there is no tolerance for objectionable content or abusive users.",
+  "ugcTermsAgreement": "I agree to #seen's Terms of Use and Privacy Policy, and understand there is no tolerance for objectionable content or abusive users.",
   "@ugcTermsAgreement": {},
 
   "ugcTermsAgreeButton": "Agree and continue",
   "@ugcTermsAgreeButton": {},
+
+  "ugcTermsViewTerms": "Terms of Use",
+  "@ugcTermsViewTerms": {},
+
+  "ugcTermsViewPrivacy": "Privacy Policy",
+  "@ugcTermsViewPrivacy": {},
 
   "reportUserTitle": "Report this user",
   "@reportUserTitle": {},

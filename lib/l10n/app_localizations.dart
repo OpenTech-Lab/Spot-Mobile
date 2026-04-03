@@ -104,7 +104,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'Spot'**
+  /// **'#seen'**
   String get appTitle;
 
   /// No description provided for @cancelAction.
@@ -296,7 +296,7 @@ abstract class AppLocalizations {
   /// No description provided for @welcomeBullet3.
   ///
   /// In en, this message translates to:
-  /// **'Danger mode — blur faces in photos, hide location'**
+  /// **'Privacy mode — blur faces in photos, hide location'**
   String get welcomeBullet3;
 
   /// No description provided for @welcomeBullet4.
@@ -470,7 +470,7 @@ abstract class AppLocalizations {
   /// No description provided for @unlockCancelledError.
   ///
   /// In en, this message translates to:
-  /// **'Unlock was cancelled or failed. Spot will stay locked until this device owner confirms access.'**
+  /// **'Unlock was cancelled or failed. #seen will stay locked until this device owner confirms access.'**
   String get unlockCancelledError;
 
   /// No description provided for @failedResetAccount.
@@ -514,6 +514,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Settings'**
   String get settingsTooltip;
+
+  /// No description provided for @termsOfUseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms of Use'**
+  String get termsOfUseTitle;
+
+  /// No description provided for @privacyPolicyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy Policy'**
+  String get privacyPolicyTitle;
 
   /// No description provided for @favoriteTopicsLabel.
   ///
@@ -800,7 +812,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteAccountDialogContent.
   ///
   /// In en, this message translates to:
-  /// **'This will permanently remove your Spot profile and posts from Supabase, then erase local app data from this device. This cannot be undone.'**
+  /// **'This will permanently remove your #seen profile and posts from Supabase, then erase local app data from this device. This cannot be undone.'**
   String get deleteAccountDialogContent;
 
   /// No description provided for @failedDeleteAccount.
@@ -1418,7 +1430,7 @@ abstract class AppLocalizations {
   /// No description provided for @splashLoadingTitle.
   ///
   /// In en, this message translates to:
-  /// **'Loading Spot'**
+  /// **'Loading #seen'**
   String get splashLoadingTitle;
 
   /// No description provided for @splashLoadingSubtitle.
@@ -1454,7 +1466,7 @@ abstract class AppLocalizations {
   /// No description provided for @peerTransportDescription.
   ///
   /// In en, this message translates to:
-  /// **'Control when Spot can share and fetch full images and videos over peer transport to avoid unexpected mobile-data use.'**
+  /// **'Control when #seen can share and fetch full images and videos over peer transport to avoid unexpected mobile-data use.'**
   String get peerTransportDescription;
 
   /// No description provided for @cdnAccelerationSection.
@@ -1654,6 +1666,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unblock user'**
   String get unblockUser;
+
+  /// No description provided for @blockedUsersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked Users'**
+  String get blockedUsersTitle;
+
+  /// No description provided for @blockedUsersEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'You haven\'t blocked anyone.'**
+  String get blockedUsersEmpty;
+
+  /// No description provided for @blockedUsersUnblockButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Unblock'**
+  String get blockedUsersUnblockButton;
+
+  /// No description provided for @blockedUsersUnblockConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unblock this user?'**
+  String get blockedUsersUnblockConfirmTitle;
+
+  /// No description provided for @blockedUsersUnblockConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'They will be able to see your content and interact with you again.'**
+  String get blockedUsersUnblockConfirmBody;
 
   /// No description provided for @reportUser.
   ///
@@ -2066,7 +2108,7 @@ abstract class AppLocalizations {
   /// No description provided for @ugcTermsSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Spot includes user-generated posts and profiles. You must agree to these terms before you can access community content.'**
+  /// **'#seen includes user-generated posts and profiles. You must agree to these terms before you can access community content.'**
   String get ugcTermsSubtitle;
 
   /// No description provided for @ugcTermsSafetyHeading.
@@ -2096,13 +2138,13 @@ abstract class AppLocalizations {
   /// No description provided for @ugcTermsBulletEnforcement.
   ///
   /// In en, this message translates to:
-  /// **'By continuing, you agree that abusive users and objectionable content are not allowed on Spot.'**
+  /// **'Violations may result in content removal, posting restrictions, or account suspension.'**
   String get ugcTermsBulletEnforcement;
 
   /// No description provided for @ugcTermsAgreement.
   ///
   /// In en, this message translates to:
-  /// **'I agree to the Spot Terms of Use and understand there is no tolerance for objectionable content or abusive users.'**
+  /// **'I agree to #seen\'s Terms of Use and Privacy Policy, and understand there is no tolerance for objectionable content or abusive users.'**
   String get ugcTermsAgreement;
 
   /// No description provided for @ugcTermsAgreeButton.
@@ -2110,6 +2152,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Agree and continue'**
   String get ugcTermsAgreeButton;
+
+  /// No description provided for @ugcTermsViewTerms.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms of Use'**
+  String get ugcTermsViewTerms;
+
+  /// No description provided for @ugcTermsViewPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy Policy'**
+  String get ugcTermsViewPrivacy;
 
   /// No description provided for @reportUserTitle.
   ///

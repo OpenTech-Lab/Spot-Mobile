@@ -9,7 +9,7 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Spot';
+  String get appTitle => '#seen';
 
   @override
   String get cancelAction => 'Cancel';
@@ -106,7 +106,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get welcomeBullet3 =>
-      'Danger mode — blur faces in photos, hide location';
+      'Privacy mode — blur faces in photos, hide location';
 
   @override
   String get welcomeBullet4 => 'Peer-to-peer, no central servers';
@@ -202,7 +202,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get unlockCancelledError =>
-      'Unlock was cancelled or failed. Spot will stay locked until this device owner confirms access.';
+      'Unlock was cancelled or failed. #seen will stay locked until this device owner confirms access.';
 
   @override
   String failedResetAccount(String error) {
@@ -229,6 +229,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsTooltip => 'Settings';
+
+  @override
+  String get termsOfUseTitle => 'Terms of Use';
+
+  @override
+  String get privacyPolicyTitle => 'Privacy Policy';
 
   @override
   String get favoriteTopicsLabel => 'Favorite Topics';
@@ -393,7 +399,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deleteAccountDialogContent =>
-      'This will permanently remove your Spot profile and posts from Supabase, then erase local app data from this device. This cannot be undone.';
+      'This will permanently remove your #seen profile and posts from Supabase, then erase local app data from this device. This cannot be undone.';
 
   @override
   String failedDeleteAccount(String error) {
@@ -735,7 +741,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get participantsLabel => 'Participants';
 
   @override
-  String get splashLoadingTitle => 'Loading Spot';
+  String get splashLoadingTitle => 'Loading #seen';
 
   @override
   String get splashLoadingSubtitle =>
@@ -756,7 +762,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get peerTransportDescription =>
-      'Control when Spot can share and fetch full images and videos over peer transport to avoid unexpected mobile-data use.';
+      'Control when #seen can share and fetch full images and videos over peer transport to avoid unexpected mobile-data use.';
 
   @override
   String get cdnAccelerationSection => 'CDN Acceleration';
@@ -862,6 +868,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get unblockUser => 'Unblock user';
+
+  @override
+  String get blockedUsersTitle => 'Blocked Users';
+
+  @override
+  String get blockedUsersEmpty => 'You haven\'t blocked anyone.';
+
+  @override
+  String get blockedUsersUnblockButton => 'Unblock';
+
+  @override
+  String get blockedUsersUnblockConfirmTitle => 'Unblock this user?';
+
+  @override
+  String get blockedUsersUnblockConfirmBody =>
+      'They will be able to see your content and interact with you again.';
 
   @override
   String get reportUser => 'Report user';
@@ -1109,7 +1131,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ugcTermsSubtitle =>
-      'Spot includes user-generated posts and profiles. You must agree to these terms before you can access community content.';
+      '#seen includes user-generated posts and profiles. You must agree to these terms before you can access community content.';
 
   @override
   String get ugcTermsSafetyHeading => 'No tolerance for abusive behavior';
@@ -1128,14 +1150,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ugcTermsBulletEnforcement =>
-      'By continuing, you agree that abusive users and objectionable content are not allowed on Spot.';
+      'Violations may result in content removal, posting restrictions, or account suspension.';
 
   @override
   String get ugcTermsAgreement =>
-      'I agree to the Spot Terms of Use and understand there is no tolerance for objectionable content or abusive users.';
+      'I agree to #seen\'s Terms of Use and Privacy Policy, and understand there is no tolerance for objectionable content or abusive users.';
 
   @override
   String get ugcTermsAgreeButton => 'Agree and continue';
+
+  @override
+  String get ugcTermsViewTerms => 'Terms of Use';
+
+  @override
+  String get ugcTermsViewPrivacy => 'Privacy Policy';
 
   @override
   String get reportUserTitle => 'Report this user';

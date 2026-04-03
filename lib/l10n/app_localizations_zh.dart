@@ -9,7 +9,7 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get appTitle => 'Spot';
+  String get appTitle => '#seen';
 
   @override
   String get cancelAction => '取消';
@@ -105,7 +105,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get welcomeBullet2 => '拍攝時GPS鎖定';
 
   @override
-  String get welcomeBullet3 => '危險模式 — 模糊照片中的臉孔、隱藏位置';
+  String get welcomeBullet3 => '隱私模式 — 模糊照片中的臉孔、隱藏位置';
 
   @override
   String get welcomeBullet4 => '點對點，無中央伺服器';
@@ -222,6 +222,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsTooltip => '設定';
+
+  @override
+  String get termsOfUseTitle => '使用條款';
+
+  @override
+  String get privacyPolicyTitle => '隱私權政策';
 
   @override
   String get favoriteTopicsLabel => '最愛主題';
@@ -832,6 +838,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get unblockUser => '解除封鎖';
 
   @override
+  String get blockedUsersTitle => '已封鎖的用戶';
+
+  @override
+  String get blockedUsersEmpty => '您尚未封鎖任何人。';
+
+  @override
+  String get blockedUsersUnblockButton => '解除封鎖';
+
+  @override
+  String get blockedUsersUnblockConfirmTitle => '解除封鎖此用戶？';
+
+  @override
+  String get blockedUsersUnblockConfirmBody => '他們將能夠查看您的內容並再次與您互動。';
+
+  @override
   String get reportUser => '檢舉用戶';
 
   @override
@@ -1066,7 +1087,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ugcTermsTitle => '同意社群使用條款';
 
   @override
-  String get ugcTermsSubtitle => 'Spot 含有使用者產生的貼文與個人檔案。您必須先同意這些條款，才能存取社群內容。';
+  String get ugcTermsSubtitle => '#seen 含有使用者產生的貼文與個人檔案。您必須先同意這些條款，才能存取社群內容。';
 
   @override
   String get ugcTermsSafetyHeading => '對不當內容與濫用行為零容忍';
@@ -1081,14 +1102,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ugcTermsBulletReporting => '當您遇到不安全內容或濫用使用者時，請使用檢舉與封鎖工具。';
 
   @override
-  String get ugcTermsBulletEnforcement => '繼續使用即表示您同意 Spot 不允許濫用使用者與令人反感的內容。';
+  String get ugcTermsBulletEnforcement => '違規行為可能導致內容刪除、發文限制或帳號停用。';
 
   @override
   String get ugcTermsAgreement =>
-      '我同意 Spot 使用條款，並了解 Spot 對令人反感的內容或濫用使用者採取零容忍政策。';
+      '我同意 #seen 的使用條款與隱私權政策，並了解 #seen 對令人反感的內容或濫用使用者採取零容忍政策。';
 
   @override
   String get ugcTermsAgreeButton => '同意並繼續';
+
+  @override
+  String get ugcTermsViewTerms => '使用條款';
+
+  @override
+  String get ugcTermsViewPrivacy => '隱私權政策';
 
   @override
   String get reportUserTitle => '檢舉此使用者';
@@ -1135,7 +1162,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   AppLocalizationsZhTw() : super('zh_TW');
 
   @override
-  String get appTitle => 'Spot';
+  String get appTitle => '#seen';
 
   @override
   String get cancelAction => '取消';
@@ -1231,7 +1258,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get welcomeBullet2 => '拍攝時GPS鎖定';
 
   @override
-  String get welcomeBullet3 => '危險模式 — 模糊照片中的臉孔、隱藏位置';
+  String get welcomeBullet3 => '隱私模式 — 模糊照片中的臉孔、隱藏位置';
 
   @override
   String get welcomeBullet4 => '點對點，無中央伺服器';
@@ -1348,6 +1375,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsTooltip => '設定';
+
+  @override
+  String get termsOfUseTitle => '使用條款';
+
+  @override
+  String get privacyPolicyTitle => '隱私權政策';
 
   @override
   String get favoriteTopicsLabel => '最愛主題';
@@ -1958,6 +1991,21 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get unblockUser => '解除封鎖';
 
   @override
+  String get blockedUsersTitle => '已封鎖的用戶';
+
+  @override
+  String get blockedUsersEmpty => '您尚未封鎖任何人。';
+
+  @override
+  String get blockedUsersUnblockButton => '解除封鎖';
+
+  @override
+  String get blockedUsersUnblockConfirmTitle => '解除封鎖此用戶？';
+
+  @override
+  String get blockedUsersUnblockConfirmBody => '他們將能夠查看您的內容並再次與您互動。';
+
+  @override
   String get reportUser => '檢舉用戶';
 
   @override
@@ -2192,7 +2240,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get ugcTermsTitle => '同意社群使用條款';
 
   @override
-  String get ugcTermsSubtitle => 'Spot 含有使用者產生的貼文與個人檔案。您必須先同意這些條款，才能存取社群內容。';
+  String get ugcTermsSubtitle => '#seen 含有使用者產生的貼文與個人檔案。您必須先同意這些條款，才能存取社群內容。';
 
   @override
   String get ugcTermsSafetyHeading => '對不當內容與濫用行為零容忍';
@@ -2207,14 +2255,20 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get ugcTermsBulletReporting => '當您遇到不安全內容或濫用使用者時，請使用檢舉與封鎖工具。';
 
   @override
-  String get ugcTermsBulletEnforcement => '繼續使用即表示您同意 Spot 不允許濫用使用者與令人反感的內容。';
+  String get ugcTermsBulletEnforcement => '違規行為可能導致內容刪除、發文限制或帳號停用。';
 
   @override
   String get ugcTermsAgreement =>
-      '我同意 Spot 使用條款，並了解 Spot 對令人反感的內容或濫用使用者採取零容忍政策。';
+      '我同意 #seen 的使用條款與隱私權政策，並了解 #seen 對令人反感的內容或濫用使用者採取零容忍政策。';
 
   @override
   String get ugcTermsAgreeButton => '同意並繼續';
+
+  @override
+  String get ugcTermsViewTerms => '使用條款';
+
+  @override
+  String get ugcTermsViewPrivacy => '隱私權政策';
 
   @override
   String get reportUserTitle => '檢舉此使用者';
