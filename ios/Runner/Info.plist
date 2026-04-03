@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Spot</string>
+	<string>#seen</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Spot</string>
+	<string>#seen</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -27,15 +27,15 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Spot needs camera access to record geo-tagged photos and videos for citizen reporting.</string>
+	<string>#seen needs camera access to record geo-tagged photos and videos for citizen reporting.</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Spot uses Face ID or your device passcode to unlock a saved account on this device.</string>
+	<string>#seen uses Face ID or your device passcode to unlock a saved account on this device.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Spot needs microphone access to record audio with your videos.</string>
+	<string>#seen needs microphone access to record audio with your videos.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Spot uses your location to geo-tag media and group posts into local events.</string>
+	<string>#seen uses your location to geo-tag media and group posts into local events.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Spot needs photo library access to save and share captured media.</string>
+	<string>#seen needs photo library access to save and share captured media.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

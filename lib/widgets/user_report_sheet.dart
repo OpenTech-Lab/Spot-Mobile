@@ -97,8 +97,16 @@ class _UserReportSheetState extends State<UserReportSheet> {
                   .map((reason) {
                     final selected = reason == _selectedReason;
                     return ChoiceChip(
-                      label: Text(_labelForReason(l10n, reason)),
+                      label: Text(
+                        _labelForReason(l10n, reason),
+                        style: SpotType.caption.copyWith(
+                          color: selected
+                              ? SpotColors.onAccent
+                              : SpotColors.textSecondary,
+                        ),
+                      ),
                       selected: selected,
+                      selectedColor: SpotColors.accent,
                       onSelected: _isSubmitting
                           ? null
                           : (_) => setState(() => _selectedReason = reason),
